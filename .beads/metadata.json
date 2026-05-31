@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "stepvine",
+  "project_id": "4a81b815-5245-4900-9662-cb9c17912ea6"
+}
