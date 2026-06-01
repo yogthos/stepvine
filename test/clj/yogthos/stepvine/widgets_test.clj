@@ -520,3 +520,55 @@
   (is (str/includes?
        (hiccup->html (render-widget-hiccup [:stepvine.components/v-box {} [:span "x"]]))
        "v-box")))
+
+;; --- re-com parity: array-bound selection widgets --------------------------
+
+(def ^:private array-ctx
+  (assoc base-ctx
+         :values     {:skills ["clj"] :tags []}
+         :field-opts {:skills {:type :array} :tags {:type :array}}))
+
+(deftest selection-list-checks-current-and-binds-reactively
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/selection-list
+                {:id :skills :label "Skills"
+                 :options [["Clojure" "clj"] ["Rust" "rust"]]}]
+               array-ctx))]
+    (is (str/includes? html "role=\"listbox\""))
+    ;; reactive selected-state (signals-only broadcast → must be a binding)
+    (is (str/includes? html "data-attr:checked"))
+    (is (str/includes? html "includes("))
+    ;; SSR initial state: clj checked, rust not
+    (is (re-find #"checked=\"checked\"[^>]*clj|clj[^>]*checked" html))
+    (is (str/includes? html "/doc/test-doc/field/skills"))))
+
+(deftest multi-select-renders-both-columns-with-data-show
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/multi-select
+                {:id :skills :label "Pick"
+                 :options [["Clojure" "clj"] ["Rust" "rust"]]}]
+               array-ctx))]
+    (is (str/includes? html "Available"))
+    (is (str/includes? html "Selected"))
+    (is (str/includes? html "data-show"))
+    ;; an item appears in BOTH columns (4 buttons for 2 options)
+    (is (= 4 (count (re-seq #"multi-select-item" html))))
+    ;; SSR: selected clj hidden in Available column, unselected rust hidden in Selected
+    (is (str/includes? html "hidden=\"hidden\""))))
+
+(deftest tree-select-nests-branches-and-leaves
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/tree-select
+                {:id :tags :label "Tags"
+                 :nodes [{:label "Lang" :open? true
+                          :children [{:label "Clojure" :value "clj"}
+                                     {:label "Rust" :value "rust"}]}]}]
+               array-ctx))]
+    (is (str/includes? html "<details open=\"open\""))
+    (is (str/includes? html "<summary>Lang</summary>"))
+    (is (str/includes? html "tree-leaf"))
+    (is (str/includes? html "data-attr:checked"))
+    (is (str/includes? html "/doc/test-doc/field/tags"))))

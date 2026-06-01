@@ -18,8 +18,15 @@
         bool? (into #{} (keep (fn [[id opts]] (when (= :boolean (:type opts))
                                                 (render/signal-name id)))
                               (:field-opts ctx)))
+        ;; :array fields (multi-select / selection-list / tree-select) seed as an
+        ;; empty JSON array so membership tests like ($sig).includes(v) are valid
+        ;; before any selection (a "" seed would be a string, not an array).
+        array? (into #{} (keep (fn [[id opts]] (when (= :array (:type opts))
+                                                 (render/signal-name id)))
+                               (:field-opts ctx)))
         seed (into {} (map (fn [[k v]] [k (cond (some? v)  v
                                                 (bool? k)  false
+                                                (array? k) []
                                                 :else      "")]))
                    (merge (render/signal-map ctx) {"uid" uid "presence" 1 "locks" {}}))]
     ;; Rendered as a <div>, not a <form>: there is no submit (inputs POST via

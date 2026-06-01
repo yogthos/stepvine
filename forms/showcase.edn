@@ -24,6 +24,8 @@
    [:secret    {:id :secret    :type :string}]
    [:progress  {:id :progress  :type :number}]
    [:tab       {:id :tab       :type :string}]
+   [:skills    {:id :skills    :type :array}]
+   [:topics    {:id :topics    :type :array}]
    [:people
     {:id :people :collection? true :index-id :pid
      :schema {:model [[:pid   {:id :pid}]
@@ -67,6 +69,7 @@
        [:li [:a {:href "#sec-text"}     "Text & input"]]
        [:li [:a {:href "#sec-choices"}  "Choices"]]
        [:li [:a {:href "#sec-ranges"}   "Ranges & dates"]]
+       [:li [:a {:href "#sec-multi"}    "Multi-selection"]]
        [:li [:a {:href "#sec-display"}  "Display & reactivity"]]
        [:li [:a {:href "#sec-nav"}      "Tabs & layout"]]
        [:li [:a {:href "#sec-feedback"} "Feedback"]]
@@ -113,6 +116,24 @@
         [:c/slider {:id :rating :label "Rating" :min 0 :max 10 :step 1}]
         [:c/date-picker {:id :birthday :label "Birthday"}]
         [:c/input-time {:id :meeting :label "Meeting time"}]]]
+
+      [:section#sec-multi.sv-panel
+       [:h2 "Multi-selection" [:span.sv-kw ":selection-list  :multi-select  :tree-select"]]
+       [:p.sv-desc "Array-bound controls. Selected state is reactive over the signal, so picks sync across viewers with no re-render."]
+       [:div.sv-demo
+        [:c/selection-list {:id :skills :label "Skills"
+                            :options [["Clojure" "clj"] ["Rust" "rust"]
+                                      ["Python" "py"] ["TypeScript" "ts"]]}]
+        [:c/multi-select {:id :skills :label "Pick skills"
+                          :options [["Clojure" "clj"] ["Rust" "rust"]
+                                    ["Python" "py"] ["TypeScript" "ts"]]}]
+        [:c/tree-select {:id :topics :label "Topics"
+                         :nodes [{:label "Backend" :open? true
+                                  :children [{:label "Databases" :value "db"}
+                                             {:label "Caching" :value "cache"}]}
+                                 {:label "Frontend"
+                                  :children [{:label "Reactivity" :value "rx"}
+                                             {:label "Styling" :value "css"}]}]}]]]
 
       [:section#sec-display.sv-panel
        [:h2 "Display & reactivity" [:span.sv-kw ":label  :value  :show  :alert"]]

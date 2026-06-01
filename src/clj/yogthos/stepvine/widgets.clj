@@ -26,6 +26,9 @@
    yogthos.stepvine.widgets.selection.checkbox
    yogthos.stepvine.widgets.selection.checkbox-enabled
    yogthos.stepvine.widgets.selection.selections
+   yogthos.stepvine.widgets.selection.selection-list
+   yogthos.stepvine.widgets.selection.multi-select
+   yogthos.stepvine.widgets.selection.tree-select
    yogthos.stepvine.widgets.selection.menu
    yogthos.stepvine.widgets.selection.typeahead
    ;; navigation
