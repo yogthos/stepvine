@@ -15,7 +15,8 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [integrant.core :as ig]))
+   [integrant.core :as ig]
+   [yogthos.stepvine.versions :as versions]))
 
 (defn- edn-file? [^java.io.File f]
   (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
@@ -42,7 +43,9 @@
 ;; --- Store API ------------------------------------------------------------
 
 (defn get-form
-  "Look up a loaded form by id (keyword or string). Returns the raw form or nil."
+  "Look up the current *authoring* (working) form by id (keyword or string).
+   Returns the raw form or nil. Used for previews/builder + new-document listing;
+   loaded documents resolve their pinned version via `get-form-version`."
   [store id]
   (get @(:forms store) (keyword id)))
 
@@ -51,16 +54,45 @@
   [store]
   (keys @(:forms store)))
 
+;; --- Versioning (§15.1) ---------------------------------------------------
+
+(defn latest-published
+  "The highest published (non-draft) version number for a form, from the archive,
+   falling back to the authoring form's declared `:version` when no archive entry
+   exists (e.g. legacy/test stores)."
+  [store id]
+  (or (when-let [a (:versions store)] (versions/latest-version a (keyword id)))
+      (:version (get-form store id) 1)))
+
+(defn version-digest
+  "The content digest of a published `[id version]`, or nil."
+  [store id v]
+  (when-let [a (:versions store)]
+    (:digest (get @a [(keyword id) v]))))
+
+(defn get-form-version
+  "Resolve the exact archived form for a pinned `[id version]`. Falls back to the
+   current authoring form when the archive has no such entry (legacy documents or
+   archive-less test stores)."
+  [store id v]
+  (or (when-let [a (:versions store)] (versions/get-version a (keyword id) v))
+      (get-form store id)))
+
 (defn save-form!
-  "Persist a form to disk and update the in-memory store."
+  "Persist a form to disk, update the in-memory working copy, and publish the
+   version into the immutable archive."
   [store form]
   (let [id (:id form)]
     (spit (io/file (:dir store) (str (name id) ".edn")) (pr-str form))
     (swap! (:forms store) assoc id form)
+    (when-let [a (:versions store)] (versions/publish! a form))
     id))
 
 (defmethod ig/init-key :store/forms
-  [_ {:keys [dir]}]
-  (let [loaded (load-dir dir)]
-    (log/info "loaded forms from" dir ":" (vec (keys loaded)))
-    {:dir dir :forms (atom loaded)}))
+  [_ {:keys [dir versions-file]}]
+  (let [loaded  (load-dir dir)
+        archive (versions/init-archive versions-file)]
+    (versions/publish-all! archive (vals loaded))
+    (log/info "loaded forms from" dir ":" (vec (keys loaded))
+              "— archived versions for" (count loaded) "forms")
+    {:dir dir :forms (atom loaded) :versions archive}))

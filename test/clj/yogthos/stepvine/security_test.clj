@@ -7,7 +7,7 @@
 
 (deftest document-access-control
   (let [store (atom {})
-        d     (documents/create! store :bmi "owner1")]
+        d     (documents/create! store :bmi {:created-by "owner1"})]
     (testing "owner can access; others cannot until shared"
       (is (documents/can-access? d "owner1"))
       (is (not (documents/can-access? d "friend")))
@@ -22,7 +22,7 @@
 
 (deftest wrap-doc-access-enforces-acl
   (let [store (atom {})
-        d     (documents/create! store :bmi "u1")
+        d     (documents/create! store :bmi {:created-by "u1"})
         _     (documents/share! store (:id d) "u2")
         ok    (constantly {:status 200 :body "ok"})
         h     ((security/wrap-doc-access store) ok)

@@ -55,7 +55,12 @@
  ;; Form definitions live on disk as one EDN file per form; the store scans this
  ;; directory at startup (v1 'database' for forms).
  :store/forms
- {:dir #or [#env FORMS_DIR "forms"]}
+ {:dir           #or [#env FORMS_DIR "forms"]
+  ;; immutable version archive (§15.1); duratom in dev/prod so pins survive
+  ;; restarts, in-memory for tests
+  :versions-file #profile {:dev  "data/form-versions.edn"
+                           :test nil
+                           :prod #or [#env FORM_VERSIONS_FILE "data/form-versions.edn"]}}
 
  ;; DB-sourced dropdown options live on disk, one EDN file per source
  :store/options

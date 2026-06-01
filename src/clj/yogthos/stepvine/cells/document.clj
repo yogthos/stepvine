@@ -17,7 +17,6 @@
    [yogthos.stepvine.exports :as exports]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.hub :as hub]
-   [yogthos.stepvine.migrations :as migrations]
    [yogthos.stepvine.options :as options]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
@@ -105,10 +104,13 @@
   {:requires [:documents :forms]
    :input    {:form-id :any :user-id :any}
    :output   {:status :int :headers :any :body :string}
-   :doc      "Create a document (recording creator + form version) and redirect."}
+   :doc      "Create a document, pinning the latest published form version + digest."}
   (fn [{:keys [documents forms]} {:keys [form-id user-id]}]
-    (let [version (migrations/current-version (forms/get-form forms form-id))
-          doc     (documents/create! documents form-id user-id version)]
+    (let [version (forms/latest-published forms form-id)
+          doc     (documents/create! documents form-id
+                                     {:created-by   user-id
+                                      :form-version version
+                                      :form-digest  (forms/version-digest forms form-id version)})]
       {:status 303 :headers {"Location" (str "/doc/" (:id doc))} :body ""})))
 
 ;; --- GET /doc/:id (render an instance) ------------------------------------

@@ -27,27 +27,45 @@
 
 (defn create!
   "Create a new empty document instance for a form, persist it, return the record.
-   The creator (`created-by`) is the owner; `:shared` holds other user ids who
-   may access it; `:form-version` records the form revision it was created against."
-  ([store form-id] (create! store form-id nil 1))
-  ([store form-id created-by] (create! store form-id created-by 1))
-  ([store form-id created-by form-version]
-   (let [doc {:id           (str (UUID/randomUUID))
+   Pins the exact `[:form-version :form-digest]` it is created against (§15.2). The
+   creator owns it; `:shared` holds other user ids who may access it. The record
+   carries lifecycle state (`:status`), an optimistic-concurrency `:rev`, and a
+   `:meta` map of system fields clients can never write directly."
+  ([store form-id] (create! store form-id {}))
+  ([store form-id {:keys [created-by form-version form-digest]}]
+   (let [now (System/currentTimeMillis)
+         doc {:id           (str (UUID/randomUUID))
               :form-id      (keyword form-id)
-              :form-version form-version
-              :created-by   created-by
+              :form-version (or form-version 1)
+              :form-digest  form-digest
+              :created-by   created-by         ; retained for existing ACL checks
+              :owner        created-by
               :shared       #{}
+              :status       :in-progress
               :db           {}
-              :created-at   (System/currentTimeMillis)}]
+              :rev          0
+              :meta         {:created-at  now :created-by  created-by
+                             :modified-at now :modified-by created-by
+                             :submitted-views #{} :approvals [] :deleted? false}
+              :created-at   now}]
      (swap! store assoc (:id doc) doc)
      doc)))
 
 (defn save-migration!
-  "Persist a migrated db and bumped form-version for a document."
-  [store id db form-version]
+  "Persist a rebased db, bumped form-version and new digest for a document (§15.1
+   opt-in rebase). Snapshots the pre-rebase db under `:meta :pre-rebase`."
+  [store id db form-version form-digest]
   (swap! store (fn [m]
                  (cond-> m
-                   (contains? m id) (update id assoc :db db :form-version form-version)))))
+                   (contains? m id)
+                   (update id (fn [doc]
+                                (-> doc
+                                    (assoc-in [:meta :pre-rebase]
+                                              {:version (:form-version doc)
+                                               :db (:db doc)})
+                                    (assoc :db db
+                                           :form-version form-version
+                                           :form-digest form-digest))))))))
 
 ;; --- Access control -------------------------------------------------------
 
@@ -71,9 +89,18 @@
   (swap! store update-in [id :shared] (fnil conj #{}) user-id))
 
 (defn save-db!
-  "Persist the latest domino db for a document (no-op if it doesn't exist)."
+  "Persist the latest domino db for a document and bump its optimistic-concurrency
+   `:rev` + `:meta :modified-at` (no-op if it doesn't exist)."
   [store id db]
-  (swap! store (fn [m] (cond-> m (contains? m id) (assoc-in [id :db] db)))))
+  (swap! store (fn [m]
+                 (cond-> m
+                   (contains? m id)
+                   (update id (fn [doc]
+                                (-> doc
+                                    (assoc :db db)
+                                    (update :rev (fnil inc 0))
+                                    (assoc-in [:meta :modified-at]
+                                              (System/currentTimeMillis)))))))))
 
 (defn delete!
   [store id]

@@ -451,10 +451,15 @@ Phases 7–11 are specified in detail in **§15 (Reference-Guided Implementation
 Roadmap)**, derived from a study of two sibling Clojure systems — a form/document
 engine and a workflow-orchestration layer. Headlines:
 
-**Phase 7 — Versioning & document store schema.** Strong version pinning
-(documents freeze their exact form version at creation), enforced immutability of
-published versions, and a concrete target document record behind the store
-abstraction (§15.1–15.2).
+**Phase 7 — Versioning & document store schema. ✅ done.** Immutable form-version
+archive (`yogthos.stepvine.versions`) with content digests and sealed superseded
+versions; `:store/forms` publishes every authoring form on boot. Documents pin
+their exact `[:form-version :form-digest]` at creation; `docs/ensure!` loads that
+frozen version (no auto-migration), and `docs/rebase!` is the opt-in forward path
+(snapshotting the pre-rebase db). The document record now carries `:status`,
+`:owner`, `:rev` (optimistic-concurrency token) and a system `:meta` map
+(§15.1–15.2). *Deferred to Phase 8:* using `:rev` to reject stale writes, the
+`:meta` write allowlist, and a drafts authoring flow.
 
 **Phase 8 — Lifecycle, audit & submission.** Declared state machine on the form,
 durable append-only audit log with before/after diffs, per-view submission +

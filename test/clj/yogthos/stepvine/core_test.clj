@@ -49,7 +49,7 @@
   (let [docs  (:store/documents (system-state))
         users (:store/users (system-state))
         admin (users/find-by-username users "admin")
-        doc   (documents/create! docs :bmi (:id admin))
+        doc   (documents/create! docs :bmi {:created-by (:id admin)})
         ctx   (p/request (login) (str "/doc/" (:id doc)) :request-method :get)]
     (is (= 200 (status ctx)))
     (is (str/includes? (body ctx) "BMI Calculator"))
@@ -60,6 +60,6 @@
   (let [docs  (:store/documents (system-state))
         bob   (users/create! (:store/users (system-state))
                              {:username (str "bob-" (System/nanoTime)) :password "x"})
-        doc   (documents/create! docs :bmi (:id bob))         ; owned by bob, not admin
+        doc   (documents/create! docs :bmi {:created-by (:id bob)})         ; owned by bob, not admin
         ctx   (p/request (login) (str "/doc/" (:id doc)) :request-method :get)]
     (is (= 403 (status ctx)))))
