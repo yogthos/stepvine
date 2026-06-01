@@ -372,7 +372,13 @@
     (is (str/includes? html "calendarjs"))
     (is (str/includes? html "lemonade"))
     (is (str/includes? html "Appointments"))
-    (is (str/includes? html "calendar-canvas"))))
+    (is (str/includes? html "calendar-canvas"))
+    ;; reactive read bridge over the <id>_events signal (no DS global)
+    (is (str/includes? html "data-attr:data-events"))
+    ;; write-back: onupdate persists to the <id>-events field endpoint like @post
+    (is (str/includes? html "/doc/test-doc/field/my-field-events"))
+    (is (str/includes? html "SIG='my_field_events'"))
+    (is (str/includes? html "datastar-request"))))
 
 ;; --- Table DnD and customization --------------------------------------------
 

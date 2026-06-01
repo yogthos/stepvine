@@ -26,6 +26,7 @@
    [:tab       {:id :tab       :type :string}]
    [:skills    {:id :skills    :type :array}]
    [:topics    {:id :topics    :type :array}]
+   [:cal-events {:id :cal-events :type :string}]
    [:people
     {:id :people :collection? true :index-id :pid
      :schema {:model [[:pid   {:id :pid}]
