@@ -10,6 +10,7 @@
    [yogthos.stepvine.web.handler]
 
     ;; Form-document engine
+   [yogthos.stepvine.partials]
    [yogthos.stepvine.forms]
    [yogthos.stepvine.documents]
    [yogthos.stepvine.audit]

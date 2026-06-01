@@ -1,0 +1,5 @@
+;; A reusable definition partial (§15.9). Forms include it with
+;; {:include :contact-note}; it is spliced in when the form is served, so a fix
+;; here reaches every form that includes it.
+{:id :contact-note
+ :partial [:c/paragraph {:text "Tip: this note is a reusable partial — defined once in partials/, spliced into any form that includes it."}]}

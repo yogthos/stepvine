@@ -55,8 +55,13 @@
  ;; --- Form-document engine -------------------------------------------------
  ;; Form definitions live on disk as one EDN file per form; the store scans this
  ;; directory at startup (v1 'database' for forms).
+ ;; Reusable definition partials, spliced into forms at serve time (§15.9)
+ :store/partials
+ {:dir #or [#env PARTIALS_DIR "partials"]}
+
  :store/forms
- {:dir           #or [#env FORMS_DIR "forms"]
+ {:partials      #ig/ref :store/partials
+  :dir           #or [#env FORMS_DIR "forms"]
   ;; immutable version archive (§15.1); duratom in dev/prod so pins survive
   ;; restarts, in-memory for tests
   :versions-file #profile {:dev  "data/form-versions.edn"

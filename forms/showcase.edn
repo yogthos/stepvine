@@ -232,6 +232,7 @@
         [:pre {:id "export-result"}]
         [:c/h-box {:gap :sm :align :center}
          [:c/submit {:view :default :label "Submit document"}]
-         [:c/revise {:view :default :label "Revise"}]]]]
+         [:c/revise {:view :default :label "Revise"}]]
+        {:include :contact-note}]]
 
       [:p.sv-presence "Editors online: " [:span {:data-text "$presence"}]]]]]}}}

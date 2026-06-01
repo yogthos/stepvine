@@ -16,6 +16,7 @@
    [clojure.string :as str]
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
+   [yogthos.stepvine.partials :as partials]
    [yogthos.stepvine.versions :as versions]))
 
 (defn- edn-file? [^java.io.File f]
@@ -43,11 +44,13 @@
 ;; --- Store API ------------------------------------------------------------
 
 (defn get-form
-  "Look up the current *authoring* (working) form by id (keyword or string).
-   Returns the raw form or nil. Used for previews/builder + new-document listing;
-   loaded documents resolve their pinned version via `get-form-version`."
+  "Look up the current *authoring* (working) form by id (keyword or string), with
+   any `{:include ..}` partials spliced (§15.9). Used for previews/builder +
+   new-document listing; loaded documents resolve their pinned version via
+   `get-form-version`."
   [store id]
-  (get @(:forms store) (keyword id)))
+  (some->> (get @(:forms store) (keyword id))
+           (partials/splice (:partials store))))
 
 (defn list-forms
   "Ids of all loaded forms."
@@ -71,12 +74,13 @@
     (:digest (get @a [(keyword id) v]))))
 
 (defn get-form-version
-  "Resolve the exact archived form for a pinned `[id version]`. Falls back to the
-   current authoring form when the archive has no such entry (legacy documents or
-   archive-less test stores)."
+  "Resolve the exact archived form for a pinned `[id version]`, with partials
+   spliced (§15.9). Falls back to the current authoring form when the archive has
+   no such entry (legacy documents or archive-less test stores)."
   [store id v]
-  (or (when-let [a (:versions store)] (versions/get-version a (keyword id) v))
-      (get-form store id)))
+  (if-let [archived (when-let [a (:versions store)] (versions/get-version a (keyword id) v))]
+    (partials/splice (:partials store) archived)
+    (get-form store id)))
 
 (defn save-form!
   "Persist a form to disk, update the in-memory working copy, and publish the
@@ -89,10 +93,10 @@
     id))
 
 (defmethod ig/init-key :store/forms
-  [_ {:keys [dir versions-file]}]
+  [_ {:keys [dir versions-file partials]}]
   (let [loaded  (load-dir dir)
         archive (versions/init-archive versions-file)]
     (versions/publish-all! archive (vals loaded))
     (log/info "loaded forms from" dir ":" (vec (keys loaded))
               "— archived versions for" (count loaded) "forms")
-    {:dir dir :forms (atom loaded) :versions archive}))
+    {:dir dir :forms (atom loaded) :versions archive :partials partials}))
