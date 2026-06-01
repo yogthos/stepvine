@@ -18,10 +18,10 @@
            ;; model + events + effects DAG. Reactions and collections, which
            ;; older domino provided natively, are reconstructed in the editor
            ;; seam (yogthos.stepvine.editor.data) on top of these primitives.
-           ;; (git tag v0.4.0 has no deps.edn/pom.xml manifest, so tools.deps
-           ;; can't consume it as a git dep — using the published maven release,
-           ;; which is the same v0.4.0 code.)
-           domino/core                     {:mvn/version "0.4.0"}
+           ;; Pinned to the master sha that carries the deps.edn manifest
+           ;; (domino-clj/domino PR #34); identical code to the v0.4.0 release.
+           ;; Switch to {:git/tag "v0.4.0" :git/sha …} once that tag is re-cut.
+           io.github.domino-clj/domino     {:git/sha "d8cf9d8c4d2d0968343be92aa263cb90c32eeafe"}
 
            ;; Datastar (server-driven hypermedia over SSE)
            dev.data-star.clojure/sdk       {:mvn/version "1.0.0-RC10"}

@@ -29,3 +29,6 @@ procyon/
 # Runtime state + generated artifacts
 data/
 forms/survey.edn
+
+# dirge tool state (per-developer)
+.dirge/
