@@ -113,6 +113,36 @@
   [manager doc-id coll-id idx]
   (apply-change! manager doc-id [[[coll-id idx] nil]]))
 
+(defn- item-keys
+  "Current item index keys of a collection, in db order."
+  [manager doc-id coll-id]
+  (vec (filter string? (keys (get (impl/db (current manager doc-id)) coll-id)))))
+
+(defn move-item!
+  "Reorder collection items by moving from one position to another. Stores an
+   explicit :order vector for the collection.
+   NOTE: collection ordering is still WIP — collections-data does not yet sort by
+   this :order, so reordering is not reflected in rendering on the current engine."
+  [manager doc-id coll-id from-idx to-idx]
+  (let [ks      (item-keys manager doc-id coll-id)
+        f-i     (parse-long from-idx)
+        t-i     (parse-long to-idx)
+        from-k  (get ks f-i)]
+    (when (and from-k (not= from-idx to-idx) (seq ks))
+      (let [new-order (-> (vec ks)
+                          (subvec 0 f-i)
+                          (into (subvec ks (inc f-i)))
+                          (#(let [h (subvec % 0 t-i)
+                                  r (subvec % t-i)]
+                              (-> h (conj from-k) (into r)))))]
+        (apply-change! manager doc-id [[[coll-id :order] new-order]])))))
+
+(defn clear-items!
+  "Remove all items from a collection."
+  [manager doc-id coll-id]
+  (doseq [k (item-keys manager doc-id coll-id)]
+    (apply-change! manager doc-id [[[coll-id k] nil]])))
+
 (defn set-item-field!
   "Set a single field of a collection item (vector id [coll idx field])."
   [manager doc-id coll-id idx field-id value]

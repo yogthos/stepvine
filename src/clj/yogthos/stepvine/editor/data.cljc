@@ -58,7 +58,12 @@
               {:id (:id opts) :seg seg :schema (:schema opts)})))
         model))
 
-(defn- item-indices [db {:keys [seg]}] (keys (get db seg)))
+(defn- item-indices
+  "The item index keys of a collection in `db`. Indices are signal-safe strings
+   (see session/new-index); filtering to strings keeps any non-item bookkeeping
+   keys (e.g. a stored :order vector) out of the item set."
+  [db {:keys [seg]}]
+  (filter string? (keys (get db seg))))
 
 (defn- item-id
   "Synthetic FLAT keyword id for an item field. domino's schema validation
@@ -261,7 +266,11 @@
                                             [(:id fopts) fopts])))
                                 (:model schema))
                   rxn-ids (map :id (:reactions schema))]
-              [id {:order      (vec (item-indices db c))
+               [id {:order      (let [ks (vec (item-indices db c))
+                                   explicit (get-in db [seg :order])]
+                              (if explicit
+                                (filterv (set ks) (into explicit ks))
+                                ks))
                    :field-opts fopts
                    :items      (into {}
                                      (for [idx (item-indices db c)]

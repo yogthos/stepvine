@@ -48,3 +48,41 @@
 (def coll-unlock
   (myc/pre-compile {:cells    {:start :form/parse-coll :unlock :form/coll-unlock-field}
                     :pipeline [:start :unlock]}))
+
+;; --- Table operations ------------------------------------------------------
+
+(def coll-sort
+  (myc/pre-compile {:cells    {:start :form/parse-table-op :op :form/coll-sort}
+                    :pipeline [:start :op]}))
+
+(def coll-page
+  (myc/pre-compile {:cells    {:start :form/parse-table-op :op :form/coll-page}
+                    :pipeline [:start :op]}))
+
+(def coll-filter
+  (myc/pre-compile {:cells    {:start :form/parse-table-op :op :form/coll-filter}
+                    :pipeline [:start :op]}))
+
+(def coll-move-row
+  (myc/pre-compile {:cells    {:start :form/parse-table-op :op :form/coll-move-row}
+                    :pipeline [:start :op]}))
+
+(def coll-clear
+  (myc/pre-compile {:cells    {:start :form/parse-table-op :op :form/coll-clear}
+                    :pipeline [:start :op]}))
+
+(def coll-columns-add
+  (myc/pre-compile {:cells    {:start :form/parse-table-op :op :form/coll-columns-add}
+                    :pipeline [:start :op]}))
+
+(def coll-columns-move
+  (myc/pre-compile {:cells    {:start :form/parse-table-op :op :form/coll-columns-move}
+                    :pipeline [:start :op]}))
+
+(def coll-columns-remove
+  (myc/pre-compile {:cells    {:start :form/parse-table-op :op :form/coll-columns-remove}
+                    :pipeline [:start :op]}))
+
+(def coll-columns-label
+  (myc/pre-compile {:cells    {:start :form/parse-table-op :op :form/coll-columns-label}
+                    :pipeline [:start :op]}))

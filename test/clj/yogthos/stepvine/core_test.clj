@@ -7,6 +7,7 @@
    [peridot.core :as p]
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.users :as users]
+   yogthos.stepvine.widgets   ; register widget render methods
    [yogthos.stepvine.test-utils :refer [system-state system-fixture]]))
 
 (use-fixtures :once (system-fixture))

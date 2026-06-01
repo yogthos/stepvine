@@ -16,6 +16,7 @@
    [yogthos.stepvine.options :as options]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
+   yogthos.stepvine.widgets   ; register all widget render methods
    [starfederation.datastar.clojure.api :as d*]))
 
 (defn coerce
@@ -178,4 +179,113 @@
   (fn [{:keys [session-manager hub] :as resources} {:keys [doc-id coll-id idx field-id uid]}]
     (when (docs/ensure! resources doc-id)
       (session/unlock-item-field! session-manager hub doc-id uid (keyword coll-id) idx (keyword field-id)))
+    {:status 204 :body ""}))
+
+;; --- Table operations (sort, page, filter, move-row, clear, columns) --------
+
+(myc/defcell :form/parse-table-op
+  {:input  {:http-request :map}
+   :output {:doc-id :any :coll-id :any :query-params :any}
+   :doc    "Parse a table operation: doc/coll from path, query params from URL."}
+  (fn [_resources {req :http-request}]
+    (let [pp (:path-params req)]
+      {:doc-id       (:id pp)
+       :coll-id      (:coll pp)
+       :query-params (:query-params req)})))
+
+(myc/defcell :form/coll-sort
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :query-params :any}
+   :output   {:status :int :body :string}
+   :doc      "Re-render the collection with sort info (view-only, no data change)."}
+  (fn [resources {:keys [doc-id coll-id]}]
+    (when (docs/ensure! resources doc-id)
+      (rerender-collection! resources doc-id (keyword coll-id)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-page
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :query-params :any}
+   :output   {:status :int :body :string}
+   :doc      "Re-render the collection with page info (view-only, no data change)."}
+  (fn [resources {:keys [doc-id coll-id]}]
+    (when (docs/ensure! resources doc-id)
+      (rerender-collection! resources doc-id (keyword coll-id)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-filter
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :query-params :any}
+   :output   {:status :int :body :string}
+   :doc      "Re-render the collection with filter applied (view-only, no data change)."}
+  (fn [resources {:keys [doc-id coll-id]}]
+    (when (docs/ensure! resources doc-id)
+      (rerender-collection! resources doc-id (keyword coll-id)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-move-row
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :query-params :any}
+   :output   {:status :int :body :string}
+   :doc      "Move a row from one index to another within a collection."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id query-params]}]
+    (when (docs/ensure! resources doc-id)
+      (let [coll (keyword coll-id)
+            from (get query-params "from")
+            to   (get query-params "to")]
+        (when (and from to)
+          (session/move-item! session-manager doc-id coll from to))
+        (rerender-collection! resources doc-id coll)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-clear
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :query-params :any}
+   :output   {:status :int :body :string}
+   :doc      "Remove all items from a collection."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id]}]
+    (when (docs/ensure! resources doc-id)
+      (let [coll (keyword coll-id)]
+        (session/clear-items! session-manager doc-id coll))
+      (rerender-collection! resources doc-id (keyword coll-id)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-columns-add
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :query-params :any}
+   :output   {:status :int :body :string}
+   :doc      "Add a new column to the collection (metadata change + re-render)."}
+  (fn [resources {:keys [doc-id coll-id]}]
+    (when (docs/ensure! resources doc-id)
+      (rerender-collection! resources doc-id (keyword coll-id)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-columns-move
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :query-params :any}
+   :output   {:status :int :body :string}
+   :doc      "Move a column (metadata change + re-render)."}
+  (fn [resources {:keys [doc-id coll-id]}]
+    (when (docs/ensure! resources doc-id)
+      (rerender-collection! resources doc-id (keyword coll-id)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-columns-remove
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :query-params :any}
+   :output   {:status :int :body :string}
+   :doc      "Remove a column (metadata change + re-render)."}
+  (fn [resources {:keys [doc-id coll-id]}]
+    (when (docs/ensure! resources doc-id)
+      (rerender-collection! resources doc-id (keyword coll-id)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-columns-label
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :query-params :any}
+   :output   {:status :int :body :string}
+   :doc      "Update a column's custom label (metadata change + re-render)."}
+  (fn [resources {:keys [doc-id coll-id]}]
+    (when (docs/ensure! resources doc-id)
+      (rerender-collection! resources doc-id (keyword coll-id)))
     {:status 204 :body ""}))

@@ -5,6 +5,7 @@
    [clojure.test :refer [deftest testing is]]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.render :as render]
+   yogthos.stepvine.widgets   ; register widget render methods
    [yogthos.stepvine.editor.impl :as impl]))
 
 (deftest signal-name-sanitizes-ids

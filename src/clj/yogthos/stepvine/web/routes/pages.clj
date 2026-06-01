@@ -57,6 +57,16 @@
       ["/coll/:coll/:idx/field/:fid"        (ds (post form/coll-field))]
       ["/coll/:coll/:idx/field/:fid/lock"   (ds (post form/coll-lock))]
       ["/coll/:coll/:idx/field/:fid/unlock" (ds (post form/coll-unlock))]
+      ;; table operations
+      ["/coll/:coll/sort"            (ds (post form/coll-sort))]
+      ["/coll/:coll/page"            (ds (post form/coll-page))]
+      ["/coll/:coll/filter"          (ds (post form/coll-filter))]
+      ["/coll/:coll/move-row"        (ds (post form/coll-move-row))]
+      ["/coll/:coll/clear"           (ds (post form/coll-clear))]
+      ["/coll/:coll/columns-add"     (ds (post form/coll-columns-add))]
+      ["/coll/:coll/columns-move"    (ds (post form/coll-columns-move))]
+      ["/coll/:coll/columns-remove"  (ds (post form/coll-columns-remove))]
+      ["/coll/:coll/columns-label"   (ds (post form/coll-columns-label))]
       ["/action/:aid"        (ds (post doc/run-export))]
       ["/build"              (ds (post doc/build))]]]))
 

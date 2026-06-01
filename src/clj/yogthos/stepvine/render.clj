@@ -27,7 +27,6 @@
    [clojure.string :as str]
    [clojure.walk :as walk]
    [hiccup2.core :as h]
-   [jsonista.core :as json]
    [yogthos.stepvine.editor.data :as data]
    [yogthos.stepvine.editor.impl :as impl]))
 
@@ -88,7 +87,9 @@
 
 (declare render-node)
 
-(defn- render-children [ctx children]
+(defn render-children
+  "Render a node's child markup (public so widget namespaces can recurse)."
+  [ctx children]
   (map (partial render-node ctx) children))
 
 (defmulti render-widget
@@ -203,149 +204,8 @@
                  (concat field-ids rxn-ids))
            (collection-signal-map (collections-data session))))))
 
-;; --- Widgets --------------------------------------------------------------
-
-(defmethod render-widget :stepvine.components/form
-  [ctx _component attrs body]
-  ;; The form seeds all signals once via data-signals (field/reaction/collection
-  ;; values plus system signals: this client's uid, presence count and per-field
-  ;; lock map), opens the SSE stream on load — tagged with uid so the server can
-  ;; release this client's locks on disconnect — and suppresses native submit.
-  (let [uid  (:uid ctx)
-        ;; Datastar drops null-valued signals from data-signals, so a field
-        ;; seeded null would never become a bindable/sendable signal. Seed nils
-        ;; as "" so every field signal exists from the start.
-        seed (into {} (map (fn [[k v]] [k (if (nil? v) "" v)]))
-                   (merge (signal-map ctx) {"uid" uid "presence" 1 "locks" {}}))]
-    ;; Rendered as a <div>, not a <form>: there is no submit (inputs POST via
-    ;; data-on:input), and an empty data-on:submit value crashes Datastar's
-    ;; engine (ValueRequired), which would break every binding on the page.
-    ;; data-signals seeds state; data-init opens the SSE stream on load.
-    [:div (merge {"data-signals" (json/write-value-as-string seed)
-                  "data-init"    (str "@get('/doc/" (:doc-id ctx) "/sse')")}
-                 (dissoc attrs :id))
-     (render-children ctx body)]))
-
-(defmethod render-widget :stepvine.components/input-field
-  [ctx _component {:keys [id label read-only error]} _body]
-  (let [opts     (get-in ctx [:field-opts id])
-        nm       (name id)
-        in-item? (boolean (:item ctx))
-        sig      (item-signal-name ctx id)   ; <field> or <coll>_<idx>_<field>
-        value    (get-in ctx [:values id])
-        number?  (= :number (:type opts))
-        err-sig  (when error ($ error))]
-    [:div.field
-     [:label label]
-     [:input
-      ;; two-way bind via the value form `data-bind="<signal>"` (bare signal
-      ;; name; references elsewhere use $name). Datastar takes control of the
-      ;; input once its async module loads + the data-init SSE opens, re-applying
-      ;; the data-signals seed — so the seed must already carry this field.
-      (cond-> {:type  (if number? "number" "text")
-               :value (if (nil? value) "" (str value))}
-        true              (assoc "data-bind" sig)
-        ;; only top-level fields get a stable id/name (item ids would collide)
-        (not in-item?)    (assoc :id nm :name nm)
-        (:required? opts) (assoc :required true)
-        read-only         (assoc :readonly true)
-        err-sig           (assoc "data-attr:aria-invalid" (str "!!" err-sig))
-        (not read-only)
-        ;; edit + server-authoritative locking, uniform for top-level and items
-        ;; (item urls/signals are coll-scoped via field-*-url and item-signal-name)
-        (assoc "data-on:input__debounce.300ms" (str "@post('" (field-post-url ctx id) "')")
-               "data-on:focus" (str "@post('" (field-lock-url ctx id) "')")
-               "data-on:blur"  (str "@post('" (field-unlock-url ctx id) "')")
-               ;; clean boolean: when unlocked $locks.<sig> is undefined, and a
-               ;; bare `&&` would yield undefined (which datastar treats as set);
-               ;; `!!` forces false so the disabled attribute is removed.
-               "data-attr:disabled" (str "!!$locks." sig " && $locks." sig " != $uid")))]
-     (when err-sig
-       [:span.error {"data-text" err-sig "data-show" err-sig}])]))
-
-(defmethod render-widget :stepvine.components/dropdown-select
-  [ctx _component {:keys [id label]} _body]
-  (let [nm       (name id)
-        in-item? (boolean (:item ctx))
-        sig      (item-signal-name ctx id)   ; <field> or <coll>_<idx>_<field>
-        current  (get-in ctx [:values id])
-        options  (get-in ctx [:options id])]
-    [:div.field
-     [:label label]
-     (into [:select
-            (cond-> {"data-bind" sig   ; value form: bare (item-scoped) signal name
-                     "data-on:change" (str "@post('" (field-post-url ctx id) "')")
-                     "data-on:focus"  (str "@post('" (field-lock-url ctx id) "')")
-                     "data-on:blur"   (str "@post('" (field-unlock-url ctx id) "')")
-                     "data-attr:disabled" (str "!!$locks." sig " && $locks." sig " != $uid")}
-              ;; only top-level fields get a stable id/name (item ids would collide)
-              (not in-item?) (assoc :id nm :name nm))
-            [:option {:value ""} "— select —"]]
-           (for [o options]
-             [:option (cond-> {:value (str (:value o))}
-                        (= (:value o) current) (assoc :selected true))
-              (:label o)]))]))
-
-(defmethod render-widget :stepvine.util/value
-  [ctx _component {:keys [rxn id default]} _body]
-  ;; Bind text to a signal. Inside a collection item both :rxn and :id are
-  ;; item-scoped and read from the item's value map (which carries per-item
-  ;; reaction values); at top level :rxn reads reactions and :id reads fields.
-  (let [sig-id   (or rxn id)
-        in-item? (boolean (:item ctx))
-        sig      (if in-item? (item-$ ctx sig-id) (if rxn ($ rxn) ($ id)))
-        current  (if in-item?
-                   (get (:values ctx) sig-id)
-                   (get (if rxn (:rxns ctx) (:values ctx)) sig-id))]
-    [:span {"data-text" sig}
-     (str (if (nil? current) (or default "") current))]))
-
-(defmethod render-widget :stepvine.components/show
-  [ctx _component {:keys [when]} body]
-  [:div {"data-show" ($ when)}
-   (render-children ctx body)])
-
-(defmethod render-widget :stepvine.components/section
-  [ctx _component {:keys [title] :as attrs} body]
-  [:fieldset (dissoc attrs :title :id)
-   (when title [:legend title])
-   (render-children ctx body)])
-
-(defmethod render-widget :stepvine.components/action
-  [ctx _component {:keys [action label]} _body]
-  ;; Triggers a server-side action (e.g. a templated export) for this document.
-  [:button.action
-   {"data-on:click" (str "@post('/doc/" (:doc-id ctx) "/action/" (name action) "')")}
-   (or label (str "Run " (name action)))])
-
-(defmethod render-widget :stepvine.components/build-button
-  [ctx _component {:keys [label]} _body]
-  ;; Form-builder: generate + save a real form from this builder document.
-  [:button.build
-   {"data-on:click" (str "@post('/doc/" (:doc-id ctx) "/build')")}
-   (or label "Build form")])
-
-(defmethod render-widget :stepvine.components/collection
-  [ctx _component {:keys [id]} body]
-  (let [coll-id id
-        {:keys [order field-opts items]} (get-in ctx [:collections coll-id])
-        doc-id   (:doc-id ctx)
-        coll-nm  (name coll-id)]
-    [:div.collection {:id (str "coll-" coll-nm)}
-     (for [idx order]
-       (let [item-ctx (assoc ctx
-                             :item {:coll coll-id :idx idx}
-                             :values (get items idx)
-                             :field-opts field-opts)]
-         [:div.coll-item {:id (str "item-" coll-nm "-" idx)}
-          (render-children item-ctx body)
-          [:button.remove
-           {"data-on:click"
-            (str "@post('/doc/" doc-id "/coll/" coll-nm "/" idx "/remove')")}
-           "Remove"]]))
-     [:button.add
-      {"data-on:click" (str "@post('/doc/" doc-id "/coll/" coll-nm "/add')")}
-      "+ Add"]]))
+;; Concrete widgets live in `yogthos.stepvine.widgets.*` (registered via the
+;; `yogthos.stepvine.widgets` namespace) — render.clj is just the engine.
 
 ;; --- Public entry points --------------------------------------------------
 

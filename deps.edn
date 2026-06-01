@@ -18,6 +18,9 @@
            ;; model + events + effects DAG. Reactions and collections, which
            ;; older domino provided natively, are reconstructed in the editor
            ;; seam (yogthos.stepvine.editor.data) on top of these primitives.
+           ;; (git tag v0.4.0 has no deps.edn/pom.xml manifest, so tools.deps
+           ;; can't consume it as a git dep — using the published maven release,
+           ;; which is the same v0.4.0 code.)
            domino/core                     {:mvn/version "0.4.0"}
 
            ;; Datastar (server-driven hypermedia over SSE)
