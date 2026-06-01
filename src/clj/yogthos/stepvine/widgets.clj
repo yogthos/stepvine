@@ -33,6 +33,9 @@
    yogthos.stepvine.widgets.selection.typeahead
    ;; navigation
    yogthos.stepvine.widgets.navigation.tabs
+   ;; overlays
+   yogthos.stepvine.widgets.overlays.modal-panel
+   yogthos.stepvine.widgets.overlays.popover
    ;; tables / collections
    yogthos.stepvine.widgets.tables.collection
    yogthos.stepvine.widgets.tables.table

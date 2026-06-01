@@ -157,6 +157,33 @@ body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; 
 @keyframes sv-throb { 0% { opacity: 1; } 100% { opacity: .15; } }
 .throbber-label { color: #6b7280; font-size: .85rem; }
 
+/* ── Modal panel ──────────────────────────────────────────────────────── */
+.modal-trigger { padding: .35rem .75rem; border: 1px solid #d1d5db; border-radius: .375rem;
+                 background: #fff; cursor: pointer; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(17,24,39,.45);
+                 display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-panel { background: #fff; border-radius: .6rem; min-width: 20rem; max-width: 90vw;
+               max-height: 85vh; overflow: auto; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.modal-header { display: flex; align-items: center; justify-content: space-between;
+                padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb; }
+.modal-title { margin: 0; font-size: 1.1rem; }
+.modal-close { background: none; border: none; font-size: 1.5rem; line-height: 1;
+               cursor: pointer; color: #6b7280; }
+.modal-body { padding: 1.25rem; }
+
+/* ── Popover ──────────────────────────────────────────────────────────── */
+.popover-anchor { position: relative; display: inline-block; }
+.popover-trigger { padding: .35rem .75rem; border: 1px solid #d1d5db; border-radius: .375rem;
+                   background: #fff; cursor: pointer; }
+.popover-body { position: absolute; z-index: 40; min-width: 12rem; background: #fff;
+                border: 1px solid #e5e7eb; border-radius: .5rem; padding: .75rem 1rem;
+                box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+.popover-below { top: calc(100% + .4rem); left: 0; }
+.popover-above { bottom: calc(100% + .4rem); left: 0; }
+.popover-right { left: calc(100% + .4rem); top: 0; }
+.popover-left  { right: calc(100% + .4rem); top: 0; }
+.popover-title { font-weight: 600; margin-bottom: .35rem; }
+
 /* ── Chart & Calendar ─────────────────────────────────────────────────── */
 .chart label, .calendar h3 { margin-bottom: .5rem; }
 .chart-canvas { width: 100%; min-height: 300px; }

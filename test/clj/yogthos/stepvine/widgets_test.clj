@@ -572,3 +572,29 @@
     (is (str/includes? html "tree-leaf"))
     (is (str/includes? html "data-attr:checked"))
     (is (str/includes? html "/doc/test-doc/field/tags"))))
+
+;; --- re-com parity: overlays -----------------------------------------------
+
+(deftest modal-panel-gates-on-local-signal
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/modal-panel
+                {:signal "showHelp" :title "Help" :trigger-label "Open"}
+                [:p "Body"]]))]
+    (is (str/includes? html "aria-modal=\"true\""))
+    (is (str/includes? html "data-show=\"$showHelp\""))         ; visibility binding
+    (is (str/includes? html "$showHelp = true"))               ; trigger opens
+    (is (str/includes? html "$showHelp = false"))              ; backdrop/close shuts
+    (is (str/includes? html "evt.stopPropagation()"))          ; inside clicks don't close
+    (is (str/includes? html "<p>Body</p>"))))
+
+(deftest popover-toggles-and-positions
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/popover
+                {:signal "tip" :trigger-label "?" :position :right :title "Tip"}
+                [:span "hint"]]))]
+    (is (str/includes? html "popover-right"))
+    (is (str/includes? html "data-show=\"$tip\""))
+    (is (str/includes? html "$tip = !$tip"))                   ; trigger toggles
+    (is (str/includes? html "<span>hint</span>"))))
