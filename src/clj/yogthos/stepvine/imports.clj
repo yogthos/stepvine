@@ -1,25 +1,67 @@
 (ns yogthos.stepvine.imports
-  "External-dependency hydration.
+  "External-data injection / hydration (PLAN.md §15.7).
 
-   A form may declare `:imports`, each with a `:trigger` field and a `:mapping`
-   of {target-field-id -> path-in-service-data}. When the trigger field changes,
-   the service is queried and the mapped values are transacted into the document
-   (which recomputes + broadcasts like any other change). Pure helpers here; the
-   wiring lives in cells.form.")
+   A form declares `:imports`, each pulling from a named `:source` (§15.6) at one
+   or more triggers and mapping the fetched data into document fields. Three
+   properties from the roadmap, improving on the reference:
+     - **lazy** — only imports whose `:on` includes the current trigger run, so a
+       source is fetched only when actually needed;
+     - **diff-based** — only fields whose value actually changes are emitted, so
+       re-running an import is idempotent;
+     - **chainable** — a later import sees an earlier one's pending changes, so
+       imports can feed each other within one pass.
 
-(defn import-for-trigger
-  "The import config whose :trigger is `field-id`, or nil."
-  [form-raw field-id]
-  (some (fn [[_ cfg]] (when (= (:trigger cfg) field-id) cfg))
-        (:imports form-raw)))
+   Spec (a vector of):
+     {:on     #{:create | :open | :event/<field>}   ; triggers
+      :from   <source-id>                            ; a key in the form's :sources
+      :params {<param-key> [<doc-path>] ...}         ; source params ← document
+      :map    {<field-id>  [<data-path>] ...}        ; document fields ← fetched data
+      :into   :data}                                 ; :data (default) | :meta
 
-(defn mapped-changes
-  "Turn a service `data` map + a `mapping` into `[[field-id value] ...]` changes,
-   skipping fields the service didn't provide."
-  [data mapping]
-  (when data
-    (into []
-          (keep (fn [[field-id path]]
-                  (let [v (get-in data (if (vector? path) path [path]))]
-                    (when (some? v) [field-id v]))))
-          mapping)))
+   Pure: `run` returns `[[field value] ...]`; the caller transacts them.")
+
+(defn triggered
+  "Imports whose `:on` set includes `trigger`."
+  [imports trigger]
+  (filter #(contains? (set (:on %)) trigger) imports))
+
+(defn event-trigger
+  "The trigger keyword for a changed field, e.g. :weight -> :event/weight."
+  [field-id]
+  (keyword "event" (name field-id)))
+
+(defn- as-path [p] (if (vector? p) p [p]))
+
+(defn run
+  "Run the imports triggered by `trigger`.
+     - resolve : (fn [source-id] -> source-fn)   ; a source resolver (§15.6)
+     - read    : (fn [doc-path]  -> value)       ; current document value at a path
+   Returns `[[field-id value] ...]` of *changed* fields, chaining so a later
+   import reads an earlier one's pending output."
+  [imports trigger resolve read]
+  (reduce
+   (fn [pending imp]
+     (let [pmap (into {} pending)
+           ;; read prefers a pending change (chaining), else the live document
+           rd   (fn [path] (let [p (as-path path)]
+                             (if (contains? pmap (first p)) (get pmap (first p)) (read p))))
+           params  (into {} (map (fn [[k path]] [k (rd path)])) (:params imp))
+           src     (resolve (:from imp))
+           data    (when src (src params))
+           changes (when data
+                     (keep (fn [[field path]]
+                             (let [v (get-in data (as-path path))]
+                               (when (and (some? v) (not= v (rd [field])))
+                                 [field v])))
+                           (:map imp)))]
+       (into pending (vec changes))))
+   []
+   (triggered imports trigger)))
+
+(defn source-ctx
+  "Build the resolver context for sources used by imports, from cell resources."
+  [{:keys [options-store patient-client request-fn base-url]}]
+  (cond-> {:options-store options-store}
+    patient-client (assoc :clients {:patient patient-client})
+    request-fn     (assoc :request-fn request-fn)
+    base-url       (assoc :base-url base-url)))

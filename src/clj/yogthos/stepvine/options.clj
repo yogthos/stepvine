@@ -12,7 +12,8 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [integrant.core :as ig]))
+   [integrant.core :as ig]
+   [yogthos.stepvine.sources :as sources]))
 
 (defn- edn-file? [^java.io.File f]
   (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
@@ -27,19 +28,30 @@
           (map (fn [f] (let [m (edn/read-string (slurp f))] [(:id m) (:options m)])))
           (filter edn-file? (.listFiles d)))))
 
+(defn- options-spec
+  "Normalize a field's `:options` into a source spec (§15.6). The legacy shorthand
+   `{:source :x}` (no :kind) means a named set from the options store."
+  [options]
+  (if (:kind options) options (assoc options :kind :options)))
+
 (defn resolve-source
-  "Options ([{:value .. :label ..} ...]) for a named source, or nil."
+  "Options ([{:value .. :label ..} ...]) for a named source set, or nil. Thin
+   accessor over the options store (back-compat)."
   [store source]
   (get store source))
 
 (defn resolve-field-options
   "Build {field-id -> options} for every field whose definition declares an
-   `:options {:source ..}`."
+   `:options` source, resolving each through the unified source resolver (§15.6) —
+   so a field may use any source `:kind` (`:options` store set, inline `:static`
+   data, …), not just a named store set."
   [store field-opts]
   (into {}
         (keep (fn [[id opts]]
-                (when-let [src (get-in opts [:options :source])]
-                  [id (resolve-source store src)])))
+                (when-let [options (:options opts)]
+                  (let [resolve (sources/resolve-source {:options-store store}
+                                                        (options-spec options))]
+                    [id (resolve)]))))     ; full list (no query)
         field-opts))
 
 (defmethod ig/init-key :store/options

@@ -4,14 +4,18 @@
 {:id :intake
  :title "Patient Intake"
 
- ;; External dependency: when :patient-id is set, fetch the patient from a
- ;; service and map fields into the document.
+ ;; Pluggable source (§15.6): the patient directory client, keyed by mrn.
+ :sources
+ {:patient {:kind :client :client :patient :key :mrn}}
+
+ ;; External dependency (§15.7): when :patient-id changes, fetch the patient and
+ ;; map fields in. Lazy (runs only on this trigger), diff-based, chainable.
  :imports
- {:patient
-  {:trigger :patient-id
-   :mapping {:fname [:given]
-             :lname [:family]
-             :dob   [:dob]}}}
+ [{:on     #{:event/patient-id}
+   :from   :patient
+   :params {:mrn [:patient-id]}
+   :map    {:fname [:given] :lname [:family] :dob [:dob]}
+   :into   :data}]
 
  :data
  {:model

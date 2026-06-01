@@ -8,7 +8,17 @@
    [yogthos.stepvine.imports :as imports]
    [yogthos.stepvine.options :as options]
    [yogthos.stepvine.session :as session]
+   [yogthos.stepvine.sources :as sources]
    [yogthos.stepvine.editor.impl :as impl]))
+
+(def ^:private patient-directory
+  {"p1" {:given "Ada" :family "Lovelace" :dob "1815-12-10"}})
+
+(defn- intake-resolve
+  "Resolve the intake form's named sources against a stub patient client."
+  [form]
+  (let [ctx (imports/source-ctx {:patient-client #(get patient-directory %)})]
+    (fn [sid] (sources/resolve-source ctx (get-in form [:sources sid])))))
 
 ;; --- DB-sourced dropdown options -----------------------------------------
 
@@ -22,33 +32,33 @@
 
 ;; --- External-service imports --------------------------------------------
 
-(deftest imports-map-service-data-to-fields
-  (let [form (forms/load-form "intake")]
-    (testing "trigger lookup finds the import keyed by its trigger field"
-      (let [cfg (imports/import-for-trigger form :patient-id)]
-        (is (= :patient-id (:trigger cfg)))))
-    (testing "no import for an unrelated field"
-      (is (nil? (imports/import-for-trigger form :kg))))
-    (testing "service data is mapped into [[field value] ...] changes"
-      (let [cfg (imports/import-for-trigger form :patient-id)
-            data {:given "Ada" :family "Lovelace" :dob "1815-12-10"}]
-        (is (= #{[:fname "Ada"] [:lname "Lovelace"] [:dob "1815-12-10"]}
-               (set (imports/mapped-changes data (:mapping cfg)))))))
-    (testing "nil service result yields no changes"
-      (is (empty? (imports/mapped-changes nil {:fname [:given]}))))))
+(defn- read-from [m] (fn [path] (get m (first path))))
+
+(deftest imports-are-lazy-and-diff-based
+  (let [form    (forms/load-form "intake")
+        resolve (intake-resolve form)]
+    (testing "an import runs only on its declared trigger (lazy)"
+      (is (empty? (imports/run (:imports form) (imports/event-trigger :kg)
+                               resolve (read-from {:patient-id "p1"}))))
+      (is (= #{[:fname "Ada"] [:lname "Lovelace"] [:dob "1815-12-10"]}
+             (set (imports/run (:imports form) (imports/event-trigger :patient-id)
+                               resolve (read-from {:patient-id "p1"}))))))
+    (testing "diff-based: fields already at the fetched value emit no change"
+      (is (= #{[:lname "Lovelace"] [:dob "1815-12-10"]}
+             (set (imports/run (:imports form) (imports/event-trigger :patient-id)
+                               resolve (read-from {:patient-id "p1" :fname "Ada"}))))))))
 
 (deftest setting-trigger-field-hydrates-from-service
   (let [form    (forms/load-form "intake")
         docs    (atom {})
         h       (atom {})
         mgr     (ig/init-key :session/manager {:documents docs :hub h})
-        ;; stand-in for :clients/patient
-        client  (fn [id] (get {"p1" {:given "Ada" :family "Lovelace" :dob "1815-12-10"}} id))]
+        resolve (intake-resolve form)]
     (session/ensure-document! mgr "intake" form {})
     (session/apply-change! mgr "intake" [[:patient-id "p1"]])
-    ;; simulate the import the apply-field cell runs after a trigger change
-    (let [cfg (imports/import-for-trigger form :patient-id)
-          changes (imports/mapped-changes (client "p1") (:mapping cfg))]
+    ;; the import the apply-field cell runs after a trigger change
+    (let [changes (imports/run (:imports form) (imports/event-trigger :patient-id)
+                               resolve (fn [path] (session/value mgr "intake" (first path))))]
       (session/apply-change! mgr "intake" changes))
     (is (= "Ada"        (session/value mgr "intake" :fname)))
     (is (= "Lovelace"   (session/value mgr "intake" :lname)))
