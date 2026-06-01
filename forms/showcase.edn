@@ -21,6 +21,9 @@
    [:birthday  {:id :birthday  :type :string}]
    [:meeting   {:id :meeting   :type :string}]
    [:fruit     {:id :fruit     :type :string}]
+   [:secret    {:id :secret    :type :string}]
+   [:progress  {:id :progress  :type :number}]
+   [:tab       {:id :tab       :type :string}]
    [:people
     {:id :people :collection? true :index-id :pid
      :schema {:model [[:pid   {:id :pid}]
@@ -41,7 +44,9 @@
     :fn (fn [n] (if (seq (str n)) (str "Hello, " n "!") "Enter your name above."))}
    {:id :rating-label :args [:rating]
     :fn (fn [r] (cond (nil? r) "n/a" (< r 3) "low" (< r 7) "medium" :else "high"))}
-   {:id :high-rating? :args [:rating] :fn (fn [r] (>= (or r 0) 7))}]}
+   {:id :high-rating? :args [:rating] :fn (fn [r] (>= (or r 0) 7))}
+   {:id :tab-overview? :args [:tab] :fn (fn [t] (or (nil? t) (= t "overview")))}
+   {:id :tab-details?  :args [:tab] :fn (fn [t] (= t "details"))}]}
 
  :exports
  {:summary {:label "Export summary"
@@ -59,13 +64,15 @@
      [:aside.sv-sidebar
       [:div.sv-brand "▦ Stepvine widgets"]
       [:ul.sv-nav
-       [:li [:a {:href "#sec-text"}    "Text & input"]]
-       [:li [:a {:href "#sec-choices"} "Choices"]]
-       [:li [:a {:href "#sec-ranges"}  "Ranges & dates"]]
-       [:li [:a {:href "#sec-display"} "Display & reactivity"]]
-       [:li [:a {:href "#sec-people"}  "Collection"]]
-       [:li [:a {:href "#sec-table"}   "Table"]]
-       [:li [:a {:href "#sec-actions"} "Actions"]]]]
+       [:li [:a {:href "#sec-text"}     "Text & input"]]
+       [:li [:a {:href "#sec-choices"}  "Choices"]]
+       [:li [:a {:href "#sec-ranges"}   "Ranges & dates"]]
+       [:li [:a {:href "#sec-display"}  "Display & reactivity"]]
+       [:li [:a {:href "#sec-nav"}      "Tabs & layout"]]
+       [:li [:a {:href "#sec-feedback"} "Feedback"]]
+       [:li [:a {:href "#sec-people"}   "Collection"]]
+       [:li [:a {:href "#sec-table"}    "Table"]]
+       [:li [:a {:href "#sec-actions"}  "Actions"]]]]
 
      [:main.sv-main
       [:header.sv-hero
@@ -82,7 +89,8 @@
         [:c/input-field {:id :age :label "Age"}]
         [:c/textarea {:id :bio :label "Bio" :rows 3 :placeholder "About you…"}]
         [:c/typeahead {:id :fruit :label "Fruit" :placeholder "Start typing…"
-                       :options [["Apple" "apple"] ["Banana" "banana"] ["Cherry" "cherry"]]}]]]
+                       :options [["Apple" "apple"] ["Banana" "banana"] ["Cherry" "cherry"]]}]
+        [:c/input-password {:id :secret :label "Password"}]]]
 
       [:section#sec-choices.sv-panel
        [:h2 "Choices" [:span.sv-kw ":dropdown  :radio  :selections  :menu  :checkbox"]]
@@ -113,6 +121,30 @@
         [:p "Rating category: " [:c/label {:rxn :rating-label}]]
         [:c/show {:when :high-rating?}
          [:c/alert {:class "alert-success" :label "That's a high rating — thank you!"}]]]]
+
+      [:section#sec-nav.sv-panel
+       [:h2 "Tabs & layout" [:span.sv-kw ":tabs  :h-box  :v-box  :title  :paragraph  :hyperlink"]]
+       [:p.sv-desc "A tab strip drives a signal; conditional panels react to it. Flex layout primitives arrange content."]
+       [:div.sv-demo
+        [:c/tabs {:id :tab :variant :horizontal
+                  :tabs [["Overview" "overview"] ["Details" "details"]]}]
+        [:c/show {:when :tab-overview?}
+         [:c/title {:text "Overview" :level 3}]
+         [:c/paragraph {:text "The tab strip sets the :tab signal on the server; these panels are shown by reactions over it."}]]
+        [:c/show {:when :tab-details?}
+         [:c/title {:text "Details" :level 3}]
+         [:c/h-box {:gap :md :align :center}
+          [:c/paragraph {:text "h-box lays children in a row."}]
+          [:c/hyperlink {:href "https://re-com.day8.com.au/" :target "_blank" :label "re-com →"}]]]]]
+
+      [:section#sec-feedback.sv-panel
+       [:h2 "Feedback" [:span.sv-kw ":progress-bar  :throbber"]]
+       [:p.sv-desc "A progress bar bound to a numeric field (edit it above-style via the slider) and a CSS throbber."]
+       [:div.sv-demo
+        [:c/slider {:id :progress :label "Progress" :min 0 :max 100 :step 5}]
+        [:c/progress-bar {:id :progress :label "Upload" :striped? true}]
+        [:c/v-box {:gap :sm}
+         [:c/throbber {:size :regular :label "Working…"}]]]]
 
       [:section#sec-people.sv-panel
        [:h2 "Collection" [:span.sv-kw ":collection"]]

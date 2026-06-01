@@ -68,6 +68,69 @@ body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; 
 /* ── Input-time ───────────────────────────────────────────────────────── */
 .input-time input { flex: 1; padding: .35rem .5rem; border: 1px solid #d1d5db; border-radius: .375rem; }
 
+/* ── Title / paragraph ────────────────────────────────────────────────── */
+.title-underline { border-bottom: 1px solid #e5e7eb; padding-bottom: .25rem; }
+
+/* ── Hyperlink ────────────────────────────────────────────────────────── */
+.hyperlink { color: #2563eb; cursor: pointer; text-decoration: none; }
+.hyperlink:hover { text-decoration: underline; }
+.hyperlink.disabled { color: #9ca3af; cursor: not-allowed; pointer-events: none; }
+
+/* ── Layout boxes (h-box / v-box) ─────────────────────────────────────── */
+.h-box { display: flex; flex-direction: row; }
+.v-box { display: flex; flex-direction: column; }
+.gap-sm { gap: .5rem; } .gap-md { gap: 1rem; } .gap-lg { gap: 1.5rem; }
+.align-start { align-items: flex-start; } .align-center { align-items: center; }
+.align-end { align-items: flex-end; } .align-stretch { align-items: stretch; }
+.justify-start { justify-content: flex-start; } .justify-center { justify-content: center; }
+.justify-end { justify-content: flex-end; } .justify-between { justify-content: space-between; }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────── */
+.tabs-strip { display: flex; gap: .25rem; }
+.tab-btn { padding: .4rem .9rem; border: 1px solid #d1d5db; background: #fff;
+           cursor: pointer; color: #374151; }
+.tab-btn:disabled { opacity: .5; cursor: not-allowed; }
+/* horizontal: a connected underline-style tab strip */
+.tabs-horizontal { border-bottom: 1px solid #d1d5db; gap: 0; }
+.tabs-horizontal .tab-btn { border: none; border-bottom: 2px solid transparent; background: none; }
+.tabs-horizontal .tab-btn.selected { border-bottom-color: #2563eb; color: #2563eb; font-weight: 600; }
+/* bar: segmented control */
+.tabs-bar .tab-btn:first-child { border-radius: .375rem 0 0 .375rem; }
+.tabs-bar .tab-btn:last-child { border-radius: 0 .375rem .375rem 0; }
+.tabs-bar .tab-btn.selected { background: #2563eb; color: #fff; border-color: #2563eb; }
+/* pill: rounded individual tabs */
+.tabs-pill { gap: .4rem; }
+.tabs-pill .tab-btn { border-radius: 999px; }
+.tabs-pill .tab-btn.selected { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+/* ── Progress bar ─────────────────────────────────────────────────────── */
+.progress-track { flex: 1; height: 1.1rem; background: #e5e7eb; border-radius: .375rem; overflow: hidden; }
+.progress-fill { height: 100%; background: #2563eb; border-radius: .375rem;
+                 display: flex; align-items: center; justify-content: flex-end;
+                 transition: width .3s ease; min-width: 1.5rem; }
+.progress-label { color: #fff; font-size: .72rem; padding-right: .4rem; font-variant-numeric: tabular-nums; }
+.progress-striped { background-image: linear-gradient(45deg, rgba(255,255,255,.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.2) 50%, rgba(255,255,255,.2) 75%, transparent 75%); background-size: 1rem 1rem; }
+
+/* ── Throbber ─────────────────────────────────────────────────────────── */
+.throbber-wrap { display: inline-flex; align-items: center; gap: .5rem; }
+.throbber { position: relative; list-style: none; margin: 0; padding: 0;
+            width: 2rem; height: 2rem; }
+.throbber-small { width: 1.2rem; height: 1.2rem; }
+.throbber-large { width: 3rem; height: 3rem; }
+.throbber li { position: absolute; top: 0; left: 50%; width: 12%; height: 50%;
+               margin-left: -6%; transform-origin: 50% 100%; background: #9ca3af;
+               border-radius: 40%; opacity: 0; animation: sv-throb 0.8s linear infinite; }
+.throbber li:nth-child(1) { transform: rotate(0deg);   animation-delay: -0.7s; }
+.throbber li:nth-child(2) { transform: rotate(45deg);  animation-delay: -0.6s; }
+.throbber li:nth-child(3) { transform: rotate(90deg);  animation-delay: -0.5s; }
+.throbber li:nth-child(4) { transform: rotate(135deg); animation-delay: -0.4s; }
+.throbber li:nth-child(5) { transform: rotate(180deg); animation-delay: -0.3s; }
+.throbber li:nth-child(6) { transform: rotate(225deg); animation-delay: -0.2s; }
+.throbber li:nth-child(7) { transform: rotate(270deg); animation-delay: -0.1s; }
+.throbber li:nth-child(8) { transform: rotate(315deg); animation-delay: 0s; }
+@keyframes sv-throb { 0% { opacity: 1; } 100% { opacity: .15; } }
+.throbber-label { color: #6b7280; font-size: .85rem; }
+
 /* ── Chart & Calendar ─────────────────────────────────────────────────── */
 .chart label, .calendar h3 { margin-bottom: .5rem; }
 .chart-canvas { width: 100%; min-height: 300px; }

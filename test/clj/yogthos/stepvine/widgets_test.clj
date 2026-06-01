@@ -426,3 +426,97 @@
                table-ctx))]
     (is (str/includes? html "data-horizontal-scroll"))
     (is (str/includes? html "scrollLeft"))))
+
+;; --- re-com parity: ported components --------------------------------------
+
+(deftest input-password-masks-and-binds
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/input-password {:id :my-field :label "Password"}]))]
+    (is (str/includes? html "type=\"password\""))
+    (is (str/includes? html "data-bind=\"my_field\""))
+    (is (str/includes? html "/field/my-field"))))
+
+(deftest title-uses-level-and-binding
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/title {:text "Heading" :level 3 :underline? true}]))]
+    (is (str/includes? html "<h3"))
+    (is (str/includes? html "title-underline"))
+    (is (str/includes? html "Heading")))
+  (testing "signal-bound title carries data-text"
+    (let [html (hiccup->html
+                (render-widget-hiccup
+                 [:stepvine.components/title {:rxn :bmi-category}]))]
+      (is (str/includes? html "data-text=\"$bmi_category\"")))))
+
+(deftest paragraph-static-and-body
+  (is (str/includes?
+       (hiccup->html (render-widget-hiccup [:stepvine.components/paragraph {:text "Body"}]))
+       "Body"))
+  (testing "with body renders children"
+    (is (str/includes?
+         (hiccup->html (render-widget-hiccup
+                        [:stepvine.components/paragraph {} [:strong "bold"]]))
+         "<strong>bold</strong>"))))
+
+(deftest hyperlink-href-and-action
+  (testing "href link navigates"
+    (let [html (hiccup->html
+                (render-widget-hiccup
+                 [:stepvine.components/hyperlink {:href "/somewhere" :label "Go"}]))]
+      (is (str/includes? html "href=\"/somewhere\""))
+      (is (str/includes? html "Go"))))
+  (testing "action link posts to the document action endpoint"
+    (let [html (hiccup->html
+                (render-widget-hiccup
+                 [:stepvine.components/hyperlink {:action :summary :label "Export"}]))]
+      (is (str/includes? html "/doc/test-doc/action/summary"))
+      (is (str/includes? html "@post(")))))
+
+(deftest tabs-selects-and-posts
+  (let [ctx  (assoc base-ctx :values {:tab "a"} :field-opts {:tab {:type :string}})
+        html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/tabs
+                {:id :tab :variant :bar
+                 :tabs [["First" "a"] ["Second" "b"]]}]
+               ctx))]
+    (is (str/includes? html "tabs-bar"))
+    (is (str/includes? html "role=\"tablist\""))
+    (is (str/includes? html "$tab = "))
+    (is (str/includes? html "/doc/test-doc/field/tab"))
+    ;; the active tab is marked selected
+    (is (str/includes? html "tab-btn selected"))))
+
+(deftest progress-bar-binds-width
+  (let [ctx  (assoc base-ctx :values {:pct 42} :field-opts {:pct {:type :number}})
+        html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/progress-bar {:id :pct :label "Done"}] ctx))]
+    (is (str/includes? html "progress-fill"))
+    (is (str/includes? html "width: 42%"))           ; SSR seed
+    (is (str/includes? html "data-attr:style"))      ; live update over SSE
+    (is (str/includes? html "$pct"))))
+
+(deftest throbber-emits-spinner-structure
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/throbber {:size :small :label "Loading"}]))]
+    (is (str/includes? html "throbber-small"))
+    (is (= 8 (count (re-seq #"<li>" html))))
+    (is (str/includes? html "Loading"))))
+
+(deftest boxes-lay-out-children-with-modifier-classes
+  (let [hb (hiccup->html
+            (render-widget-hiccup
+             [:stepvine.components/h-box {:gap :md :align :center :justify :between}
+              [:span "a"] [:span "b"]]))]
+    (is (str/includes? hb "h-box"))
+    (is (str/includes? hb "gap-md"))
+    (is (str/includes? hb "align-center"))
+    (is (str/includes? hb "justify-between"))
+    (is (str/includes? hb "<span>a</span><span>b</span>")))
+  (is (str/includes?
+       (hiccup->html (render-widget-hiccup [:stepvine.components/v-box {} [:span "x"]]))
+       "v-box")))

@@ -8,10 +8,14 @@
    yogthos.stepvine.widgets.layout.section
    yogthos.stepvine.widgets.layout.show
    yogthos.stepvine.widgets.layout.alert
+   yogthos.stepvine.widgets.layout.box
    ;; basic inputs + display
    yogthos.stepvine.widgets.basics.input-field
+   yogthos.stepvine.widgets.basics.input-password
    yogthos.stepvine.widgets.basics.text
    yogthos.stepvine.widgets.basics.label
+   yogthos.stepvine.widgets.basics.title
+   yogthos.stepvine.widgets.basics.paragraph
    yogthos.stepvine.widgets.basics.value
    yogthos.stepvine.widgets.basics.slider
    yogthos.stepvine.widgets.basics.date-picker
@@ -24,11 +28,17 @@
    yogthos.stepvine.widgets.selection.selections
    yogthos.stepvine.widgets.selection.menu
    yogthos.stepvine.widgets.selection.typeahead
+   ;; navigation
+   yogthos.stepvine.widgets.navigation.tabs
    ;; tables / collections
    yogthos.stepvine.widgets.tables.collection
    yogthos.stepvine.widgets.tables.table
    ;; buttons / actions
    yogthos.stepvine.widgets.buttons.action
+   yogthos.stepvine.widgets.buttons.hyperlink
+   ;; display / feedback
+   yogthos.stepvine.widgets.display.progress-bar
+   yogthos.stepvine.widgets.display.throbber
    ;; visualization
    yogthos.stepvine.widgets.viz.chart
    yogthos.stepvine.widgets.viz.calendar))
