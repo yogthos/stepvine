@@ -49,6 +49,39 @@
       .input-time input { flex: 1; padding: .35rem .5rem; border: 1px solid #d1d5db; border-radius: .375rem; }
       /* Chart & Calendar */
       .chart label, .calendar h3 { margin-bottom: .5rem; }
+
+      /* ── Widget gallery (showcase) — re-com-inspired ──────────────── */
+      body:has(.sv-shell) { max-width: none; margin: 0; color: #1f2937; }
+      .sv-shell { display: flex; align-items: flex-start; min-height: 100vh; background: #fff; }
+      .sv-sidebar { flex: 0 0 236px; position: sticky; top: 0; align-self: stretch;
+                    height: 100vh; overflow-y: auto; background: #f7f8fa;
+                    border-right: 1px solid #e5e7eb; padding: 1.25rem 0; }
+      .sv-brand { font-weight: 700; font-size: 1.05rem; padding: 0 1.25rem 1rem;
+                  color: #111827; letter-spacing: .01em; }
+      .sv-nav { list-style: none; margin: 0; padding: 0; }
+      .sv-nav a { display: block; padding: .45rem 1.25rem; color: #374151;
+                  text-decoration: none; border-left: 3px solid transparent; font-size: .92rem; }
+      .sv-nav a:hover { background: #eef2f7; color: #111827; }
+      .sv-nav a:target { border-left-color: #2563eb; color: #2563eb; background: #eef4ff; }
+      .sv-main { flex: 1; min-width: 0; padding: 2.25rem 2.5rem 4rem; max-width: 880px; }
+      .sv-hero h1 { margin: 0 0 .25rem; font-size: 1.85rem; color: #111827; }
+      .sv-hero p { margin: 0 0 1.75rem; color: #6b7280; }
+      .sv-panel { border: 1px solid #e5e7eb; border-radius: .6rem; background: #fff;
+                  padding: 1.25rem 1.5rem 1.5rem; margin: 0 0 1.5rem;
+                  box-shadow: 0 1px 2px rgba(0,0,0,.03); scroll-margin-top: 1rem; }
+      .sv-panel > h2 { margin: 0 0 .2rem; font-size: 1.15rem; color: #111827;
+                       display: flex; align-items: baseline; flex-wrap: wrap; gap: .6rem; }
+      .sv-panel > h2 .sv-kw { font-size: .72rem; font-weight: 500; color: #9ca3af;
+                              font-family: ui-monospace, SFMono-Regular, monospace; }
+      .sv-desc { margin: 0 0 1rem; color: #6b7280; font-size: .9rem; }
+      .sv-demo { border-top: 1px dashed #eef0f3; padding-top: 1rem; }
+      .sv-presence { color: #6b7280; font-size: .85rem; margin-top: 1.5rem; }
+      .sv-shell h1, .sv-shell h2 { line-height: 1.2; }
+      @media (max-width: 720px) {
+        .sv-shell { display: block; }
+        .sv-sidebar { display: none; }
+        .sv-main { padding: 1.25rem; }
+      }
     </style>
   </head>
   <body>

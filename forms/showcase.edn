@@ -1,6 +1,8 @@
 ;; Widget showcase — a single document exercising every widget in the library,
-;; used as a comprehensive smoke test. Reactivity is demonstrated by a greeting
-;; reaction (over :name) and a BMI-style category reaction (over :rating).
+;; presented as a re-com-style gallery (sidebar of categories + component
+;; panels). Also a comprehensive smoke test. Reactivity is demonstrated by a
+;; greeting reaction (over :name) and a rating category + conditional alert
+;; driven by the slider.
 {:id :showcase
  :title "Widget Showcase"
  :version 1
@@ -52,54 +54,92 @@
    :opts  {:widget-namespaces {"c" "stepvine.components"}}
    :markup
    [:c/form {}
-    [:h1 "Widget Showcase"]
-    [:p "A live document exercising every widget. Edits propagate to all viewers."]
+    [:div.sv-shell
 
-    [:c/section {:title "Text"}
-     [:c/input-field {:id :name :label "Name"}]
-     [:c/label {:rxn :greeting}]
-     [:c/textarea {:id :bio :label "Bio" :rows 3 :placeholder "About you…"}]
-     [:c/input-field {:id :age :label "Age"}]]
+     [:aside.sv-sidebar
+      [:div.sv-brand "▦ Stepvine widgets"]
+      [:ul.sv-nav
+       [:li [:a {:href "#sec-text"}    "Text & input"]]
+       [:li [:a {:href "#sec-choices"} "Choices"]]
+       [:li [:a {:href "#sec-ranges"}  "Ranges & dates"]]
+       [:li [:a {:href "#sec-display"} "Display & reactivity"]]
+       [:li [:a {:href "#sec-people"}  "Collection"]]
+       [:li [:a {:href "#sec-table"}   "Table"]]
+       [:li [:a {:href "#sec-actions"} "Actions"]]]]
 
-    [:c/section {:title "Choices"}
-     [:c/dropdown {:id :color :label "Favorite color"
-                   :options [["Red" "red"] ["Green" "green"] ["Blue" "blue"]]}]
-     [:c/radio {:id :size :label "Size"
-                :options [["Small" "s"] ["Medium" "m"] ["Large" "l"]] :stacked true}]
-     [:c/selections {:id :plan :label "Plan"
-                     :options [["Free" "free"] ["Pro" "pro"] ["Team" "team"]]}]
-     [:c/menu {:id :tool :label "Tool"
-               :options [["Pen" "pen"] ["Brush" "brush"] ["Eraser" "eraser"]]}]
-     [:c/checkbox {:id :agree :label "I agree to the terms"}]]
+     [:main.sv-main
+      [:header.sv-hero
+       [:h1 "Widget gallery"]
+       [:p "Every Stepvine widget, live. The server owns all state — every edit "
+        "recomputes on the server and broadcasts to all viewers over SSE."]]
 
-    [:c/section {:title "Ranges & dates"}
-     [:c/slider {:id :rating :label "Rating" :min 0 :max 10 :step 1}]
-     [:p "Rating category: " [:c/label {:rxn :rating-label}]]
-     [:c/show {:when :high-rating?}
-      [:c/alert {:class "alert-success" :label "That's a high rating — thank you!"}]]
-     [:c/date-picker {:id :birthday :label "Birthday"}]
-     [:c/input-time {:id :meeting :label "Meeting time"}]]
+      [:section#sec-text.sv-panel
+       [:h2 "Text & input" [:span.sv-kw ":input-field  :textarea  :typeahead"]]
+       [:p.sv-desc "Two-way-bound text/number inputs, multi-line text, and datalist autocomplete."]
+       [:div.sv-demo
+        [:c/input-field {:id :name :label "Name"}]
+        [:p "Greeting: " [:c/label {:rxn :greeting}]]
+        [:c/input-field {:id :age :label "Age"}]
+        [:c/textarea {:id :bio :label "Bio" :rows 3 :placeholder "About you…"}]
+        [:c/typeahead {:id :fruit :label "Fruit" :placeholder "Start typing…"
+                       :options [["Apple" "apple"] ["Banana" "banana"] ["Cherry" "cherry"]]}]]]
 
-    [:c/section {:title "Autocomplete"}
-     [:c/typeahead {:id :fruit :label "Fruit"
-                    :options [["Apple" "apple"] ["Banana" "banana"] ["Cherry" "cherry"]]
-                    :placeholder "Start typing…"}]]
+      [:section#sec-choices.sv-panel
+       [:h2 "Choices" [:span.sv-kw ":dropdown  :radio  :selections  :menu  :checkbox"]]
+       [:p.sv-desc "Single- and multi-select controls in several shapes."]
+       [:div.sv-demo
+        [:c/dropdown {:id :color :label "Favorite color"
+                      :options [["Red" "red"] ["Green" "green"] ["Blue" "blue"]]}]
+        [:c/radio {:id :size :label "Size" :stacked true
+                   :options [["Small" "s"] ["Medium" "m"] ["Large" "l"]]}]
+        [:c/selections {:id :plan :label "Plan"
+                        :options [["Free" "free"] ["Pro" "pro"] ["Team" "team"]]}]
+        [:c/menu {:id :tool :label "Tool"
+                  :options [["Pen" "pen"] ["Brush" "brush"] ["Eraser" "eraser"]]}]
+        [:c/checkbox {:id :agree :label "I agree to the terms"}]]]
 
-    [:c/section {:title "Collection (people)"}
-     [:c/collection {:id :people}
-      [:c/input-field {:id :first :label "First"}]
-      [:c/input-field {:id :last :label "Last"}]
-      [:p "Full: " [:c/value {:id :full}]]]]
+      [:section#sec-ranges.sv-panel
+       [:h2 "Ranges & dates" [:span.sv-kw ":slider  :date-picker  :input-time"]]
+       [:p.sv-desc "A range slider plus native date and time pickers."]
+       [:div.sv-demo
+        [:c/slider {:id :rating :label "Rating" :min 0 :max 10 :step 1}]
+        [:c/date-picker {:id :birthday :label "Birthday"}]
+        [:c/input-time {:id :meeting :label "Meeting time"}]]]
 
-    [:c/section {:title "Table (tasks)"}
-     [:c/table {:id :tasks
-                :columns [{:path :title :label "Title" :sortable? true
-                           :widget :stepvine.components/input-field}
-                          {:path :priority :label "Priority" :sortable? true
-                           :widget :stepvine.components/input-field}]
-                :can-add-rows? true :can-delete-rows? true :can-move-rows? true
-                :can-clear-table? true :paged? true :page-size 5 :striped? true}]]
+      [:section#sec-display.sv-panel
+       [:h2 "Display & reactivity" [:span.sv-kw ":label  :value  :show  :alert"]]
+       [:p.sv-desc "Signal-bound text and a conditional alert. The slider above drives both — try it."]
+       [:div.sv-demo
+        [:p "Rating category: " [:c/label {:rxn :rating-label}]]
+        [:c/show {:when :high-rating?}
+         [:c/alert {:class "alert-success" :label "That's a high rating — thank you!"}]]]]
 
-    [:p.presence "Editors online: " [:span {:data-text "$presence"}]]
-    [:c/action {:action :summary :label "Export summary"}]
-    [:pre {:id "export-result"}]]}}}
+      [:section#sec-people.sv-panel
+       [:h2 "Collection" [:span.sv-kw ":collection"]]
+       [:p.sv-desc "A repeating group; each item's full name is a per-item derived field (domino event)."]
+       [:div.sv-demo
+        [:c/collection {:id :people}
+         [:c/input-field {:id :first :label "First"}]
+         [:c/input-field {:id :last :label "Last"}]
+         [:p "Full: " [:c/value {:id :full}]]]]]
+
+      [:section#sec-table.sv-panel
+       [:h2 "Table" [:span.sv-kw ":table"]]
+       [:p.sv-desc "A collection as a table: add/remove/reorder rows, sort columns, and page."]
+       [:div.sv-demo
+        [:c/table {:id :tasks
+                   :columns [{:path :title :label "Title" :sortable? true
+                              :widget :stepvine.components/input-field}
+                             {:path :priority :label "Priority" :sortable? true
+                              :widget :stepvine.components/input-field}]
+                   :can-add-rows? true :can-delete-rows? true :can-move-rows? true
+                   :can-clear-table? true :paged? true :page-size 5 :striped? true}]]]
+
+      [:section#sec-actions.sv-panel
+       [:h2 "Actions" [:span.sv-kw ":action"]]
+       [:p.sv-desc "Trigger a server-side action — here a templated export of the current values."]
+       [:div.sv-demo
+        [:c/action {:action :summary :label "Export summary"}]
+        [:pre {:id "export-result"}]]]
+
+      [:p.sv-presence "Editors online: " [:span {:data-text "$presence"}]]]]]}}}
