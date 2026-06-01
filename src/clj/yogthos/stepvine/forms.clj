@@ -17,7 +17,16 @@
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
    [yogthos.stepvine.partials :as partials]
+   [yogthos.stepvine.validation :as validation]
    [yogthos.stepvine.versions :as versions]))
+
+(defn- prepare
+  "Resolve a served form: splice partials (§15.9) then compile its declarative
+   validation into error + :valid? reactions (§15.8)."
+  [store form]
+  (some->> form
+           (partials/splice (:partials store))
+           validation/compile-validations))
 
 (defn- edn-file? [^java.io.File f]
   (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
@@ -49,8 +58,7 @@
    new-document listing; loaded documents resolve their pinned version via
    `get-form-version`."
   [store id]
-  (some->> (get @(:forms store) (keyword id))
-           (partials/splice (:partials store))))
+  (prepare store (get @(:forms store) (keyword id))))
 
 (defn list-forms
   "Ids of all loaded forms."
@@ -79,7 +87,7 @@
    no such entry (legacy documents or archive-less test stores)."
   [store id v]
   (if-let [archived (when-let [a (:versions store)] (versions/get-version a (keyword id) v))]
-    (partials/splice (:partials store) archived)
+    (prepare store archived)
     (get-form store id)))
 
 (defn save-form!

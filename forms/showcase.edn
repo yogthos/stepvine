@@ -9,7 +9,7 @@
 
  :data
  {:model
-  [[:name      {:id :name      :type :string}]
+  [[:name      {:id :name      :type :string :validation [[:max-len 40]]}]
    [:bio       {:id :bio       :type :string}]
    [:age       {:id :age       :type :number}]
    [:color     {:id :color     :type :string}]
