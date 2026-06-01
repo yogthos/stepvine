@@ -472,9 +472,15 @@ renders disabled with a banner, flipped live via a `$locked` signal (§15.4–15
 *Deferred to Phase 11 (multi-node):* using `:rev` to reject stale writes and
 moving lock/presence into a shared store (§15.3 — only needed off single-node).
 
-**Phase 9 — Pluggable sources, imports & partials.** Uniform source resolver
-(multimethod by kind), lazy diff-based imports, conditional validation, and
-reusable definition partials (§15.6–15.9).
+**Phase 9 — Pluggable sources, imports, validation & partials. ✅ done.**
+`yogthos.stepvine.sources` — one `resolve-source` multimethod on `:kind`
+(`:static`, `:options`, `:client`, host-allowlisted `:http`); `options` delegates
+to it. `imports` rewritten lazy + diff-based + chainable, fetching via named
+sources. `validation` — a `:validation`/`:validate-when` vocabulary compiled to
+Domino error reactions + a `:valid?` reaction (which `:submit-when` gates on).
+`partials` — `{:include id}` blocks spliced into forms at serve time. Forms are
+served through splice→compile; all sci-sandboxed, never `clojure.core/eval`
+(§15.6–15.9).
 
 **Phase 10 — Workflow orchestration.** Data-defined actions/steps with a
 pluggable step dispatcher, a uniform external-client protocol, and a durable
