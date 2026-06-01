@@ -306,7 +306,7 @@
                  :chart-type :line :x-axis-title "Date" :y-axis-title "BMI"}]))]
     (is (str/includes? html "highcharts"))
     (is (str/includes? html "BMI Trend"))
-    (is (str/includes? html "min-height:300px"))))
+    (is (str/includes? html "chart-canvas"))))
 
 ;; --- Table locking ---------------------------------------------------------
 
@@ -372,7 +372,7 @@
     (is (str/includes? html "calendarjs"))
     (is (str/includes? html "lemonade"))
     (is (str/includes? html "Appointments"))
-    (is (str/includes? html "min-height:400px"))))
+    (is (str/includes? html "calendar-canvas"))))
 
 ;; --- Table DnD and customization --------------------------------------------
 

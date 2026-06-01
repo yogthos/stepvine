@@ -250,6 +250,18 @@
   [session view-id]
   (get-in session [:form :views view-id :markup]))
 
+(defn theme-href
+  "Resolve a view's optional `:opts {:theme …}` to a stylesheet href, or nil.
+   A full URL (http…) or absolute path (/…) is used verbatim; a bare name like
+   \"dark\" maps to \"/css/dark.css\"."
+  [session view-id]
+  (when-let [theme (get-in session [:form :views view-id :opts :theme])]
+    (let [t (if (keyword? theme) (name theme) (str theme))]
+      (cond
+        (re-find #"^https?://" t) t
+        (.startsWith t "/")       t
+        :else                     (str "/css/" t ".css")))))
+
 (def ^:private collection-widgets
   "Widgets that render a collection container and can be re-rendered standalone."
   #{:stepvine.components/collection :stepvine.components/table})

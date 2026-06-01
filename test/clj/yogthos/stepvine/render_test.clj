@@ -13,6 +13,20 @@
   (is (= "overweight"   (render/signal-name :overweight?)))
   (is (= "bmi_category" (render/signal-name :bmi-category))))
 
+(deftest theme-href-resolves-view-opts
+  (let [sess (fn [theme]
+               {:form {:views {:default {:opts (when theme {:theme theme})}}}})]
+    (testing "no theme opt → nil (default stylesheet only)"
+      (is (nil? (render/theme-href (sess nil) :default))))
+    (testing "bare name → /css/<name>.css"
+      (is (= "/css/dark.css" (render/theme-href (sess "dark") :default)))
+      (is (= "/css/dark.css" (render/theme-href (sess :dark) :default))))
+    (testing "absolute path passes through verbatim"
+      (is (= "/assets/brand.css" (render/theme-href (sess "/assets/brand.css") :default))))
+    (testing "full URL passes through verbatim"
+      (is (= "https://cdn.example.com/t.css"
+             (render/theme-href (sess "https://cdn.example.com/t.css") :default))))))
+
 (deftest resolve-component-expands-aliases
   (let [aliases {"c" "stepvine.components"}]
     (is (= :stepvine.components/input-field

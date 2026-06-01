@@ -41,7 +41,7 @@
      [:script {:src "https://cdn.jsdelivr.net/npm/highcharts@11/highcharts.js"}]
      [:div.widget.chart.field
       (when label [:label label])
-      [:div {:id chart-id :style "width:100%;min-height:300px;"}]]
+      [:div.chart-canvas {:id chart-id}]]
      [:script (h/raw (format chart-js-template
                              chart-id
                              sig

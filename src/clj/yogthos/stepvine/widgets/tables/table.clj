@@ -96,7 +96,7 @@
         csc       (when current-sort-col (name current-sort-col))
         sort-expr (str "@post('" (coll-base ctx coll-id) "/sort?col=" col-name "')")]
     [:th.widget-table-sortable-column
-     {:style {:cursor "pointer"} "data-on:click" sort-expr}
+     {"data-on:click" sort-expr}
      (str (or label col-name))
      [:span.widget-table-sort-direction
       (sort-indicator (when (= col-name csc) current-sort-dir))]]))
@@ -445,8 +445,7 @@
      (when (or customizable? (some :reorderable? columns) (some :removable? columns))
        [:script (h/raw column-dnd-js)])
      [:div.widget-table-horizontal
-      {:data-horizontal-scroll "true"
-       :style {:overflow-x "auto" :overflow-y "visible"}}
+      {:data-horizontal-scroll "true"}
       [:table.table.table-bordered.horizontal-table
        {:class (str/join " " (clojure.core/filter some?
                               [(when striped? "horizontal-table-striped")
@@ -476,7 +475,7 @@
         (for [col columns
               :let [col-label (or (:label col) (name (:path col)))]]
           [:tr
-           [:th {:scope "row" :style {:white-space "nowrap"}}
+           [:th.widget-table-row-header {:scope "row"}
             (str col-label)
             (when (and (:sortable? col)
                        (= (name (:path col)) (when current-sort-col (name current-sort-col))))

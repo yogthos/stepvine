@@ -136,7 +136,10 @@
                      ;; resolve option sources for top-level AND collection-item fields
                      (assoc :options (options/resolve-field-options options-store (render/all-field-opts sess))))
             view (render/render-view ctx (render/view-markup sess vid))]
-        {:html (selmer/render-file "html/form.html" {:title (:title form-raw) :view view})})
+        {:html (selmer/render-file "html/form.html"
+                                   {:title (:title form-raw)
+                                    :view  view
+                                    :theme (render/theme-href sess vid)})})
       {:html (selmer/render-file "html/form.html"
                                  {:title "Not found" :view "<p>No such document.</p>"})})))
 

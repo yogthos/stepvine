@@ -43,5 +43,5 @@
      [:script {:src "https://cdn.jsdelivr.net/npm/@calendarjs/ce/dist/index.min.js"}]
      [:div.widget.calendar.field
       (when label [:h3 label])
-      [:div {:id cal-id :style "min-height:400px;"}]]
+      [:div.calendar-canvas {:id cal-id}]]
      [:script (h/raw (format calendarjs-js-template cal-id sig))])))
