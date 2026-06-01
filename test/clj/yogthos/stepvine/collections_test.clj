@@ -165,6 +165,54 @@
 (defn- positions [html & labels]
   (map #(str/index-of html (str "value=\"" % "\"")) labels))
 
+;; --- Nested collections (a collection within a collection item) -----------
+
+(def ^:private nested-form
+  "Teams, each team a collection of members; each member has a derived :full
+   name (a domino event) — proving collections nest via domino's nested model."
+  '{:id :teams :title "Teams" :version 1
+    :data
+    {:model
+     [[:teams
+       {:id :teams :collection? true :index-id :tid
+        :schema
+        {:model
+         [[:tid   {:id :tid}]
+          [:tname {:id :tname :type :string}]
+          [:members
+           {:id :members :collection? true :index-id :mid
+            :schema
+            {:model  [[:mid   {:id :mid}]
+                      [:first {:id :first :type :string}]
+                      [:last  {:id :last  :type :string}]
+                      [:full  {:id :full  :type :string}]]
+             :events [{:id :calc-full :inputs [:first :last] :outputs [:full]
+                       :handler (fn [{{:keys [first last]} :inputs}]
+                                  {:full (str (or first "") (when (and first last) " ") (or last ""))})}]}}]]}}]]}})
+
+(deftest nested-collection-derived-fields
+  (let [s0 (impl/create-session nested-form {})
+        ;; two teams, members under each
+        s1 (impl/apply-changes s0 [[[:teams "t1"] {}] [[:teams "t2"] {}]])
+        s2 (impl/apply-changes s1 [[[:teams "t1" :members "m1"] {}]
+                                   [[:teams "t1" :members "m2"] {}]
+                                   [[:teams "t2" :members "n1"] {}]])
+        s3 (impl/apply-changes s2 [[[:teams "t1" :members "m1" :first] "Ada"]
+                                   [[:teams "t1" :members "m1" :last]  "Lovelace"]
+                                   [[:teams "t2" :members "n1" :first] "Grace"]
+                                   [[:teams "t2" :members "n1" :last]  "Hopper"]])]
+    (testing "a nested-item field reads back at its full path"
+      (is (= "Ada" (impl/value s3 [:teams "t1" :members "m1" :first]))))
+    (testing "a nested-item derived field (event) computes within its own item"
+      (is (= "Ada Lovelace" (impl/value s3 [:teams "t1" :members "m1" :full])))
+      (is (= "Grace Hopper" (impl/value s3 [:teams "t2" :members "n1" :full]))))
+    (testing "nested items are independent — an untouched member stays nil (lazy)"
+      (is (nil? (impl/value s3 [:teams "t1" :members "m2" :full]))))
+    (testing "removing a nested item drops it without disturbing siblings"
+      (let [s4 (impl/apply-changes s3 [[[:teams "t1" :members "m2"] nil]])]
+        (is (= "Ada Lovelace" (impl/value s4 [:teams "t1" :members "m1" :full])))
+        (is (nil? (impl/value s4 [:teams "t1" :members "m2" :first])))))))
+
 (defn- row-count [html] (count (re-seq #"id=\"row-tasks-" html)))
 
 (deftest table-sort-and-page

@@ -1,5 +1,6 @@
 (ns yogthos.stepvine.editor.data
   (:require [domino.core :as d]
+            [clojure.string :as str]
             [clojure.set :refer [union]]))
 
 ;; ==============================================================================
@@ -65,62 +66,70 @@
   [db {:keys [seg]}]
   (filter string? (keys (get db seg))))
 
-(defn- item-id
-  "Synthetic FLAT keyword id for an item field. domino's schema validation
+(defn- path->flat-id
+  "Synthetic FLAT keyword id for a field at db `path`. domino's schema validation
    flattens event input/output ids, so compound (vector) ids are rejected; the
-   model keeps the nested path while the id is a collision-free keyword."
-  [seg idx field]
-  (keyword (str (name seg) "__" idx "__" (name field))))
+   model keeps the nested path while the id is a collision-free keyword joining
+   the path segments (e.g. [:teams \"t1\" :members \"m1\" :first] ->
+   :teams__t1__members__m1__first)."
+  [path]
+  (keyword (str/join "__" (map #(if (keyword? %) (name %) (str %)) path))))
 
-(defn- item-model
-  "Nested model entry projecting an item's fields under `[seg idx …]`. Branch
-   segments carry no opts map — domino validates the raw model by flattening it,
-   and a map without `:id` is treated as invalid. Item fields are tagged
-   `:item? true` so they are excluded from the top-level editable field set."
-  [seg idx schema]
-  [seg (into [idx]
-             (map (fn [entry]
-                    (let [fseg  (first entry)
-                          fopts (if (map? (second entry)) (second entry) {})]
-                      [fseg (assoc fopts :id (item-id seg idx (:id fopts)) :item? true)]))
-                  (:model schema)))])
+(defn- nested-entry
+  "Fully-nested model tuple for a single leaf field at db `path` carrying `opts`.
+   Branch segments carry no opts map — domino validates the raw model by
+   flattening it, and a map without `:id` is treated as invalid; only the leaf
+   carries the opts (with its `:id`)."
+  [path opts]
+  (reduce (fn [child seg] [seg child])
+          [(last path) opts]
+          (reverse (butlast path))))
 
-(defn- item-events
-  "An item's events, rewritten to the synthetic item ids and bridged so the form
-   handler still sees/returns local field ids."
-  [seg idx schema]
-  (map (fn [{:keys [inputs outputs] h :handler}]
-         (let [kid (fn [f] (item-id seg idx f))]
-           {:inputs  (mapv kid inputs)
-            :outputs (mapv kid outputs)
-            :handler (fn [_ctx in _out]
-                       (let [local (into {} (map (fn [f] [f (get in (kid f))])) inputs)]
-                         (into {} (map (fn [[k v]] [(kid k) v])) (h {:inputs local}))))}))
-       (:events schema)))
+(defn- expand-item
+  "Recursively expand a collection item's `schema` at db-path `prefix` (db subtree
+   `sub`) into {:model :events :reaction-defs}. Item fields project onto nested
+   paths with flat ids (tagged `:item?`); events are rewritten to those ids and
+   bridged so the form handler still sees/returns local field ids; reactions keep
+   vector (path) ids for editor-side computation. Nested collections in the item
+   schema are expanded recursively for the items present in `sub`."
+  [prefix schema sub]
+  (let [{:keys [model events reactions]} schema
+        colls     (collection-fields model)
+        coll-segs (set (map :seg colls))
+        plain     (remove #(coll-segs (first %)) model)
+        fid       (fn [local] (path->flat-id (conj (vec prefix) local)))
+        models    (mapv (fn [entry]
+                          (let [fseg  (first entry)
+                                fopts (if (map? (second entry)) (second entry) {})]
+                            (nested-entry (conj (vec prefix) fseg)
+                                          (assoc fopts :id (fid (:id fopts)) :item? true))))
+                        plain)
+        evs       (mapv (fn [{:keys [inputs outputs] h :handler}]
+                          {:inputs  (mapv fid inputs)
+                           :outputs (mapv fid outputs)
+                           :handler (fn [_ctx in _out]
+                                      (let [local (into {} (map (fn [i] [i (get in (fid i))])) inputs)]
+                                        (into {} (map (fn [[k v]] [(fid k) v])) (h {:inputs local}))))})
+                        events)
+        rds       (mapv (fn [{:keys [id args] f :fn}]
+                          {:id   (conj (vec prefix) id)
+                           :args (mapv (fn [a] (conj (vec prefix) a)) args)
+                           :fn   f})
+                        reactions)
+        children  (for [{:keys [seg schema]} colls
+                        cidx (filter string? (keys (get sub seg)))]
+                    (expand-item (conj (vec prefix) seg cidx) schema (get-in sub [seg cidx])))]
+    {:model         (into models (mapcat :model children))
+     :events        (into evs (mapcat :events children))
+     :reaction-defs (into rds (mapcat :reaction-defs children))}))
 
-(defn- item-reaction-defs [seg idx schema]
-  (map (fn [{:keys [id args] f :fn}]
-         {:id   [seg idx id]
-          :args (mapv (fn [a] [seg idx a]) args)
-          :fn   f})
-       (:reactions schema)))
-
-;; ---- live schema (base + per-item) -------------------------------------------
-
-(defn- live-schema
-  "domino schema (model + events) for the current item set in `db`."
+(defn- expansions
+  "Expand every item of every top-level collection in `db` (recursing into nested
+   collections)."
   [form db]
-  (let [{:keys [model events]} (:data form)
-        colls (collection-fields model)]
-    {:model  (into (vec model)
-                   (for [{:keys [seg schema] :as c} colls
-                         idx (item-indices db c)]
-                     (item-model seg idx schema)))
-     :events (into (mapv bridge-event events)
-                   (for [{:keys [seg schema] :as c} colls
-                         idx (item-indices db c)
-                         ev  (item-events seg idx schema)]
-                     ev))}))
+  (for [{:keys [seg schema] :as c} (collection-fields (get-in form [:data :model]))
+        idx (item-indices db c)]
+    (expand-item [seg idx] schema (get-in db [seg idx]))))
 
 ;; ---- reactions (editor-owned, eager) -----------------------------------------
 
@@ -143,16 +152,6 @@
             (into order remaining)
             (recur (into order ready) (into placed (map :id ready)) (vec later) (dec guard))))))))
 
-(defn- all-reaction-defs [form db]
-  (let [{:keys [model reactions]} (:data form)
-        colls (collection-fields model)]
-    (topo-reactions
-     (into (vec reactions)
-           (for [{:keys [seg schema] :as c} colls
-                 idx (item-indices db c)
-                 r   (item-reaction-defs seg idx schema)]
-             r)))))
-
 (defn- compute-reactions
   "`{reaction-id -> value}` from the current db, in dependency order."
   [ctx ordered-defs]
@@ -174,11 +173,17 @@
 ;; ---- lifecycle ---------------------------------------------------------------
 
 (defn- build-ctx
-  "Initialise a domino ctx for the item set implied by `db`, plus eager reactions."
+  "Initialise a domino ctx for the item set implied by `db`, plus eager reactions.
+   The per-item (recursive) expansion is computed once and feeds both the live
+   schema and the reaction defs."
   [form db]
-  (-> (d/initialize (live-schema form db) db)
-      (assoc ::reaction-defs (all-reaction-defs form db))
-      with-reactions))
+  (let [{:keys [model events reactions]} (:data form)
+        exps   (expansions form db)
+        schema {:model  (into (vec model) (mapcat :model exps))
+                :events (into (mapv bridge-event events) (mapcat :events exps))}]
+    (-> (d/initialize schema db)
+        (assoc ::reaction-defs (topo-reactions (into (vec reactions) (mapcat :reaction-defs exps))))
+        with-reactions)))
 
 (defn initialize-ctx
   "Given a form and an initial DB state, build the domino context."
