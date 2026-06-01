@@ -3,7 +3,7 @@
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))
 
-(defmethod render-widget :stepvine.util/value
+(defmethod render-widget :stepvine.components/value
   [ctx _component {:keys [rxn id default]} _body]
   ;; Bind text to a signal. Inside a collection item both :rxn and :id are
   ;; item-scoped and read from the item's value map (which carries per-item

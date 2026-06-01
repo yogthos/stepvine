@@ -31,9 +31,9 @@
   (let [aliases {"c" "stepvine.components"}]
     (is (= :stepvine.components/input-field
            (render/resolve-component aliases :c/input-field)))
-    ;; namespaced-but-unaliased passes through
-    (is (= :stepvine.util/value
-           (render/resolve-component aliases :stepvine.util/value)))))
+    ;; namespaced-but-unaliased passes through unchanged
+    (is (= :other.ns/thing
+           (render/resolve-component aliases :other.ns/thing)))))
 
 (defn- render-bmi [changes]
   (let [form    (forms/load-form "bmi")

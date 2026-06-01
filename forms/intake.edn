@@ -62,6 +62,6 @@
     [:c/input-field {:label "Weight (kg)" :id :kg :error :weight-error}]
     [:c/input-field {:label "Height (m)" :id :m :error :height-error}]
     [:c/input-field {:label "BMI" :id :bmi :read-only true}]
-    [:p "Category: " [:stepvine.util/value {:rxn :bmi-category}]]
-    [:p "Form valid: " [:stepvine.util/value {:rxn :form-valid?}]]
+    [:p "Category: " [:stepvine.components/value {:rxn :bmi-category}]]
+    [:p "Form valid: " [:stepvine.components/value {:rxn :form-valid?}]]
     [:p.presence "Editors online: " [:span {:data-text "$presence"}]]]}}}

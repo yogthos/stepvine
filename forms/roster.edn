@@ -44,6 +44,6 @@
     [:c/collection {:id :members}
      [:c/input-field {:label "First" :id :first}]
      [:c/input-field {:label "Last" :id :last}]
-     [:p "Full name: " [:stepvine.util/value {:id :full}]
-      " · Initials: " [:stepvine.util/value {:rxn :initials}]]]
+     [:p "Full name: " [:stepvine.components/value {:id :full}]
+      " · Initials: " [:stepvine.components/value {:rxn :initials}]]]
     [:p.presence "Editors online: " [:span {:data-text "$presence"}]]]}}}

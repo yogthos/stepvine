@@ -58,7 +58,7 @@
     [:c/input-field {:label "Weight (kg)" :id :kg}]
     [:c/input-field {:label "Height (m)"  :id :m}]
     [:c/input-field {:label "BMI" :id :bmi :read-only true}]
-    [:p "Category: " [:stepvine.util/value {:rxn :bmi-category}]]
+    [:p "Category: " [:stepvine.components/value {:rxn :bmi-category}]]
     [:c/show {:when :overweight?}
      [:p.warning
       "Patient is overweight — please provide a weight-management brochure."]]
@@ -76,4 +76,4 @@
     [:c/input-field {:label "Weight (kg)" :id :kg :read-only true}]
     [:c/input-field {:label "Height (m)"  :id :m :read-only true}]
     [:c/input-field {:label "BMI" :id :bmi :read-only true}]
-    [:p "Category: " [:stepvine.util/value {:rxn :bmi-category}]]]}}}
+    [:p "Category: " [:stepvine.components/value {:rxn :bmi-category}]]]}}}
