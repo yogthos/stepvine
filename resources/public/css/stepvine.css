@@ -157,6 +157,29 @@ body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; 
 @keyframes sv-throb { 0% { opacity: 1; } 100% { opacity: .15; } }
 .throbber-label { color: #6b7280; font-size: .85rem; }
 
+/* ── Layout primitives (scroller / border / gap / line) ───────────────── */
+.scroller { overflow: auto; }
+.scroller-sm { max-height: 8rem; } .scroller-md { max-height: 16rem; } .scroller-lg { max-height: 24rem; }
+.border-box { border: 1px solid #d1d5db; padding: 1rem; }
+.border-rounded { border-radius: .5rem; }
+.gap-size-sm { flex: 0 0 .5rem; height: .5rem; } .gap-size-md { flex: 0 0 1rem; height: 1rem; }
+.gap-size-lg { flex: 0 0 2rem; height: 2rem; }
+.line-horizontal { height: 1px; background: #e5e7eb; margin: .75rem 0; }
+.line-vertical { width: 1px; align-self: stretch; background: #e5e7eb; margin: 0 .75rem; }
+
+/* ── Alert list ───────────────────────────────────────────────────────── */
+.alert-list-items { display: flex; flex-direction: column; gap: .5rem; }
+.alert-heading { display: block; margin-bottom: .15rem; }
+
+/* ── Info button ──────────────────────────────────────────────────────── */
+.info-button-anchor { position: relative; display: inline-block; }
+.info-button { width: 1.25rem; height: 1.25rem; border-radius: 50%; border: 1px solid #9ca3af;
+               background: #fff; color: #6b7280; font-style: italic; font-size: .8rem; line-height: 1;
+               cursor: pointer; padding: 0; }
+.info-button-popover { position: absolute; z-index: 40; min-width: 12rem; background: #1f2937;
+                       color: #f9fafb; border-radius: .375rem; padding: .5rem .7rem; font-size: .85rem;
+                       box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+
 /* ── Modal panel ──────────────────────────────────────────────────────── */
 .modal-trigger { padding: .35rem .75rem; border: 1px solid #d1d5db; border-radius: .375rem;
                  background: #fff; cursor: pointer; }

@@ -1,7 +1,8 @@
 (ns yogthos.stepvine.widgets.layout.alert
-  "Alert widget — displays a styled message. Optionally conditional via :when signal."
+  "Alert widgets — a single styled message (alert) and a stack of them
+   (alert-list, re-com's alert-list). Optionally conditional via :when signal."
   (:require
-   [yogthos.stepvine.render :refer [render-widget]]))
+   [yogthos.stepvine.render :as render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/alert
   [ctx _component {:keys [class when label]} _body]
@@ -10,3 +11,17 @@
             :role  "alert"}
      when (assoc "data-show" (str "$" (name when))))
    (or label "No message")])
+
+(defmethod render-widget :stepvine.components/alert-list
+  [ctx _component {:keys [label alerts]} body]
+  ;; Render from an :alerts data vector ({:class :heading :body}) and/or arbitrary
+  ;; body children (e.g. nested :alert widgets).
+  [:div.widget.alert-list
+   (when label [:label label])
+   (into [:div.alert-list-items]
+         (concat
+          (for [{:keys [class heading body]} alerts]
+            [:div {:class (str "alert " (or class "alert-info")) :role "alert"}
+             (when heading [:strong.alert-heading (str heading)])
+             [:span (str body)]])
+          (render/render-children ctx body)))])

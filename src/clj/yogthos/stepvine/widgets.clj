@@ -9,6 +9,7 @@
    yogthos.stepvine.widgets.layout.show
    yogthos.stepvine.widgets.layout.alert
    yogthos.stepvine.widgets.layout.box
+   yogthos.stepvine.widgets.layout.primitives
    ;; basic inputs + display
    yogthos.stepvine.widgets.basics.input-field
    yogthos.stepvine.widgets.basics.input-password
@@ -42,6 +43,7 @@
    ;; buttons / actions
    yogthos.stepvine.widgets.buttons.action
    yogthos.stepvine.widgets.buttons.hyperlink
+   yogthos.stepvine.widgets.buttons.info-button
    ;; display / feedback
    yogthos.stepvine.widgets.display.progress-bar
    yogthos.stepvine.widgets.display.throbber

@@ -157,16 +157,26 @@
          [:c/title {:text "Details" :level 3}]
          [:c/h-box {:gap :md :align :center}
           [:c/paragraph {:text "h-box lays children in a row."}]
-          [:c/hyperlink {:href "https://re-com.day8.com.au/" :target "_blank" :label "re-com →"}]]]]]
+          [:c/hyperlink {:href "https://re-com.day8.com.au/" :target "_blank" :label "re-com →"}]]]
+        [:c/line {:orientation :horizontal}]
+        [:c/border {:rounded? true}
+         [:c/scroller {:size :sm}
+          [:c/paragraph {:text "A bordered, scrollable region (scroller inside border). Resize the window to see it scroll."}]
+          [:c/paragraph {:text "Layout primitives — scroller, border, gap, line — are pure structure; the theme supplies all spacing and rules."}]]]]]
 
       [:section#sec-feedback.sv-panel
-       [:h2 "Feedback" [:span.sv-kw ":progress-bar  :throbber"]]
-       [:p.sv-desc "A progress bar bound to a numeric field (edit it above-style via the slider) and a CSS throbber."]
+       [:h2 "Feedback" [:span.sv-kw ":progress-bar  :throbber  :alert-list  :info-button"]]
+       [:p.sv-desc "A progress bar bound to a numeric field (edit it above-style via the slider), a CSS throbber, a stack of alerts, and an inline info button."]
        [:div.sv-demo
-        [:c/slider {:id :progress :label "Progress" :min 0 :max 100 :step 5}]
+        [:c/h-box {:gap :sm :align :center}
+         [:c/slider {:id :progress :label "Progress" :min 0 :max 100 :step 5}]
+         [:c/info-button {:signal "progInfo" :info "Drag the slider; the bar below tracks it live over SSE."}]]
         [:c/progress-bar {:id :progress :label "Upload" :striped? true}]
         [:c/v-box {:gap :sm}
-         [:c/throbber {:size :regular :label "Working…"}]]]]
+         [:c/throbber {:size :regular :label "Working…"}]]
+        [:c/alert-list {:label "Notices"
+                        :alerts [{:class "alert-warning" :heading "Heads up" :body "Some fields are optional."}
+                                 {:class "alert-success" :body "Everything is saved server-side as you type."}]}]]]
 
       [:section#sec-overlays.sv-panel
        [:h2 "Overlays" [:span.sv-kw ":popover  :modal-panel"]]

@@ -598,3 +598,41 @@
     (is (str/includes? html "data-show=\"$tip\""))
     (is (str/includes? html "$tip = !$tip"))                   ; trigger toggles
     (is (str/includes? html "<span>hint</span>"))))
+
+;; --- re-com parity: layout primitives + feedback ---------------------------
+
+(deftest layout-primitives-emit-structure-classes
+  (is (str/includes?
+       (hiccup->html (render-widget-hiccup [:stepvine.components/scroller {:size :sm} [:p "x"]]))
+       "scroller scroller-sm"))
+  (is (str/includes?
+       (hiccup->html (render-widget-hiccup [:stepvine.components/border {:rounded? true} [:span "x"]]))
+       "border-box border-rounded"))
+  (is (str/includes?
+       (hiccup->html (render-widget-hiccup [:stepvine.components/gap {:size :lg}]))
+       "gap-size-lg"))
+  (let [line (hiccup->html (render-widget-hiccup [:stepvine.components/line {:orientation :vertical}]))]
+    (is (str/includes? line "line-vertical"))
+    (is (str/includes? line "role=\"separator\""))))
+
+(deftest alert-list-renders-each-alert
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/alert-list
+                {:label "Notices"
+                 :alerts [{:class "alert-warning" :heading "Heads up" :body "Check this."}
+                          {:class "alert-success" :body "All good."}]}]))]
+    (is (str/includes? html "alert-list-items"))
+    (is (str/includes? html "alert-warning"))
+    (is (str/includes? html "Heads up"))
+    (is (str/includes? html "alert-success"))
+    (is (= 2 (count (re-seq #"role=\"alert\"" html))))))
+
+(deftest info-button-toggles-help-popover
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/info-button {:signal "i1" :info "Helpful note."}]))]
+    (is (str/includes? html "info-button"))
+    (is (str/includes? html "$i1 = !$i1"))
+    (is (str/includes? html "data-show=\"$i1\""))
+    (is (str/includes? html "Helpful note."))))
