@@ -48,7 +48,13 @@
     :fn (fn [r] (cond (nil? r) "n/a" (< r 3) "low" (< r 7) "medium" :else "high"))}
    {:id :high-rating? :args [:rating] :fn (fn [r] (>= (or r 0) 7))}
    {:id :tab-overview? :args [:tab] :fn (fn [t] (or (nil? t) (= t "overview")))}
-   {:id :tab-details?  :args [:tab] :fn (fn [t] (= t "details"))}]}
+   {:id :tab-details?  :args [:tab] :fn (fn [t] (= t "details"))}
+   ;; drives the chart: a JSON series derived from the rating slider, so the
+   ;; chart redraws live as you drag it (signal name chart_data = $chart_data,
+   ;; which the :chart widget reads as <id>_data).
+   {:id :chart-data :args [:rating]
+    :fn (fn [r] (let [b (or r 5)]
+                  (str "[" b "," (* 2 b) "," (max 1 (dec b)) "," (+ b 3) "," b "]")))}]}
 
  :exports
  {:summary {:label "Export summary"
@@ -74,6 +80,7 @@
        [:li [:a {:href "#sec-nav"}      "Tabs & layout"]]
        [:li [:a {:href "#sec-feedback"} "Feedback"]]
        [:li [:a {:href "#sec-overlays"} "Overlays"]]
+       [:li [:a {:href "#sec-viz"}      "Visualization"]]
        [:li [:a {:href "#sec-people"}   "Collection"]]
        [:li [:a {:href "#sec-table"}    "Table"]]
        [:li [:a {:href "#sec-actions"}  "Actions"]]]]
@@ -187,6 +194,13 @@
           [:span "Every widget here is server-authoritative — this popover is the rare bit of purely-local UI state."]]
          [:c/modal-panel {:signal "demoModal" :title "Hello from a modal" :trigger-label "Open modal"}
           [:p "Modal content rendered as ordinary children. Click the backdrop or × to close."]]]]]
+
+      [:section#sec-viz.sv-panel
+       [:h2 "Visualization" [:span.sv-kw ":chart  :calendar"]]
+       [:p.sv-desc "A Highcharts line chart driven by the rating slider (drag it above to redraw live) and a CalendarJS week schedule."]
+       [:div.sv-demo
+        [:c/chart {:id :chart :chart-type :line :x-axis-title "Day" :y-axis-title "Rating"}]
+        [:c/calendar {:id :cal :label "Schedule"}]]]
 
       [:section#sec-people.sv-panel
        [:h2 "Collection" [:span.sv-kw ":collection"]]
