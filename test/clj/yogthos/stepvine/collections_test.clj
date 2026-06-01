@@ -131,3 +131,74 @@
       (is (str/includes? html (str "data-bind=\"members_" idx "_first\"")))
       (is (str/includes? html "/coll/members/add"))
       (is (str/includes? html (str "/coll/members/" idx "/remove"))))))
+
+;; --- Table view-state (sort / page / row order) ---------------------------
+
+(defn- order-of [mgr]
+  (get-in (render/collections-data (session/current mgr "roster")) [:members :order]))
+
+(deftest move-item-reorders-by-view-state
+  (let [[_ _ mgr] (mgr+)
+        form (forms/load-form "roster")]
+    (session/ensure-document! mgr "roster" form {})
+    (let [i1 (session/add-item! mgr "roster" :members)
+          i2 (session/add-item! mgr "roster" :members)
+          i3 (session/add-item! mgr "roster" :members)]
+      (testing "initial order is insertion order"
+        (is (= [i1 i2 i3] (order-of mgr))))
+      (testing "moving i3 before i1 reorders the collection"
+        (session/move-item! mgr "roster" :members i3 i1)
+        (is (= [i3 i1 i2] (order-of mgr))))
+      (testing "a newly added item appears after the stored order"
+        (let [i4 (session/add-item! mgr "roster" :members)]
+          (is (= [i3 i1 i2 i4] (order-of mgr)))))
+      (testing "removing an item drops it from the rendered order"
+        (session/remove-item! mgr "roster" :members i1)
+        (is (= [i3 i2] (vec (filter #{i3 i2} (order-of mgr)))))
+        (is (not (some #{i1} (order-of mgr))))))))
+
+(defn- render-tasks [mgr]
+  (let [sess (session/current mgr "tasks")
+        ctx  (assoc (render/session->context sess :default "tasks") :options {})]
+    (render/render-view ctx (render/view-markup sess :default))))
+
+(defn- positions [html & labels]
+  (map #(str/index-of html (str "value=\"" % "\"")) labels))
+
+(defn- row-count [html] (count (re-seq #"id=\"row-tasks-" html)))
+
+(deftest table-sort-and-page
+  (let [[_ _ mgr] (mgr+)
+        form (forms/load-form "tasks")]   ; page-size 3, columns Title + Priority
+    (session/ensure-document! mgr "tasks" form {})
+    (let [a (session/add-item! mgr "tasks" :tasks)
+          b (session/add-item! mgr "tasks" :tasks)
+          c (session/add-item! mgr "tasks" :tasks)]
+      (doseq [[idx t p] [[a "Charlie" 3] [b "Alice" 1] [c "Bob" 2]]]
+        (session/set-item-field! mgr "tasks" :tasks idx :title t)
+        (session/set-item-field! mgr "tasks" :tasks idx :priority p))
+      (testing "no sort: 3 rows on a single page"
+        (let [html (render-tasks mgr)]
+          (is (= 3 (row-count html)))
+          (is (str/includes? html "Page 1 of 1"))))
+      (testing "sort by title ascending orders the rows alphabetically"
+        (session/set-table-sort! mgr "tasks" :tasks "title")
+        (let [[alice bob charlie] (positions (render-tasks mgr) "Alice" "Bob" "Charlie")]
+          (is (< alice bob charlie))))
+      (testing "clicking the same column again toggles to descending"
+        (session/set-table-sort! mgr "tasks" :tasks "title")
+        (let [[charlie bob alice] (positions (render-tasks mgr) "Charlie" "Bob" "Alice")]
+          (is (< charlie bob alice))))
+      (testing "sort by priority is numeric (1,2,3 -> Alice,Bob,Charlie)"
+        (session/set-table-sort! mgr "tasks" :tasks "title")      ; third cycle clears
+        (session/set-table-sort! mgr "tasks" :tasks "priority")
+        (let [[alice bob charlie] (positions (render-tasks mgr) "Alice" "Bob" "Charlie")]
+          (is (< alice bob charlie))))
+      (testing "paging splits a 4th row onto page 2"
+        (let [d (session/add-item! mgr "tasks" :tasks)]
+          (session/set-item-field! mgr "tasks" :tasks d :title "Dave")
+          (is (str/includes? (render-tasks mgr) "Page 1 of 2"))
+          (is (= 3 (row-count (render-tasks mgr))))
+          (session/set-table-page! mgr "tasks" :tasks "next")
+          (is (str/includes? (render-tasks mgr) "Page 2 of 2"))
+          (is (= 1 (row-count (render-tasks mgr)))))))))

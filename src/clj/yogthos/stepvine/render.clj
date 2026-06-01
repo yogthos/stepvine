@@ -132,14 +132,30 @@
 
 ;; --- Collections: data + signals ------------------------------------------
 
+(defn- apply-order
+  "Reorder a collection's :order by an explicit view-state order vector: stored
+   order first (present items only), then any items not in it (newly added)."
+  [{:keys [order] :as cd} explicit]
+  (if (seq explicit)
+    (let [present (set order)
+          ordered (vec (filter present explicit))
+          extra   (vec (remove (set ordered) order))]
+      (assoc cd :order (into ordered extra)))
+    cd))
+
 (defn collections-data
   "Per-collection render data from a live session:
    {coll-id {:order [idx...] :field-opts {fid -> opts} :items {idx {id -> value}}}}.
    Each item's value map carries both model fields AND the per-item reaction
    values declared on the collection's :schema. (Delegates to the editor seam,
-   which reconstructs collections on top of the underlying engine.)"
+   which reconstructs collections on top of the underlying engine, then applies
+   any per-collection row ordering from the session's table view-state.)"
   [session]
-  (data/collections-data session))
+  (let [view (:view-state session)]
+    (reduce-kv (fn [acc coll cd]
+                 (assoc acc coll (apply-order cd (get-in view [coll :order]))))
+               {}
+               (data/collections-data session))))
 
 (defn- coll-sig [coll-id idx fid]
   (str (signal-name coll-id) "_" idx "_" (signal-name fid)))
@@ -221,6 +237,7 @@
                         (map :id (get-in form [:data :reactions])))
      :field-opts  field-opts
      :collections (collections-data session)
+     :view-state  (:view-state session)   ; table sort/page/filter (presentation)
      :aliases     (get-in view [:opts :widget-namespaces])
      :doc-id      doc-id}))
 
@@ -233,16 +250,20 @@
   [session view-id]
   (get-in session [:form :views view-id :markup]))
 
+(def ^:private collection-widgets
+  "Widgets that render a collection container and can be re-rendered standalone."
+  #{:stepvine.components/collection :stepvine.components/table})
+
 (defn find-collection-node
-  "Find the [:c/collection {:id coll-id} ...] markup node in a view, for
-   re-rendering the container on add/remove. coll-id is a keyword."
+  "Find the collection/table markup node with `:id` coll-id in a view, for
+   re-rendering the container on add/remove/sort/page/move. coll-id is a keyword."
   [markup aliases coll-id]
   (let [found (atom nil)]
     (walk/prewalk
      (fn [n]
        (when (and (nil? @found)
                   (widget-node? n)
-                  (= :stepvine.components/collection (resolve-component aliases (first n)))
+                  (collection-widgets (resolve-component aliases (first n)))
                   (= coll-id (:id (second n))))
          (reset! found n))
        n)

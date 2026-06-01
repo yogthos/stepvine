@@ -1,0 +1,36 @@
+;; Table widget demo — a sortable, pageable, reorderable task list backed by a
+;; collection. Exercises the table view-state (sort / page / row-order) on top of
+;; the domino-nested-model collection.
+{:id :tasks
+ :title "Task List"
+ :version 1
+
+ :data
+ {:model
+  [[:tasks
+    {:id :tasks :collection? true :index-id :tid
+     :schema
+     {:model [[:tid      {:id :tid}]
+              [:title    {:id :title    :type :string}]
+              [:priority {:id :priority :type :number}]]}}]]}
+
+ :views
+ {:default
+  {:title "Task List"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Tasks"]
+    [:c/table
+     {:id :tasks
+      :columns [{:path :title    :label "Title"    :sortable? true
+                 :widget :stepvine.components/input-field}
+                {:path :priority :label "Priority" :sortable? true
+                 :widget :stepvine.components/input-field}]
+      :can-add-rows?    true
+      :can-delete-rows? true
+      :can-move-rows?   true
+      :can-clear-table? true
+      :paged?           true
+      :page-size        3
+      :striped?         true}]]}}}

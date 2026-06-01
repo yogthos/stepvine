@@ -197,20 +197,25 @@
   {:requires [:forms :documents :session-manager :hub :options-store]
    :input    {:doc-id :any :coll-id :any :query-params :any}
    :output   {:status :int :body :string}
-   :doc      "Re-render the collection with sort info (view-only, no data change)."}
-  (fn [resources {:keys [doc-id coll-id]}]
+   :doc      "Cycle the sort for a column (view-state) and re-render."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id query-params]}]
     (when (docs/ensure! resources doc-id)
-      (rerender-collection! resources doc-id (keyword coll-id)))
+      (let [coll (keyword coll-id)]
+        (when-let [col (get query-params "col")]
+          (session/set-table-sort! session-manager doc-id coll col))
+        (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
 (myc/defcell :form/coll-page
   {:requires [:forms :documents :session-manager :hub :options-store]
    :input    {:doc-id :any :coll-id :any :query-params :any}
    :output   {:status :int :body :string}
-   :doc      "Re-render the collection with page info (view-only, no data change)."}
-  (fn [resources {:keys [doc-id coll-id]}]
+   :doc      "Advance/rewind the table page (view-state) and re-render."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id query-params]}]
     (when (docs/ensure! resources doc-id)
-      (rerender-collection! resources doc-id (keyword coll-id)))
+      (let [coll (keyword coll-id)]
+        (session/set-table-page! session-manager doc-id coll (get query-params "dir"))
+        (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
 (myc/defcell :form/coll-filter

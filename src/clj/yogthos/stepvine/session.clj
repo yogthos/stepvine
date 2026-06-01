@@ -118,30 +118,59 @@
   [manager doc-id coll-id]
   (vec (filter string? (keys (get (impl/db (current manager doc-id)) coll-id)))))
 
-(defn move-item!
-  "Reorder collection items by moving from one position to another. Stores an
-   explicit :order vector for the collection.
-   NOTE: collection ordering is still WIP — collections-data does not yet sort by
-   this :order, so reordering is not reflected in rendering on the current engine."
-  [manager doc-id coll-id from-idx to-idx]
-  (let [ks      (item-keys manager doc-id coll-id)
-        f-i     (parse-long from-idx)
-        t-i     (parse-long to-idx)
-        from-k  (get ks f-i)]
-    (when (and from-k (not= from-idx to-idx) (seq ks))
-      (let [new-order (-> (vec ks)
-                          (subvec 0 f-i)
-                          (into (subvec ks (inc f-i)))
-                          (#(let [h (subvec % 0 t-i)
-                                  r (subvec % t-i)]
-                              (-> h (conj from-k) (into r)))))]
-        (apply-change! manager doc-id [[[coll-id :order] new-order]])))))
-
 (defn clear-items!
-  "Remove all items from a collection."
+  "Remove all items from a collection (and any stored view ordering)."
   [manager doc-id coll-id]
   (doseq [k (item-keys manager doc-id coll-id)]
     (apply-change! manager doc-id [[[coll-id k] nil]])))
+
+;; --- Table view-state (presentation only; per document, shared by viewers) ---
+;; Sort/page/row-order/filter are not document data — domino has no concept of
+;; them — so they live in the session map under :view-state {coll-id {...}} and
+;; survive transacts (apply only touches ::ctx). Updated directly on the session
+;; atom (no domino transact); the route handler re-renders + broadcasts.
+
+(defn- update-view!
+  [manager doc-id coll-id f]
+  (swap! (e/get-session-atom! manager doc-id)
+         update-in [:view-state coll-id] (fnil f {})))
+
+(defn move-item!
+  "Reorder a collection by moving item key `from-key` to before `to-key`. Stores
+   the resulting order in view-state; collections-data renders by it."
+  [manager doc-id coll-id from-key to-key]
+  (when (and from-key to-key (not= from-key to-key))
+    (let [base (set (item-keys manager doc-id coll-id))]
+      (when (and (base from-key) (base to-key))
+        (update-view! manager doc-id coll-id
+                      (fn [{:keys [order] :as vs}]
+                        (let [cur (vec (filter base (or (not-empty order) (item-keys manager doc-id coll-id))))
+                              cur (vec (remove #{from-key} cur))
+                              ti  (.indexOf cur to-key)
+                              ti  (if (neg? ti) (count cur) ti)]
+                          (assoc vs :order (vec (concat (subvec cur 0 ti) [from-key] (subvec cur ti)))))))))))
+
+(defn set-table-sort!
+  "Cycle the sort for a column: unsorted → asc → desc → unsorted."
+  [manager doc-id coll-id col]
+  (let [col (keyword col)]
+    (update-view! manager doc-id coll-id
+                  (fn [{:keys [sort] :as vs}]
+                    (assoc vs :sort
+                           (cond
+                             (not= (:col sort) col) {:col col :dir :asc}
+                             (= (:dir sort) :asc)   {:col col :dir :desc}
+                             :else                  nil))))))
+
+(defn set-table-page!
+  "Move the table page: dir is \"next\"/\"prev\" or an absolute integer string."
+  [manager doc-id coll-id dir]
+  (update-view! manager doc-id coll-id
+                (fn [{:keys [page] :or {page 0} :as vs}]
+                  (assoc vs :page (max 0 (case dir
+                                           "next" (inc page)
+                                           "prev" (dec page)
+                                           (or (parse-long (str dir)) page)))))))
 
 (defn set-item-field!
   "Set a single field of a collection item (vector id [coll idx field])."

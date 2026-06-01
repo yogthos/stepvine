@@ -30,6 +30,32 @@
 (defn- coll-base [ctx coll-id]
   (str "/doc/" (:doc-id ctx) "/coll/" (name coll-id)))
 
+(defn- cmp-vals [a b]
+  (cond
+    (= a b)                        0
+    (nil? a)                       1
+    (nil? b)                       -1
+    (and (number? a) (number? b))  (compare a b)
+    :else                          (compare (str a) (str b))))
+
+(defn- apply-view
+  "Apply the table's server-side view-state (sort column/dir, paging) to the row
+   order. Returns {:order display-order :sort {:col :dir} :page p :pages n}."
+  [ctx coll-id order items {:keys [page-size paged?]}]
+  (let [{:keys [sort page] :or {page 0}} (get-in ctx [:view-state coll-id])
+        sorted (if-let [col (:col sort)]
+                 (let [asc (sort-by #(get-in items [% col]) cmp-vals (vec order))]
+                   (vec (if (= :desc (:dir sort)) (reverse asc) asc)))
+                 (vec order))
+        total  (count sorted)
+        psize  (max 1 (or page-size 100))
+        pages  (max 1 (long (Math/ceil (/ (double (max 1 total)) psize))))
+        page   (max 0 (min page (dec pages)))
+        win    (if paged?
+                 (subvec sorted (min (* page psize) total) (min (* (inc page) psize) total))
+                 sorted)]
+    {:order win :sort sort :page page :pages pages :total total}))
+
 ;; ═══════════════════════════════════════════════════════════════════════════
 ;; per-cell widget construction
 ;; ═══════════════════════════════════════════════════════════════════════════
@@ -114,24 +140,18 @@
 ;; ═══════════════════════════════════════════════════════════════════════════
 
 (defn- page-controls
-  [ctx coll-id]
-  (let [sig (render/item-signal-name ctx coll-id)]
+  "Server-state pager: prev/next POST /page?dir=… and the server re-renders with
+   the new page; the page indicator is rendered server-side."
+  [ctx coll-id page pages]
+  (let [base (coll-base ctx coll-id)]
     [:div.widget-table-pager
      [:nav [:ul.pagination
-            [:li.page-item
-             [:a.page-link {:href "#"
-                            "data-on:click"
-                            (str "$" sig "_page = Math.max(0, ($" sig "_page || 0) - 1); "
-                                 "@post('" (coll-base ctx coll-id) "/page')")}
-              "«"]]
+            [:li.page-item {:class (when (<= page 0) "disabled")}
+             [:a.page-link {:href "#" "data-on:click" (str "@post('" base "/page?dir=prev')")} "«"]]
             [:li.page-item.disabled
-             [:span.page-link {"data-text" (str "$" sig "_page_info")} ""]]
-            [:li.page-item
-             [:a.page-link {:href "#"
-                            "data-on:click"
-                            (str "$" sig "_page = ($" sig "_page || 0) + 1; "
-                                 "@post('" (coll-base ctx coll-id) "/page')")}
-              "»"]]]]]))
+             [:span.page-link (str "Page " (inc page) " of " pages)]]
+            [:li.page-item {:class (when (>= (inc page) pages) "disabled")}
+             [:a.page-link {:href "#" "data-on:click" (str "@post('" base "/page?dir=next')")} "»"]]]]]))
 
 ;; ═══════════════════════════════════════════════════════════════════════════
 ;; inline JS for drag-and-drop + horizontal scroll
@@ -328,7 +348,10 @@
         row-path       (conj table-path idx)
         row-read-only? (boolean (or read-only (get-in opts [:row-read-only idx])))]
     [:tr
-     {:class (str (when row-read-only? "read-only"))
+     ;; stable id so a re-ordering morph relocates the whole row (with its bound
+     ;; inputs) instead of reconciling cell contents positionally
+     {:id (str "row-" (name coll-id) "-" idx)
+      :class (str (when row-read-only? "read-only"))
       "data-table-row-idx" (str idx)}
      (when row-controls?
        [:td.widget-table-row-controls
@@ -415,7 +438,7 @@
                         [:button.btn.btn-outline-secondary.btn-sm.widget-table-add-column
                          {"data-on:click" (str "@post('" base "/columns-add')")}
                          "Add Column"])]))
-             (when paged? (page-controls ctx coll-id))]]]])]])))
+             (when paged? (page-controls ctx coll-id (:page opts 0) (:pages opts 1)))]]]])]])))
 
 ;; ═══════════════════════════════════════════════════════════════════════════
 ;; horizontal table
@@ -495,7 +518,7 @@
                     [:button.btn.btn-outline-secondary.btn-sm.widget-table-add-column
                      {"data-on:click" (str "@post('" base "/columns-add')")}
                      "Add Column"])]))
-         (when paged? (page-controls ctx coll-id))])])))
+         (when paged? (page-controls ctx coll-id (:page opts 0) (:pages opts 1)))])])))
 
 ;; ═══════════════════════════════════════════════════════════════════════════
 ;; main render
@@ -529,6 +552,9 @@
                               {:path fid
                                :label (or (:label fopts) (name fid))})
                             field-opts))
+        ;; server-side view-state: sort + paging applied to the (already row-
+        ;; ordered) collection; the displayed order/indicators come from here.
+        view      (apply-view ctx coll-id order items {:page-size page-size :paged? paged?})
         merged    (merge
                    {:row-controls?       (or row-controls?
                                             can-add-rows? can-delete-rows? can-move-rows?)
@@ -549,17 +575,20 @@
                     :hover-highlight?    hover-highlight?
                     :condensed?          condensed?
                     :customizable?       customizable?
-                    :current-sort-col    current-sort-col
-                    :current-sort-dir    current-sort-dir
                     :field-opts          field-opts
                     :read-only           read-only}
-                   opts)]
-    [:div.widget.widget-table
+                   opts
+                   {:current-sort-col (get-in view [:sort :col])
+                    :current-sort-dir (get-in view [:sort :dir])
+                    :page             (:page view)
+                    :pages            (:pages view)})]
+    ;; stable id so the re-render (patch-elements morph) can target this table
+    [:div.widget.widget-table {:id (str "coll-" (name coll-id))}
      (when label
        (if (string? label)
          [:label.widget-table-label label]
          [:div.widget-table-label label]))
      (when filter (filter-dropdown ctx coll-id filter))
      (if horizontal?
-       (horizontal-table ctx coll-id columns items order merged)
-       (vertical-table ctx coll-id columns items order merged))]))
+       (horizontal-table ctx coll-id columns items (:order view) merged)
+       (vertical-table ctx coll-id columns items (:order view) merged))]))

@@ -148,6 +148,38 @@ try {
     .catch(() => bad('live propagation between users failed'));
   await ctx2.close();
 
+  // ---- 7. Table widget — add / sort / page ------------------------------
+  step('7. Table widget — add, sort, page');
+  const tTitles = async () => {
+    const c = await page.locator('tbody tr[data-table-row-idx]').count();
+    const out = [];
+    for (let i = 0; i < c; i++) out.push(await page.locator('tbody tr[data-table-row-idx]').nth(i).locator('input').nth(0).inputValue());
+    return out;
+  };
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Task List")'), '.widget-table');
+  ok('opened a table document');
+  // three filled rows (all fit on page 1, size 3) for clean sort assertions
+  for (let i = 0; i < 3; i++) { await page.click('.widget-table-add-row'); await page.waitForTimeout(250); }
+  const tdata = [['Charlie', '3'], ['Alice', '1'], ['Bob', '2']];
+  for (let i = 0; i < 3; i++) {
+    const r = page.locator('tbody tr[data-table-row-idx]').nth(i);
+    await r.locator('input').nth(0).fill(tdata[i][0]); await r.locator('input').nth(1).fill(tdata[i][1]);
+    await page.waitForTimeout(150);
+  }
+  await page.waitForTimeout(300);
+  await page.click('th.widget-table-sortable-column:has-text("Title")'); await page.waitForTimeout(400);
+  JSON.stringify(await tTitles()) === JSON.stringify(['Alice', 'Bob', 'Charlie']) ? ok('sort by title ascending') : bad(`sort asc wrong: ${await tTitles()}`);
+  await page.click('th.widget-table-sortable-column:has-text("Title")'); await page.waitForTimeout(400);
+  JSON.stringify(await tTitles()) === JSON.stringify(['Charlie', 'Bob', 'Alice']) ? ok('sort by title descending') : bad(`sort desc wrong: ${await tTitles()}`);
+  await page.click('th.widget-table-sortable-column:has-text("Priority")'); await page.waitForTimeout(400);
+  JSON.stringify(await tTitles()) === JSON.stringify(['Alice', 'Bob', 'Charlie']) ? ok('sort by priority (numeric)') : bad(`sort prio wrong: ${await tTitles()}`);
+  // a 4th row exercises paging (size 3 -> 2 pages)
+  await page.click('.widget-table-add-row'); await page.waitForTimeout(300);
+  (await page.locator('.widget-table-pager').innerText()).includes('of 2') ? ok('4th row creates page 2') : bad('paging info wrong');
+  await page.click('.widget-table-pager a:has-text("»")'); await page.waitForTimeout(400);
+  (await page.locator('.widget-table-pager').innerText()).includes('Page 2 of 2') ? ok('paged to page 2') : bad('next page failed');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');
