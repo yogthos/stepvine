@@ -6,12 +6,14 @@
 (defmethod render-widget :stepvine.components/checkbox
   [ctx _component {:keys [id label read-only]} _body]
   (let [sig      (render/item-signal-name ctx id)
-        in-item? (boolean (:item ctx))]
+        in-item? (boolean (:item ctx))
+        checked? (boolean (get-in ctx [:values id]))]
     [:div.widget.checkbox.field
      [:input
       (cond-> {:type  "checkbox"
                "data-bind" sig}
         (not in-item?) (assoc :id (name id) :name (name id))
+        checked?       (assoc :checked true)   ; reflect the persisted value
         read-only      (assoc :disabled true)
         (not read-only)
         (assoc "data-on:change" (str "@post('" (render/field-post-url ctx id) "')")

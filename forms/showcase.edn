@@ -16,7 +16,7 @@
    [:size      {:id :size      :type :string}]
    [:plan      {:id :plan      :type :string}]
    [:tool      {:id :tool      :type :string}]
-   [:agree     {:id :agree     :type :string}]
+   [:agree     {:id :agree     :type :boolean}]
    [:rating    {:id :rating    :type :number}]
    [:birthday  {:id :birthday  :type :string}]
    [:meeting   {:id :meeting   :type :string}]
