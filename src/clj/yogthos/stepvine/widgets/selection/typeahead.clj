@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.typeahead
+(ns yogthos.stepvine.widgets.selection.typeahead
   "Typeahead/autocomplete widget using HTML5 datalist."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

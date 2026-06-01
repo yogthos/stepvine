@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.alert
+(ns yogthos.stepvine.widgets.layout.alert
   "Alert widget — displays a styled message. Optionally conditional via :when signal."
   (:require
    [yogthos.stepvine.render :refer [render-widget]]))

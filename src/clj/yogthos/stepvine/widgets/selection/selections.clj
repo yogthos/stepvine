@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.selections
+(ns yogthos.stepvine.widgets.selection.selections
   "Button-based selection widget (single or multi)."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.text
+(ns yogthos.stepvine.widgets.basics.text
   "Textarea and labeled-value widgets."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

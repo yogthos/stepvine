@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.date-picker
+(ns yogthos.stepvine.widgets.basics.date-picker
   "Date input widget."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

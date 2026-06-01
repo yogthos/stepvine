@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.chart
+(ns yogthos.stepvine.widgets.viz.chart
   "Chart widget — renders a Highcharts chart driven by Datastar signals.
    The widget emits a container div, a Highcharts CDN <script> tag, and an inline
    script that reads signal data to initialize/update the chart reactively."

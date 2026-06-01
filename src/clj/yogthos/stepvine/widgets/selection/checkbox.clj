@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.checkbox
+(ns yogthos.stepvine.widgets.selection.checkbox
   "Checkbox widget — boolean toggle with label."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

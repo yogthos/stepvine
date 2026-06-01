@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.section
+(ns yogthos.stepvine.widgets.layout.section
   "Fieldset section — groups child widgets under an optional legend."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

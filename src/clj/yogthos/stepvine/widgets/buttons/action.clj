@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.action
+(ns yogthos.stepvine.widgets.buttons.action
   "Action buttons — trigger a server-side action (e.g. an export), or the form
    builder's build step."
   (:require

@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.input-time
+(ns yogthos.stepvine.widgets.basics.input-time
   "Time input widget using HTML5 type=\"time\"."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.label
+(ns yogthos.stepvine.widgets.basics.label
   "Static label widget — displays text, optionally bound to a signal."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

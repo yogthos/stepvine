@@ -312,7 +312,7 @@
 
 (deftest table-cell-locking-uses-cell-path
   "Per-cell locking: each cell's lock-container-path is the cell path [coll idx field]."
-  (let [node (yogthos.stepvine.widgets.table/build-cell-node
+  (let [node (yogthos.stepvine.widgets.tables.table/build-cell-node
               {:lock-granularity :cell}
               [:people]
               {:path :name :label "Name"}
@@ -323,7 +323,7 @@
 
 (deftest table-row-locking-uses-row-path
   "Per-row locking: all cells in a row share the row path."
-  (let [node (yogthos.stepvine.widgets.table/build-cell-node
+  (let [node (yogthos.stepvine.widgets.tables.table/build-cell-node
               {:lock-granularity :row}
               [:people]
               {:path :name :label "Name"}
@@ -333,7 +333,7 @@
 
 (deftest table-table-locking-uses-table-path
   "Per-table locking: all cells share the table path."
-  (let [node (yogthos.stepvine.widgets.table/build-cell-node
+  (let [node (yogthos.stepvine.widgets.tables.table/build-cell-node
               {:lock-granularity :table}
               [:people]
               {:path :name :label "Name"}
@@ -343,7 +343,7 @@
 
 (deftest table-cell-locking-defaults-to-cell
   "Default lock-granularity is :cell."
-  (let [node (yogthos.stepvine.widgets.table/build-cell-node
+  (let [node (yogthos.stepvine.widgets.tables.table/build-cell-node
               {}
               [:people]
               {:path :name :label "Name"}

@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.calendar
+(ns yogthos.stepvine.widgets.viz.calendar
   "Calendar/Schedule widget using @calendarjs/ce.
    Renders an event schedule (day/week view) driven by Datastar signals.
    Loads CalendarJS via CDN and initializes from signal data."

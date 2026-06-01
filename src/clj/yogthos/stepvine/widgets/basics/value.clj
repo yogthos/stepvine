@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.value
+(ns yogthos.stepvine.widgets.basics.value
   "Inline signal-bound text — renders a field or reaction value as a <span>."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

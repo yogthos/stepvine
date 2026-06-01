@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.form
+(ns yogthos.stepvine.widgets.layout.form
   "Form container widget — seeds all signals and opens the SSE stream."
   (:require
    [jsonista.core :as json]

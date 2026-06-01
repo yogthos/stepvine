@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.checkbox-enabled
+(ns yogthos.stepvine.widgets.selection.checkbox-enabled
   "Checkbox-enabled text field widget — a checkbox that toggles a paired text input.
    When unchecked, the text field is disabled and cleared."
   (:require

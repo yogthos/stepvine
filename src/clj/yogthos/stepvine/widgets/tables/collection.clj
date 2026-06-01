@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.collection
+(ns yogthos.stepvine.widgets.tables.collection
   "Collection container — renders each item from the body template with
    item-scoped signals, plus add/remove controls."
   (:require

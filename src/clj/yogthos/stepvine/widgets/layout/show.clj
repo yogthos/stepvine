@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.show
+(ns yogthos.stepvine.widgets.layout.show
   "Conditional block — visible only when a reaction signal is truthy."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.radio
+(ns yogthos.stepvine.widgets.selection.radio
   "Radio button group widget."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

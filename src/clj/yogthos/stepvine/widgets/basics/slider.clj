@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.slider
+(ns yogthos.stepvine.widgets.basics.slider
   "Range slider widget with value display."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

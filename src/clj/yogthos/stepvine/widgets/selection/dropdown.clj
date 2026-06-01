@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.dropdown
+(ns yogthos.stepvine.widgets.selection.dropdown
   "Select/dropdown widget with option formatting, placeholder, and filtering.
    Serves both `:dropdown` and the form-facing `:dropdown-select` alias."
   (:require

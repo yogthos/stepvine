@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.table
+(ns yogthos.stepvine.widgets.tables.table
   "Server-rendered table widget with per-cell locking, custom cell widgets,
    sorting, filtering, paging, drag-and-drop rows/columns, column customization,
    and horizontal/vertical modes.

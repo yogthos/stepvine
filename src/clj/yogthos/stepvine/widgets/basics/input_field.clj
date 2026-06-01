@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.input-field
+(ns yogthos.stepvine.widgets.basics.input-field
   "Text/number input field — two-way bound, server-authoritative locking."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))

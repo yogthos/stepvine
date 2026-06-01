@@ -1,29 +1,34 @@
 (ns yogthos.stepvine.widgets
   "Widget library — require this namespace to register all widget render methods.
-   Each widget extends the `yogthos.stepvine.render/render-widget` multimethod."
+   Each widget extends the `yogthos.stepvine.render/render-widget` multimethod.
+   Widgets are grouped by category under `yogthos.stepvine.widgets.<group>.*`."
   (:require
-   ;; core / structural widgets (form, fields, collections, actions)
-   yogthos.stepvine.widgets.form
-   yogthos.stepvine.widgets.input-field
-   yogthos.stepvine.widgets.value
-   yogthos.stepvine.widgets.show
-   yogthos.stepvine.widgets.section
-   yogthos.stepvine.widgets.action
-   yogthos.stepvine.widgets.collection
-   ;; field widgets
-   yogthos.stepvine.widgets.alert
-   yogthos.stepvine.widgets.calendar
-   yogthos.stepvine.widgets.chart
-   yogthos.stepvine.widgets.checkbox
-   yogthos.stepvine.widgets.checkbox-enabled
-   yogthos.stepvine.widgets.date-picker
-   yogthos.stepvine.widgets.dropdown
-   yogthos.stepvine.widgets.input-time
-   yogthos.stepvine.widgets.label
-   yogthos.stepvine.widgets.menu
-   yogthos.stepvine.widgets.radio
-   yogthos.stepvine.widgets.selections
-   yogthos.stepvine.widgets.slider
-   yogthos.stepvine.widgets.table
-   yogthos.stepvine.widgets.text
-   yogthos.stepvine.widgets.typeahead))
+   ;; layout / structure
+   yogthos.stepvine.widgets.layout.form
+   yogthos.stepvine.widgets.layout.section
+   yogthos.stepvine.widgets.layout.show
+   yogthos.stepvine.widgets.layout.alert
+   ;; basic inputs + display
+   yogthos.stepvine.widgets.basics.input-field
+   yogthos.stepvine.widgets.basics.text
+   yogthos.stepvine.widgets.basics.label
+   yogthos.stepvine.widgets.basics.value
+   yogthos.stepvine.widgets.basics.slider
+   yogthos.stepvine.widgets.basics.date-picker
+   yogthos.stepvine.widgets.basics.input-time
+   ;; selection controls
+   yogthos.stepvine.widgets.selection.dropdown
+   yogthos.stepvine.widgets.selection.radio
+   yogthos.stepvine.widgets.selection.checkbox
+   yogthos.stepvine.widgets.selection.checkbox-enabled
+   yogthos.stepvine.widgets.selection.selections
+   yogthos.stepvine.widgets.selection.menu
+   yogthos.stepvine.widgets.selection.typeahead
+   ;; tables / collections
+   yogthos.stepvine.widgets.tables.collection
+   yogthos.stepvine.widgets.tables.table
+   ;; buttons / actions
+   yogthos.stepvine.widgets.buttons.action
+   ;; visualization
+   yogthos.stepvine.widgets.viz.chart
+   yogthos.stepvine.widgets.viz.calendar))

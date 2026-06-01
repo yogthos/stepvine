@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.widgets.menu
+(ns yogthos.stepvine.widgets.selection.menu
   "Menu widget — button group that sets a value or triggers actions."
   (:require
    [yogthos.stepvine.render :as render :refer [render-widget]]))
