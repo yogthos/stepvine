@@ -1,0 +1,49 @@
+;; Phase 4b fixture — a collection (Domino subcontext). :members is a collection
+;; whose items each have their own schema (model + events), so per-item derived
+;; fields (full name) recompute independently. Items are indexed by :mid.
+{:id :roster
+ :title "Team Roster"
+
+ :data
+ {:model
+  [[:team-name {:id :team-name :type :string}]
+   [:members
+    {:id :members
+     :collection? true
+     :index-id :mid
+     :schema
+     {:model
+      [[:mid   {:id :mid   :type :string}]
+       [:first {:id :first :type :string}]
+       [:last  {:id :last  :type :string}]
+       [:full  {:id :full  :type :string}]]
+      :events
+      [{:id      :calc-full
+        :inputs  [:first :last]
+        :outputs [:full]
+        :handler (fn [{{:keys [first last]} :inputs}]
+                   {:full (str (or first "")
+                               (when (and first last) " ")
+                               (or last ""))})}]
+      ;; per-item reaction (Domino subcontext reaction): derived display value
+      :reactions
+      [{:id :initials :args [:first :last]
+        :fn (fn [f l] (str (when (seq f) (subs f 0 1))
+                           (when (seq l) (subs l 0 1))))}]}}]]}
+
+ :views
+ {:default
+  {:title "Team Roster"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Team Roster"]
+    [:c/input-field {:label "Team Name" :id :team-name}]
+    [:h2 "Members"]
+    ;; the collection body is the per-item template
+    [:c/collection {:id :members}
+     [:c/input-field {:label "First" :id :first}]
+     [:c/input-field {:label "Last" :id :last}]
+     [:p "Full name: " [:stepvine.util/value {:id :full}]
+      " · Initials: " [:stepvine.util/value {:rxn :initials}]]]
+    [:p.presence "Editors online: " [:span {:data-text "$presence"}]]]}}}

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{title}}</title>
+    <script type="module"
+            src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"></script>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; line-height: 1.5; }
+      .field { display: flex; align-items: center; gap: .75rem; margin: .5rem 0; }
+      .field label { flex: 0 0 8rem; text-align: right; color: #374151; }
+      .field input { flex: 1; padding: .35rem .5rem; border: 1px solid #d1d5db; border-radius: .375rem; }
+      .field input[readonly] { background: #f3f4f6; color: #6b7280; }
+      .warning { color: #b45309; background: #fffbeb; border: 1px solid #fcd34d; padding: .5rem .75rem; border-radius: .375rem; }
+    </style>
+  </head>
+  <body>
+    {{view|safe}}
+  </body>
+</html>

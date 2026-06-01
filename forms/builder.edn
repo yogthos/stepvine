@@ -1,0 +1,39 @@
+;; The visual form builder — itself a Stepvine form. Fill in the new form's id +
+;; title, add field rows, then "Build form" generates and saves a real form
+;; (yogthos.stepvine.builder/build-form + forms/save-form!).
+{:id :builder
+ :version 1
+ :title "Form builder"
+
+ :data
+ {:model
+  [[:form-id    {:id :form-id    :type :string}]
+   [:form-title {:id :form-title :type :string}]
+   [:fields
+    {:id :fields
+     :collection? true
+     :index-id :rowid
+     :schema
+     {:model [[:rowid  {:id :rowid  :type :string}]
+              [:fid    {:id :fid    :type :string}]
+              [:flabel {:id :flabel :type :string}]
+              [:ftype  {:id :ftype  :type :enum :options {:source :field-types/all}}]]}}]]}
+
+ :views
+ {:default
+  {:title "Form builder"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Form builder"]
+    [:p "Define a new form, then build it. It becomes available to create
+         documents from."]
+    [:c/input-field {:label "Form id (e.g. contact)" :id :form-id}]
+    [:c/input-field {:label "Title" :id :form-title}]
+    [:h2 "Fields"]
+    [:c/collection {:id :fields}
+     [:c/input-field {:label "Field id" :id :fid}]
+     [:c/input-field {:label "Label" :id :flabel}]
+     [:c/dropdown-select {:label "Type" :id :ftype}]]
+    [:c/build-button {:label "Build form"}]
+    [:pre {:id "build-result"}]]}}}

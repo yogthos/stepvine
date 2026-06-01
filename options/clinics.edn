@@ -1,0 +1,6 @@
+;; A DB-sourced dropdown option set. Referenced from a form field via
+;; {:options {:source :clinics/active}}. One file per source, keyed by :id.
+{:id :clinics/active
+ :options [{:value "north"  :label "North Clinic"}
+           {:value "south"  :label "South Clinic"}
+           {:value "harbor" :label "Harbor Clinic"}]}

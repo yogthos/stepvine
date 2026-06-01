@@ -1,0 +1,5 @@
+;; Dropdown options for the form builder's field "type" selector.
+{:id :field-types/all
+ :options [{:value "string" :label "Text (single line)"}
+           {:value "number" :label "Number"}
+           {:value "text"   :label "Text (multi-line)"}]}

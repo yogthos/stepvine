@@ -1,0 +1,61 @@
+(ns yogthos.stepvine.editor.impl
+  (:require [sci.core :as sci]
+            [yogthos.stepvine.editor.locks   :as locks]
+            [yogthos.stepvine.editor.data    :as data]
+            [yogthos.stepvine.editor.actions :as actions]
+            [clojure.pprint]))
+
+(defn eval-form [form-raw]
+  (sci/eval-string (pr-str form-raw)
+                   {:bindings {'println println
+                               'now     #?(:clj  #(java.util.Date.)
+                                           :cljs #(js/Date.))
+                               'today   #?(:clj  #(.format (java.text.SimpleDateFormat. "yyyy-MM-dd") (java.util.Date.))
+                                           :cljs #(.format ^js (js/Intl.DateTimeFormat. "en-CA" {:dateStyle "short"})))
+                               'inst-ms inst-ms}}))
+
+
+(defn create-session
+  "Takes a form and an initial-db, and generates the domino context.
+   Other functions of the form specification have yet to be enabled."
+  [form-raw initial-db]
+  ;; TODO: add async
+
+  ;; TODO: custom bindings
+  (let [form (eval-form form-raw)
+        ctx (data/initialize-ctx form initial-db)]
+
+    ;; TODO: walk views for direct reactions.
+    {:form form
+     :form-raw form-raw
+     ::data/ctx ctx
+     :related-fn (data/get-related-fn ctx)
+     :parents-fn (data/get-parents-fn ctx)
+     :field-opts-fn (data/get-field-opts-fn ctx) ;; TODO: deprecate in favour of field-opts
+     :field-opts (data/get-field-opts-map ctx)
+     :connections     #{}
+     ::actions/pending {}
+     ;; NOTE: We are directly pulling the action map from the parsed form.
+     ;;       write a helper if more sophisticated parsing/interpreting is required.
+     ::actions/rules   (:actions form)
+     ::locks/locks     {}}))
+
+
+(defn value [session id]
+  (data/get-value (::data/ctx session) id))
+
+(defn db [session]
+  (data/get-db (::data/ctx session)))
+
+(defn apply-changes [session changes]
+  (data/transact-ctx session changes))
+
+(defn apply-changes! [session changes]
+  (let [result (data/transact-ctx session changes)
+        {:keys [status] :as report} (data/get-tx-report (::data/ctx result))]
+    (if (= status :complete)
+      result
+      (throw (ex-info "Error transacting changes!"
+                      {:error-id ::transaction-error
+                       :changes changes
+                       :report report})))))

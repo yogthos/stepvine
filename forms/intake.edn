@@ -1,0 +1,67 @@
+;; Phase 4 fixture — exercises the three data-relationship kinds beyond derived
+;; fields: external-service imports, DB-sourced dropdown options, and cross-field
+;; validation (reactions, including a reaction over other reactions).
+{:id :intake
+ :title "Patient Intake"
+
+ ;; External dependency: when :patient-id is set, fetch the patient from a
+ ;; service and map fields into the document.
+ :imports
+ {:patient
+  {:trigger :patient-id
+   :mapping {:fname [:given]
+             :lname [:family]
+             :dob   [:dob]}}}
+
+ :data
+ {:model
+  [[:patient-id {:id :patient-id :type :string}]
+   [:patient
+    [:given  {:id :fname :type :string}]
+    [:family {:id :lname :type :string}]
+    [:dob    {:id :dob   :type :string}]]
+   ;; DB-sourced dropdown: options resolved at render time from a named source.
+   [:clinic {:id :clinic :type :enum :options {:source :clinics/active}}]
+   [:weight {:id :kg  :type :number}]
+   [:height {:id :m   :type :number}]
+   [:bmi    {:id :bmi :type :number}]]
+
+  :events
+  [{:id      :calc-bmi
+    :inputs  [:kg :m]
+    :outputs [:bmi]
+    :handler (fn [{{:keys [kg m]} :inputs}]
+               {:bmi ((fnil / 0 1 1) kg m m)})}]
+
+  :reactions
+  [{:id :weight-error :args [:kg]
+    :fn (fn [kg] (cond (nil? kg) nil (<= kg 0) "Weight must be positive"
+                       (> kg 500) "Implausible weight (>500kg)" :else nil))}
+   {:id :height-error :args [:m]
+    :fn (fn [m] (cond (nil? m) nil (<= m 0) "Height must be positive"
+                      (> m 3) "Implausible height (>3m)" :else nil))}
+   {:id :bmi-category :args [:bmi]
+    :fn (fn [b] (cond (nil? b) "n/a" (< b 18.5) "underweight" (< b 25) "healthy"
+                      (< b 30) "overweight" :else "obese"))}
+   ;; a reaction over other reactions: overall validity
+   {:id :form-valid? :args [:weight-error :height-error]
+    :fn (fn [w h] (and (nil? w) (nil? h)))}]}
+
+ :views
+ {:default
+  {:title "Patient Intake"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Patient Intake"]
+    [:c/input-field {:label "Patient ID" :id :patient-id}]
+    [:c/input-field {:label "Given Name" :id :fname :read-only true}]
+    [:c/input-field {:label "Family Name" :id :lname :read-only true}]
+    [:c/input-field {:label "Date of Birth" :id :dob :read-only true}]
+    [:c/dropdown-select {:label "Clinic" :id :clinic}]
+    [:c/input-field {:label "Weight (kg)" :id :kg :error :weight-error}]
+    [:c/input-field {:label "Height (m)" :id :m :error :height-error}]
+    [:c/input-field {:label "BMI" :id :bmi :read-only true}]
+    [:p "Category: " [:stepvine.util/value {:rxn :bmi-category}]]
+    [:p "Form valid: " [:stepvine.util/value {:rxn :form-valid?}]]
+    [:p.presence "Editors online: " [:span {:data-text "$presence"}]]]}}}

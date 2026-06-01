@@ -1,0 +1,181 @@
+(ns yogthos.stepvine.cells.form
+  "Mycelium cells for editing a document instance — Phase 5.
+
+   All endpoints are document-scoped under /doc/:id; each cell ensures the live
+   session exists (recreating it from the persisted db via docs/ensure!) before
+   operating. Recompute + broadcast of field/reaction/collection signals happens
+   in the session manager's on-update hook; lock-state and collection-structure
+   broadcasts happen in their handlers."
+  (:require
+   [clojure.string :as str]
+   [jsonista.core :as json]
+   [mycelium.core :as myc]
+   [yogthos.stepvine.docs :as docs]
+   [yogthos.stepvine.hub :as hub]
+   [yogthos.stepvine.imports :as imports]
+   [yogthos.stepvine.options :as options]
+   [yogthos.stepvine.render :as render]
+   [yogthos.stepvine.session :as session]
+   [starfederation.datastar.clojure.api :as d*]))
+
+(defn coerce
+  "Coerce an incoming signal value to the field's declared type. Datastar may
+   deliver number-input values as strings; blank clears the field (nil)."
+  [field-opts v]
+  (if (= :number (:type field-opts))
+    (cond
+      (number? v) v
+      (and (string? v) (seq (str/trim v)))
+      (let [t (str/trim v)] (or (parse-long t) (parse-double t)))
+      :else nil)
+    v))
+
+;; --- POST /doc/:id/field/:fid[/lock|/unlock] ------------------------------
+
+(myc/defcell :form/parse-field
+  {:input  {:http-request :map}
+   :output {:doc-id :any :field-id :any :uid :any :raw-value :any}
+   :doc    "Read the field id from the path and value + uid from posted signals."}
+  (fn [_resources {req :http-request}]
+    (let [signals  (json/read-value (d*/get-signals req))
+          field-id (get-in req [:path-params :fid])]
+      {:doc-id    (get-in req [:path-params :id])
+       :field-id  field-id
+       :uid       (get-in req [:session :user-id])   ; authenticated user
+       ;; the signal name is sanitized (e.g. :form-id -> "form_id"), so read the
+       ;; posted value by the sanitized name, not the raw path-param field id
+       :raw-value (get signals (render/signal-name (keyword field-id)))})))
+
+(defn- run-imports!
+  "If `fid` triggers an import, fetch from the service and transact the mapped
+   fields (which recompute + broadcast)."
+  [session-manager patient-client form-raw doc-id fid trigger-value]
+  (when-let [cfg (imports/import-for-trigger form-raw fid)]
+    (let [data    (patient-client trigger-value)
+          changes (imports/mapped-changes data (:mapping cfg))]
+      (when (seq changes)
+        (session/apply-change! session-manager doc-id changes)))))
+
+(myc/defcell :form/apply-field
+  {:requires [:forms :documents :session-manager :patient-client]
+   :input    {:doc-id :any :field-id :any :uid :any :raw-value :any}
+   :output   {:status :int :body :string}
+   :doc      "Coerce + transact the change (lock-aware), then run any triggered import."}
+  (fn [{:keys [session-manager patient-client] :as resources} {:keys [doc-id field-id uid raw-value]}]
+    (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
+      (let [sess  (session/current session-manager doc-id)
+            fid   (keyword field-id)
+            value (coerce (get-in sess [:field-opts fid]) raw-value)]
+        (session/apply-field-as! session-manager doc-id uid fid value)
+        (run-imports! session-manager patient-client form-raw doc-id fid value)
+        {:status 204 :body ""})
+      {:status 404 :body (str "No such document: " doc-id)})))
+
+(myc/defcell :form/lock-field
+  {:requires [:forms :documents :session-manager :hub]
+   :input    {:doc-id :any :field-id :any :uid :any :raw-value :any}
+   :output   {:status :int :body :string}
+   :doc      "Acquire a field lock for uid and broadcast lock state."}
+  (fn [{:keys [session-manager hub] :as resources} {:keys [doc-id field-id uid]}]
+    (docs/ensure! resources doc-id)
+    (session/lock-field! session-manager hub doc-id uid (keyword field-id))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/unlock-field
+  {:requires [:forms :documents :session-manager :hub]
+   :input    {:doc-id :any :field-id :any :uid :any :raw-value :any}
+   :output   {:status :int :body :string}
+   :doc      "Release uid's field lock and broadcast lock state."}
+  (fn [{:keys [session-manager hub] :as resources} {:keys [doc-id field-id uid]}]
+    (docs/ensure! resources doc-id)
+    (session/unlock-field! session-manager hub doc-id uid (keyword field-id))
+    {:status 204 :body ""}))
+
+;; --- POST /doc/:id/coll/:coll[/add | /:idx/remove | /:idx/field/:fid] ------
+
+(defn- rerender-collection!
+  "Re-render a collection's container and patch it (by element id) to all peers.
+   Resolves option sources (incl. item-field dropdowns) so re-rendered items keep
+   their dropdown options."
+  [{:keys [session-manager hub options-store]} doc-id coll-id]
+  (let [sess (session/current session-manager doc-id)
+        ctx  (-> (render/session->context sess :default doc-id)
+                 (assoc :options (options/resolve-field-options
+                                  options-store (render/all-field-opts sess))))]
+    (when-let [html (render/render-collection ctx sess :default coll-id)]
+      (hub/broadcast-elements! hub doc-id html))))
+
+(myc/defcell :form/parse-coll
+  {:input  {:http-request :map}
+   :output {:doc-id :any :coll-id :any :idx :any :field-id :any :uid :any :value :any}
+   :doc    "Parse a collection op: doc/coll/idx/field from the path, value+uid from signals."}
+  (fn [_resources {req :http-request}]
+    (let [pp      (:path-params req)
+          signals (try (json/read-value (d*/get-signals req)) (catch Exception _ {}))
+          coll    (:coll pp)
+          idx     (:idx pp)
+          fid     (:fid pp)]
+      {:doc-id   (:id pp)
+       :coll-id  coll
+       :idx      idx
+       :field-id fid
+       :uid      (get-in req [:session :user-id])   ; authenticated user
+       :value    (when fid
+                   (get signals (str (render/signal-name coll) "_" idx "_"
+                                     (render/signal-name fid))))})))
+
+(myc/defcell :form/coll-add
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :idx :any :field-id :any :uid :any :value :any}
+   :output   {:status :int :body :string}
+   :doc      "Add an empty item to a collection and re-render the container."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id]}]
+    (when (docs/ensure! resources doc-id)
+      (session/add-item! session-manager doc-id (keyword coll-id))
+      (rerender-collection! resources doc-id (keyword coll-id)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-remove
+  {:requires [:forms :documents :session-manager :hub :options-store]
+   :input    {:doc-id :any :coll-id :any :idx :any :field-id :any :uid :any :value :any}
+   :output   {:status :int :body :string}
+   :doc      "Remove a collection item and re-render the container."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id idx]}]
+    (when (docs/ensure! resources doc-id)
+      (session/remove-item! session-manager doc-id (keyword coll-id) idx)
+      (rerender-collection! resources doc-id (keyword coll-id)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-field
+  {:requires [:forms :documents :session-manager]
+   :input    {:doc-id :any :coll-id :any :idx :any :field-id :any :uid :any :value :any}
+   :output   {:status :int :body :string}
+   :doc      "Set one field of a collection item (lock-aware); recompute via on-update."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id idx field-id uid value]}]
+    (when (docs/ensure! resources doc-id)
+      (let [sess  (session/current session-manager doc-id)
+            coll  (keyword coll-id)
+            fid   (keyword field-id)
+            fopts (get-in (render/collections-data sess) [coll :field-opts fid])]
+        (session/apply-item-field-as! session-manager doc-id uid coll idx fid (coerce fopts value))))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-lock-field
+  {:requires [:forms :documents :session-manager :hub]
+   :input    {:doc-id :any :coll-id :any :idx :any :field-id :any :uid :any :value :any}
+   :output   {:status :int :body :string}
+   :doc      "Acquire a lock on a collection item field and broadcast lock state."}
+  (fn [{:keys [session-manager hub] :as resources} {:keys [doc-id coll-id idx field-id uid]}]
+    (when (docs/ensure! resources doc-id)
+      (session/lock-item-field! session-manager hub doc-id uid (keyword coll-id) idx (keyword field-id)))
+    {:status 204 :body ""}))
+
+(myc/defcell :form/coll-unlock-field
+  {:requires [:forms :documents :session-manager :hub]
+   :input    {:doc-id :any :coll-id :any :idx :any :field-id :any :uid :any :value :any}
+   :output   {:status :int :body :string}
+   :doc      "Release uid's lock on a collection item field and broadcast."}
+  (fn [{:keys [session-manager hub] :as resources} {:keys [doc-id coll-id idx field-id uid]}]
+    (when (docs/ensure! resources doc-id)
+      (session/unlock-item-field! session-manager hub doc-id uid (keyword coll-id) idx (keyword field-id)))
+    {:status 204 :body ""}))

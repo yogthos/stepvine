@@ -24,3 +24,8 @@ resources/public/js/
 .dolt/
 *.db
 .beads-credential-key
+procyon/
+
+# Runtime state + generated artifacts
+data/
+forms/survey.edn

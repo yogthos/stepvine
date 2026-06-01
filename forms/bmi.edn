@@ -1,0 +1,79 @@
+;; Phase 1 fixture form — a trimmed, self-contained BMI calculator.
+;;
+;; The :data section IS the Domino schema: model paths carry field :id/:type,
+;; :events define cascading derived fields (BMI from weight+height), and
+;; :reactions define derived *display* values (which become Datastar signals in
+;; Phase 3). Event/reaction fns stay as quoted lists here and are evaluated
+;; safely via sci in yogthos.stepvine.editor.impl/eval-form.
+{:id :bmi
+ :title "BMI Calculator"
+
+ :data
+ {:model
+  [[:patient
+    [:weight {:id :kg,  :type :number}]
+    [:height {:id :m,   :type :number}]
+    [:bmi    {:id :bmi, :type :number}]]]
+
+  :events
+  [{:id      :calc-bmi
+    :inputs  [:kg :m]
+    :outputs [:bmi]
+    :handler (fn [{{:keys [kg m]} :inputs}]
+               {:bmi ((fnil / 0 1 1) kg m m)})}]
+
+  :reactions
+  [{:id :overweight? :args [:bmi] :fn (fn [bmi] (>= (or bmi 0) 25))}
+   {:id :bmi-category
+    :args [:bmi]
+    :fn (fn [b]
+          (cond
+            (nil? b)   "n/a"
+            (< b 18.5) "underweight"
+            (< b 25)   "healthy"
+            (< b 30)   "overweight"
+            :else      "obese"))}]}
+
+ ;; Templated export: placeholders are substituted from current field/reaction
+ ;; values (and :fn/uuid, :fn/date) at export time.
+ :exports
+ {:summary
+  {:label "Export summary"
+   :template {:resourceType "Observation"
+              :id        :fn/uuid
+              :generated :fn/date
+              :weightKg  :kg
+              :heightM   :m
+              :bmi       :bmi
+              :category  :bmi-category}}}
+
+ :views
+ {:default
+  {:title "BMI Calculator"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "BMI Calculator"]
+    [:p [:a {:href "?view=summary"} "View summary →"]]
+    [:c/input-field {:label "Weight (kg)" :id :kg}]
+    [:c/input-field {:label "Height (m)"  :id :m}]
+    [:c/input-field {:label "BMI" :id :bmi :read-only true}]
+    [:p "Category: " [:stepvine.util/value {:rxn :bmi-category}]]
+    [:c/show {:when :overweight?}
+     [:p.warning
+      "Patient is overweight — please provide a weight-management brochure."]]
+    [:p.presence "Editors online: " [:span {:data-text "$presence"}]]
+    [:c/action {:action :summary :label "Export summary"}]
+    [:pre {:id "export-result"}]]}
+
+  :summary
+  {:title "BMI — Summary"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "BMI — Summary"]
+    [:p [:a {:href "?view=default"} "← Back to editor"]]
+    [:c/input-field {:label "Weight (kg)" :id :kg :read-only true}]
+    [:c/input-field {:label "Height (m)"  :id :m :read-only true}]
+    [:c/input-field {:label "BMI" :id :bmi :read-only true}]
+    [:p "Category: " [:stepvine.util/value {:rxn :bmi-category}]]]}}}
