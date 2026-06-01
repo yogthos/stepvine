@@ -13,12 +13,12 @@
            io.github.yogthos/mycelium      {:git/url "https://github.com/yogthos/mycelium"
                                             :git/sha "65d6164b0dd8f75ecdd35e51fce336fcb5226cbf"}
 
-           ;; Reactive form-document engine
-           ;; Pinned to 0.4.0-alpha.3: the vendored editor (yogthos.stepvine.editor.*)
-           ;; targets this API surface (get-downstream/select/set-value/…). domino
-           ;; 0.4.0 stable is a ground-up rewrite exposing only transact/initialize/
-           ;; trigger-effects, so upgrading would require rewriting the editor layer.
-           domino/core                     {:mvn/version "0.4.0-alpha.3"}
+           ;; Reactive form-document engine. The vendored editor
+           ;; (yogthos.stepvine.editor.*) targets this (current) domino API: a
+           ;; model + events + effects DAG. Reactions and collections, which
+           ;; older domino provided natively, are reconstructed in the editor
+           ;; seam (yogthos.stepvine.editor.data) on top of these primitives.
+           domino/core                     {:mvn/version "0.4.0"}
 
            ;; Datastar (server-driven hypermedia over SSE)
            dev.data-star.clojure/sdk       {:mvn/version "1.0.0-RC10"}

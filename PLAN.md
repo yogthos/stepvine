@@ -27,14 +27,16 @@ current system and the remaining roadmap.
 5. **Backend-swappable stores.** Every store (`:store/forms`, `:store/documents`,
    …) exposes a small API. Disk-backed atoms/duratom today; a query DB
    (XTDB/Datalevin) tomorrow behind the same API.
-
+6. **LLM friendly** The system must provide APIs for the LLM (or any external client)
+   to hook into and edit the document the same way the user would through the UI.
+ 
 ---
 
 ## 2. The Three Pillars
 
 | Layer | Library | Responsibility | Scope |
 |-------|---------|----------------|-------|
-| **Reactive state** | **Domino** (`domino/core 0.4.0-alpha.3`) | The form's data graph: model paths, events (cascading derived fields), effects (side-effect boundaries), reactions (derived display values). | Per **document/session** |
+| **Reactive state** | **Domino** (`domino/core 0.4.0`) — a model + events + effects DAG. *Reactions* (eager display values) and *collections* (per-item subcontexts), which current domino does not provide, are reconstructed in the editor seam. | The form's data graph: model paths, events (cascading derived fields), effects, and (editor-provided) reactions. | Per **document/session** |
 | **Orchestration** | **Mycelium** | Each HTTP route is a compiled workflow of pure `defcell`s: parse → resolve session → transact → diff → render → respond. Resources (stores, clients) injected per request. | Per **HTTP request** |
 | **Transport / UI** | **Datastar** (`dev.data-star.clojure/sdk` + `…/ring`) | `data-*` attributes bind the DOM to server-owned **signals**; user events POST intent; the server pushes `PatchElements` + `PatchSignals` over SSE. | Per **connection** |
 
@@ -120,10 +122,14 @@ Key properties:
 - **`:options {:source …}`** on a field def references a named option set
   (DB-sourced dropdowns), resolved at render time.
 
-### 3.1 Collections (Domino subcontexts)
+### 3.1 Collections
 
 A field with `:collection? true` holds a map of items, each with its own schema
-(model + events + reactions). Per-item derived fields recompute independently:
+(model + events + reactions). Per-item derived fields recompute independently.
+Current domino has no nested contexts, so the editor projects each item onto
+plain nested paths `[coll idx field]` (with synthetic flat ids for domino's event
+graph) and rebuilds a *live schema* — base model/events plus one set per current
+item — from the db on every transact:
 
 ```clojure
 [:members
@@ -389,13 +395,22 @@ Anonymous           ─── no access (redirected to /login)
    *document → {connection → sse-gen, user}*.
 4. **sci sandboxing** for evaluating form `:event`/`:reaction` fns (safe, no
    trusted-eval).
-5. **Domino pinned to `0.4.0-alpha.3`.** The vendored editor targets that API
-   surface (`get-downstream`/`select`/`set-value`/…). Domino `0.4.0` stable is a
-   ground-up rewrite exposing only `transact`/`initialize`/`trigger-effects`, so
-   upgrading would require rewriting the editor layer. One cosmetic `random-uuid`
-   compile warning from `domino.util` remains (external alpha namespace); the
-   warning in our own `editor.util` is fixed via an unconditional
-   `(:refer-clojure :exclude [random-uuid])`.
+5. **Editor ported to current domino (`0.4.0`).** domino `0.4.0` is a ground-up
+   rewrite — a model + events + effects DAG exposing only
+   `transact`/`initialize`/`initial-transaction`/`trigger-effects` — that dropped
+   the native reactions and collections (subcontexts) the editor relied on. The
+   editor seam (`editor.data`) now reconstructs both on top of the new
+   primitives, so we track the maintained library instead of a legacy alpha:
+   - **Reactions** are computed by the editor (eager, dependency-ordered) rather
+     than modelled as lazy events; they read back through `get-value` like fields.
+   - **Collections** project each item onto nested paths with synthetic flat ids,
+     rebuilding a live schema (base + per-item model/events) from the db on every
+     transact — re-init preserves event laziness for free.
+   - **Lock relatedness** is recomputed from the events graph; an item field's
+     lock-parent is its *item*, so different items edit concurrently.
+
+   This also removed the stray `random-uuid` compile warnings (domino `0.4.0`'s
+   `domino.util` excludes it; our `editor.util` excludes it unconditionally).
 
 ---
 
@@ -458,7 +473,9 @@ editor) is vendored under `src/clj/yogthos/stepvine/editor*` — a self-containe
 - `editor` — `session-manager`, `create-session!`, `lock!`/`unlock!`, `save-ids!`, `disconnect!`
 - `editor.impl` — sci evaluation, `create-session`, `apply-changes`, `value`, `db`
 - `editor.locks` — multi-user field lock manager (related-field locking)
-- `editor.data` — `initialize-ctx`, `transact-ctx`, Domino wrapper
+- `editor.data` — the **domino adapter seam**: `initialize-ctx`/`transact-ctx`,
+  value reads, field-opts, the relatedness/parents graph, and the
+  reactions + collections reconstruction described in §10.5
 - `editor.actions`, `editor.util` — action map + uuid/util helpers
 
 ### Net-new Stepvine code

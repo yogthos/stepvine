@@ -1,6 +1,5 @@
 (ns yogthos.stepvine.editor
   (:require [domino.core :as d]
-            [domino.graph :as g]
             [sci.core :as sci]
             [clojure.pprint :refer [pprint]]
             [clojure.set :refer [union difference]]

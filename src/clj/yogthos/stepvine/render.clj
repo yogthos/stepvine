@@ -29,8 +29,7 @@
    [hiccup2.core :as h]
    [jsonista.core :as json]
    [yogthos.stepvine.editor.data :as data]
-   [yogthos.stepvine.editor.impl :as impl]
-   [domino.core :as d]))
+   [yogthos.stepvine.editor.impl :as impl]))
 
 ;; --- Names & signals ------------------------------------------------------
 
@@ -136,27 +135,10 @@
   "Per-collection render data from a live session:
    {coll-id {:order [idx...] :field-opts {fid -> opts} :items {idx {id -> value}}}}.
    Each item's value map carries both model fields AND the per-item reaction
-   values declared on the collection's :schema."
+   values declared on the collection's :schema. (Delegates to the editor seam,
+   which reconstructs collections on top of the underlying engine.)"
   [session]
-  (let [ctx (::data/ctx session)]
-    (reduce-kv
-     (fn [acc coll-id sub]
-       (if (::d/collection? sub)
-         (let [elements (::d/elements sub)
-               order    (vec (keys elements))
-               fopts    (or (some-> elements first val ::d/id->opts) {})
-               rxn-ids  (map :id (get-in (::d/id->opts ctx) [coll-id :schema :reactions]))
-               items    (into {}
-                              (map (fn [idx]
-                                     (let [ids (concat (keys (::d/id->opts (get elements idx))) rxn-ids)]
-                                       [idx (into {}
-                                                  (map (fn [id] [id (impl/value session [coll-id idx id])]))
-                                                  ids)])))
-                              order)]
-           (assoc acc coll-id {:order order :field-opts fopts :items items}))
-         acc))
-     {}
-     (::d/subcontexts ctx))))
+  (data/collections-data session))
 
 (defn- coll-sig [coll-id idx fid]
   (str (signal-name coll-id) "_" idx "_" (signal-name fid)))
