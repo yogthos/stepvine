@@ -447,18 +447,31 @@ suite covering all of the above.
 
 ### 🔜 Planned
 
-**Phase 7 — Workflow state machine.** Document `:state` (draft → submitted →
-completed → cancelled); `:allowed-transitions` on form metadata; action steps
-(state-change, email, save-pdf, fax); state filtering on the document list; audit
-log of transitions.
+Phases 7–11 are specified in detail in **§15 (Reference-Guided Implementation
+Roadmap)**, derived from a study of two sibling Clojure systems — a form/document
+engine and a workflow-orchestration layer. Headlines:
 
-**Phase 8 — Pages & workflow navigation.** Page definitions on a form (`:pages`
-with `:page-type` index/documents/document-search); index-based routing; custom
-search forms for document metadata; creation modals with index selection.
+**Phase 7 — Versioning & document store schema.** Strong version pinning
+(documents freeze their exact form version at creation), enforced immutability of
+published versions, and a concrete target document record behind the store
+abstraction (§15.1–15.2).
 
-**Phase 9 — Production hardening.** Real database backends (XTDB/Datalevin behind
-the store abstractions); FHIR client for imports/exports; session recovery; OAuth2/OIDC;
-PDF report generation; audit logging.
+**Phase 8 — Lifecycle, audit & submission.** Declared state machine on the form,
+durable append-only audit log with before/after diffs, per-view submission +
+approvals, soft delete, and hard read-only enforcement after finalization
+(§15.3–15.5).
+
+**Phase 9 — Pluggable sources, imports & partials.** Uniform source resolver
+(multimethod by kind), lazy diff-based imports, conditional validation, and
+reusable definition partials (§15.6–15.9).
+
+**Phase 10 — Workflow orchestration.** Data-defined actions/steps with a
+pluggable step dispatcher, a uniform external-client protocol, and a durable
+workflow-event log — all in-process (§15.10–15.12).
+
+**Phase 11 — Pages, index lookups & production hardening.** Multi-document
+workflow pages, index-based document creation/search, real query-DB backends,
+PDF generation, OAuth2/OIDC (§15.13).
 
 ---
 
@@ -526,3 +539,464 @@ editor) is vendored under `src/clj/yogthos/stepvine/editor*` — a self-containe
 3. **One mechanism per concern** — Domino (state) · Mycelium (orchestration) · Datastar (transport).
 4. **Declarative data relationships** — expressed in form EDN, not handler code.
 5. **Backend-swappable stores** — small store APIs; disk/atom today, query DB tomorrow.
+
+---
+
+## 15. Reference-Guided Implementation Roadmap
+
+This section is the detailed build guide for Phases 7–11. It distills the design
+of two mature sibling systems — a **form/document engine** (forms, versioned
+documents, sources, rules, audit) and a **workflow-orchestration layer** (multi-
+document workflows, pluggable processors, external integrations) — into concrete
+instructions for Stepvine, **adopting their proven patterns and fixing their
+known weaknesses**.
+
+**One structural advantage we keep.** In the reference, the document engine and
+the orchestrator are *two services* that talk over signed HTTP (handoff JWTs,
+cross-service `409`s, return-value hooks). Stepvine is a **single process**:
+Domino owns state, Mycelium orchestrates, Datastar transports. So we get the
+orchestration benefits *without* the dual-service machinery — the orchestrator
+and the state owner are the same JVM. Where the reference returns "directives"
+across a service boundary, we apply them as ordinary in-process changes. We keep
+the **directive shape** anyway (steps return data, the document layer applies
+it), because it keeps action steps pure and testable.
+
+Each subsection follows: **Pattern** (what the reference does) → **Have** (our
+current state) → **Build** (how to implement) → **Improve** (where we deliberately
+diverge).
+
+### 15.1 Form versioning & version pinning
+
+**Pattern.** Forms are append-only rows keyed by a stable logical name; each save
+is a new immutable version. A document, at *creation*, atomically resolves "latest
+published version" and freezes that version's identifier on itself (a foreign
+key). Every later load resolves the form by that frozen id, never by name — so
+in-flight documents are immune to later edits of the form. Drafts are a flag that
+excludes a version from "latest" resolution. There is **no** data-migration path:
+old documents simply keep loading their old version forever.
+
+**Have.** Forms are EDN files in `forms/` with a `:version` int; `migrations.clj`
+can upgrade document data across versions; documents are persisted in a duratom
+store. We already pin at render time by version.
+
+**Build.**
+- Make `forms` a **versioned store**, not a flat file read. Keep authoring as EDN
+  on disk, but on load compute a content **`:digest`** (hash of the canonical EDN)
+  and treat each `(form-id, version)` pair as an immutable artifact. The store
+  API: `latest-published`, `get-version [id v]`, `publish! [form]` (assigns the
+  next monotonic `:version`, refuses to overwrite an existing published version).
+- **Pin at creation, atomically.** When `POST /form/:id/new` creates a document,
+  resolve `latest-published` *once* and write `{:form-id … :form-version n
+  :form-digest …}` onto the document record. `docs/ensure!` and `cells/document`
+  load the form by `(form-id, form-version)` — never "current".
+- **Drafts.** A `:draft? true` form version is visible only to its author/preview,
+  excluded from `latest-published` and from the new-document picker.
+
+**Improve.**
+- **Enforce immutability** the reference only assumes. Publishing version *n* is
+  write-once; a change is always a *new* version. The `:digest` makes this
+  intrinsic and lets identical re-saves dedupe.
+- **Keep our migration story** — the reference has none. A document may stay
+  pinned forever (default), *or* be explicitly **rebased** onto a newer version
+  via a declarative field-mapping migration (generalize `migrations.clj` into
+  ordered `:migrations [{:from n :to n+1 :rename {…} :drop […] :via fn}]` on the
+  form). Rebase is opt-in, audited, and snapshots the pre-rebase data.
+- Put `:version`/`:draft?` **inside the validated form spec** so they cannot drift
+  from a duplicated metadata copy (a real desync bug in the reference).
+
+### 15.2 Document store schema (target shape behind the store API)
+
+**Pattern.** A document row splits **user data** (the field values) from
+**system/workflow metadata**, both as schemaless JSON; field writes are
+*incremental per-path* via a deep-set primitive, never whole-document; there is no
+version/owner/status column — all of that lives inside metadata.
+
+**Have.** `documents` duratom holds whole documents; `session` holds the live
+Domino db; on-update persists + broadcasts.
+
+**Build.** Define this **target record** (the contract the store abstraction must
+satisfy, whether backed by duratom today or XTDB/Datalevin/Postgres later):
+
+```clojure
+{:id           "uuid"
+ :form-id      :intake
+ :form-version 3                 ; pinned (§15.1)
+ :form-digest  "sha256-…"
+ :owner        "user-id"
+ :status       :in-progress      ; :draft|:in-progress|:submitted|:completed|:cancelled
+ :data         { …domino db… }   ; field values (the editor's persisted db)
+ :meta         {:created-at … :created-by …
+                :modified-at … :modified-by …
+                :submitted-views #{}          ; per-view submission (§15.5)
+                :approvals []                 ; append-only sign-off log
+                :deleted? false :deleted-by nil
+                :workflow {:state :draft :history []}}  ; §15.10
+ :rev          17}               ; monotonic revision / optimistic-concurrency token
+```
+
+- Keep the **data / meta split**: clients can never write `meta` paths directly
+  (an allowlist on the field-save cell rejects+logs attempts), so
+  created-by/approvals/state can't be forged.
+- Persist **incrementally**: the session already applies `[[path value]]` deltas;
+  the store should persist the delta + bumped `:rev`, not re-serialize everything
+  (we have editscript — use it as the deep-set equivalent).
+
+**Improve.**
+- Add an explicit **`:rev`** (the reference has none). Every write bumps it; the
+  field-save cell can reject a stale-base write as a concurrency backstop, and a
+  multi-node deployment can use it for compare-and-swap. This is the one piece of
+  durable concurrency control the reference lacks.
+- Keep `:status` as a **first-class indexed field** (not buried in metadata) so
+  the document list can filter by it cheaply.
+
+### 15.3 Editing, concurrency & durability
+
+**Pattern.** Live edits flow over a socket; each document funnels *all* its writes
+through a single serializing goroutine (no write-write races); clients update
+optimistically and converge on server-broadcast authoritative values; field-level
+**cooperative locks** live in one in-memory atom (hierarchical: locking a row
+blocks its cells), released on disconnect; presence is computed from connected
+sockets. Locks and presence are **not persisted** and are **single-node**.
+
+**Have.** This is largely *done* and arguably cleaner than the reference: the
+session-manager serializes per-doc writes via atom swap; Datastar SSE broadcasts
+authoritative signal deltas; `editor.locks` does related-field (hierarchical)
+locking; presence + lock maps broadcast over SSE; a heartbeat frees dropped
+clients' locks.
+
+**Build / Improve.**
+- **Durability of locks/presence.** Today they're in-process like the reference.
+  Define a `LockStore`/`PresenceStore` abstraction so a Redis/DB backing can slot
+  in for multi-node — mirroring how `forms`/`documents` are already abstracted.
+- **Never crash on a write/audit failure.** The reference calls `System/exit` when
+  a DB/audit insert fails — a single transient error takes down every connected
+  user. Our cells must instead surface a per-client error event and keep serving;
+  audit writes go to a dead-letter, never to process exit.
+- Use the new **`:rev`** (§15.2) to reject writes whose base revision is stale,
+  closing the last-write-wins gap at path granularity.
+
+### 15.4 Audit trail
+
+**Pattern.** An append-only audit table `(id, time, actor-metadata, event)` fed by
+an async channel; every state-changing action is logged with actor + payload
+*before* execution. **Gaps the reference admits:** no before/after value diff, no
+per-document index, and workflow state changes are *not* audited at all.
+
+**Have.** No durable audit log yet.
+
+**Build.** Add an `audit` store + a `cells/audit` write path:
+
+```clojure
+{:id "uuid" :at <inst> :doc-id "…" :by "user-id"
+ :action :field/save                 ; :field/save :doc/submit :state/transition :action/run …
+ :path [:weight] :before 70 :after 72   ; value-level diff
+ :detail { … }}                      ; action-specific payload
+```
+
+- Write from the field-save / lock / submit / action cells, **fire-and-forget**
+  but with a dead-letter on failure (never block the edit, never exit).
+- Index by `:doc-id` + `:at` so "history of this document" is a cheap query.
+
+**Improve over the reference on all three gaps:** record **before/after diffs**
+(we already have old+new in the session swap), **index per document**, and
+**audit every workflow transition** (the reference left this as a TODO).
+
+### 15.5 Submission, approval & finalization
+
+**Pattern.** Submission is **per view** (a document can be submitted for view A
+while still editable for view B), recorded as a set of submitted view-ids plus an
+append-only **sign-off log** `{view, user, time}`; un-submitting ("revise")
+removes the view from the set but keeps the sign-off (audit). A sole-editor guard
+blocks submit while other editors are present. **Weakness:** a "submitted"
+document stays fully editable — only *re-submit* is blocked; the durable snapshot
+is a separately generated report, not a freeze of the document.
+
+**Have.** Exports (templated snapshots) exist; no submission/approval state.
+
+**Build.**
+- `:meta :submitted-views` (a set) + `:meta :approvals` (append-only
+  `[{:view :default :by … :at …}]`). A `submit` action validates the view
+  (§15.8), checks sole-editor (we already track presence), adds the view, appends
+  the approval, and emits a **snapshot** (reuse `exports`) into a `reports` store.
+- A `revise` action removes the view from the set, keeps the approval entry.
+
+**Improve.** **Enforce read-only after submission** — the field-save cell consults
+`:submitted-views` and rejects writes to a submitted view (the reference leaves
+submitted documents editable, a real hazard for a sign-off system). The immutable
+report snapshot becomes the legal artifact; the live document for that view goes
+read-only until explicitly revised.
+
+### 15.6 Pluggable data sources
+
+**Pattern.** A form declares named sources; each is compiled at parse time into a
+**callable fn** via a multimethod dispatched on `[location type]` (local/remote ×
+search/fetch/http). Widgets call them through one uniform contract
+(`(opts text [handler])` for search-as-you-type, `(opts)` for fetch). Remote calls
+are **server-mediated** (the browser never calls the upstream directly), transit-
+encoded, with the base host injected at call time. Sources are version-pinned with
+the form (cached per form version). A small param allowlist guards requests.
+
+**Have.** `options.clj` resolves field option lists from sources; `imports.clj`
+hydrates. The pieces exist but aren't a single uniform abstraction.
+
+**Build.** Generalize into one **source resolver** keyed by a single `:kind`:
+
+```clojure
+:sources
+{:field-types  {:kind :static  :data [["Text" "text"] ["Number" "number"]]}
+ :clinic-search {:kind :http-search :url "/clinics" :query-key :q
+                 :allow #{:q :region} :host-allow ["clinics.internal"]}
+ :patient       {:kind :http-fetch  :url "/patient" :key :mrn}}
+```
+
+```clojure
+(defmulti resolve-source :kind)          ; → returns a fn
+(defmethod resolve-source :http-search [spec] (fn [ctx query] …))
+```
+
+- Compile sources at form load, cache inside the parsed form (so they're
+  **version-pinned** for free, like our reactions/events already are).
+- Invoke **server-side** over the existing Datastar POST/SSE path (already our
+  model — the typeahead/option widgets call a cell that resolves the source and
+  patches results back). This is *natively* how Stepvine works, so we're more
+  aligned with this pattern than the reference (which had to bolt a websocket
+  round-trip onto a client-rendered app).
+
+**Improve.**
+- **Close the SSRF surface** the reference only half-guards: an explicit
+  `:host-allow`/`:url` allowlist per source, validated at load, in addition to the
+  param `:allow` set.
+- One `:kind` multimethod for *all* sources (the reference split this across a
+  pluggable datasource multimethod **and** a hard-coded `case` for hydration
+  sources — unify them).
+
+### 15.7 Imports (external-data injection / "hydration")
+
+**Pattern.** Declarative rules that pull external/derived data into a document at
+**triggers** (`on-create`, `on-open`, on named events). Only the *triggered*
+injections run (lazy — no fetch unless needed). A bidirectional path-mapping
+library maps source paths → document paths, supports transforms and a registered
+derivation (e.g. age↔DOB), and emits **only changed `[path value]`** (idempotent).
+Injections can **chain** — a later one sees an earlier one's pending changes.
+
+**Have.** `imports.clj` with `:trigger` + `:mapping`.
+
+**Build.** Formalize the import spec and make it lazy + diff-based + chainable:
+
+```clojure
+:imports
+[{:on    #{:create}              ; :create | :open | :event/<name>
+  :from  :patient                ; a source id (§15.6)
+  :params {:mrn [:meta :mrn]}    ; resolved from doc/meta or a prior import's pending changes
+  :map   [{:from [:name :family] :to :last-name}
+          {:from [:dob]          :to :age :via :age-from-dob}]  ; named transform
+  :into  :data}]                 ; :data | :meta
+```
+
+- Run only imports whose `:on` intersects the current trigger; fetch the source
+  lazily; emit `[[path value]]` deltas **only where the value differs**; thread
+  pending deltas so later imports can reference earlier ones.
+
+**Improve.** Make the source type a **multimethod** (the reference hard-coded it
+as a `case` — its own TODO), drop the external mapping dependency in favor of our
+own small path-map + named-transform registry, and fix the "inject at document
+root" case the reference disabled due to a vector-index bug (our paths are
+explicit vectors, so root injection is well-defined).
+
+### 15.8 Validation
+
+**Pattern.** Per-field validators declared in the model
+(`:required`, `:email`, `[:max-count 7]`, custom comparators), plus
+**`:validate-when`** preconditions (only validate a field if other validations
+pass — conditional/dependent validation), and a document-level pass that gates
+submission and returns `[{path error}]`.
+
+**Have.** Field-error **reactions** + a `:form-valid?` reaction; validity already
+expressed in the reactive graph.
+
+**Build.** We don't need a parallel validator engine — Domino reactions already
+*are* the dataflow. Add:
+- A small **validator vocabulary** that compiles to error reactions (so authors
+  write `:validation [:required [:max-count 7]]` and we generate the reaction),
+  keeping authoring declarative while reusing Domino for evaluation.
+- **Conditional validation**: a field's error reaction takes a guard reaction as
+  input (the `:validate-when` idea, expressed as a reaction dependency).
+- A document-level `:valid?` reaction that the `submit` action (§15.5) gates on.
+
+**Improve.** Because validity is *in the reactive graph*, error state and
+visibility/enable already update live over SSE with no extra round-trip — the
+reference re-runs a separate UI-rule engine and re-broadcasts; we get it for free.
+
+### 15.9 Partials (reusable definition blocks)
+
+**Pattern.** A "fragment" is a named, separately-stored reusable sub-tree of form
+definition (e.g. a common role-picker block), referenced by id and **spliced in at
+parse time**. **Weakness:** the reference splices at *write* time, so updating a
+shared fragment does **not** propagate to already-saved forms (stale copies).
+
+**Have.** None; every form is self-contained.
+
+**Build.** Add `partials/` (EDN blocks) + a `{:include :partial-id}` node that the
+form loader splices when parsing a form. Partials can carry model+events+markup
+fragments (e.g. an "address" block: three fields + a validation + markup).
+
+**Improve.** Splice at **load** time (forms are parsed fresh per version), so a
+partial fix reaches every form that includes it — *or* version-pin partials with
+the including form's version when we want reproducibility. Either is strictly
+better than the reference's frozen write-time copy.
+
+### 15.10 Workflow orchestration (states & actions)
+
+**Pattern.** A workflow is **EDN data, not code**: pages + a state map + an
+`:actions` map. There is **no engine loop** — when a document action arrives, the
+orchestrator looks up the action, resolves any dynamic values, runs an ordered
+list of **steps**, guards on the current state, and returns **directives** the
+document engine applies (set-state / set-field, our names in §15.12). State
+transitions are themselves a step whose transition table is *data*. **Weaknesses:** no durable
+per-instance/event log (state lives only in the document), no validation that the
+state graph is well-formed, and multi-step actions are fail-fast with **no
+rollback/compensation**.
+
+**Have.** `:exports` + `POST /doc/:id/action/:aid` run a templated action; no
+states/transitions.
+
+**Build.** Attach a declarative workflow to the form:
+
+```clojure
+:workflow
+{:initial :draft
+ :states {:draft  {:on {:submit :review}}
+          :review {:on {:approve :done :reject :draft}}
+          :done   {:terminal? true}}
+ :actions
+ {:submit  {:guard :valid?                       ; a document reaction (§15.8)
+            :steps [{:do :set-state :to :review}
+                    {:do :notify :to :reviewer :template :submitted}
+                    {:do :snapshot :as :report}]}
+  :approve {:require-role :reviewer
+            :steps [{:do :set-state :to :done}
+                    {:do :pdf :template :summary :store :reports}]}}}
+```
+
+- Implement actions as a **Mycelium workflow** over the existing
+  `cells/document`. Each step is dispatched by a **multimethod** `run-step :do`
+  (pluggable, §15.11). A step returns a **directive** (`{:set-state …}`,
+  `{:set-field [path val]}`, `{:emit-report …}`) which the document layer applies
+  in-process and persists + broadcasts — same shape as the reference's cross-
+  service hooks, but no HTTP/JWT because it's one process.
+- **Guard + state check** before running: validate the document (§15.8) and that
+  the transition is legal for the current `:status`/`:workflow :state`.
+
+**Improve.**
+- **Validate the transition graph at load** (no unreachable/terminal-less states,
+  every `:on` target exists) — the reference validates none of this.
+- **Durable workflow-event log** (`{:doc-id :action :step :result :at :by}`),
+  which the reference entirely lacks (state lived only in document metadata). This
+  doubles as the §15.4 audit for transitions.
+- **Idempotency + compensation** for multi-step actions: each step carries an
+  idempotency key; a failed step can declare a compensating step so a partial
+  run (e.g. emailed-then-pdf-failed) can be unwound or safely retried — the
+  reference is fail-fast with partial side effects and no undo.
+
+### 15.11 Pluggable step dispatcher & external clients
+
+**Pattern.** Two open dispatch systems: **processors** (compute dynamic values in
+the action config, pure) and **actions/steps** (perform side effects). Both are
+plain multimethods — a new behavior is one `defmethod` + a require line, no core
+change. External systems (the form engine, directory, FHIR, fax, email) are
+wrapped as `clients.*` namespaces. **Weakness:** clients are *ad-hoc namespaces of
+fns*, not a uniform abstraction — no shared retry/timeout/circuit-breaker, hard to
+mock/swap.
+
+**Have.** A single external `clients` component (patient stub); `exports` is a
+seed of the step idea.
+
+**Build.**
+- **Step dispatcher**: `(defmulti run-step :do)` with built-ins `:set-state`,
+  `:set-field`, `:notify`, `:pdf`, `:snapshot`, `:call`. Adding `:fax` is one
+  `defmethod` + a require — the same open-dispatch extensibility, applied to our
+  in-process step layer.
+- **Value resolution in step configs**: rather than a separate templating engine,
+  resolve `{:from [path]}` / `{:reaction :id}` placeholders against the document
+  using our existing render context, and evaluate any inline expressions with
+  **sci** (sandboxed) — we already sci-evaluate form fns, so authors get one
+  consistent, *safe* expression mechanism instead of trusted `eval`.
+
+**Improve.** Give external integrations a **uniform client protocol** (an
+Integrant component implementing `fetch`/`call` with a shared timeout + retry +
+circuit-breaker policy), so every integration (FHIR, directory, fax, mail) is
+configured the same way and mocked the same way in tests — replacing the
+reference's inconsistent per-client namespaces. Keep code-as-config **sci-only**
+(never `clojure.core/eval`), closing the reference's biggest safety hole.
+
+### 15.12 Directive contract (in-process replacement for cross-service hooks)
+
+The reference's orchestrator returns *directives* that the document engine
+applies (rather than writing the store itself), keeping the orchestrator
+credential-free. We keep the **same pure-step / applied-directive split** but in
+one process:
+
+- A step returns one of `{:set-state s}`, `{:set-field [path v]}`,
+  `{:set-meta [path v]}`, `{:emit-report …}`, `{:notify …}` (or a vector of them).
+- A single `apply-directives!` in the document layer applies them through the
+  session (so they recompute reactions, persist, audit, and broadcast over SSE
+  like any other change).
+- This keeps steps **pure and unit-testable** (input doc + step → directives) with
+  no I/O in the dispatch itself, while side effects (mail/pdf/http) live in the
+  clients (§15.11) behind the resilience policy.
+
+### 15.13 Pages, index lookups & production hardening
+
+**Pattern.** A workflow declares **pages** (`:page-type` index / documents /
+document-search); an **index** multimethod resolves an external key (e.g. a
+patient identifier) into an entity bundle used to *prepopulate and search*
+documents — the read-side mirror of the write-side processor system.
+
+**Have.** Landing list + editor + SSE; imports can prepopulate.
+
+**Build (Phase 11).**
+- `:pages` on a form/workflow with `:page-type #{:index :documents :search}`;
+  routes derive from them; the document list filters by `:status`/owner/metadata.
+- An **index resolver** multimethod (`resolve-index :kind`) that turns a lookup
+  key into `{:index … :entities {…}}`, feeding both document creation (prepopulate
+  via §15.7 imports) and metadata search.
+- **Backends**: implement the store abstractions over a real query DB
+  (XTDB/Datalevin) — the target schema (§15.2) is already DB-agnostic. Add PDF
+  generation (`:pdf` step), a FHIR/external client (§15.11), and OAuth2/OIDC
+  alongside the existing bcrypt/session auth.
+
+### 15.14 Net improvements over the reference systems
+
+| Area | Reference weakness | Stepvine plan |
+|---|---|---|
+| Published-version immutability | Convention only; in-place update possible | Write-once versions + content `:digest` (§15.1) |
+| Document→version data migration | None | Opt-in audited **rebase** with field-mapping (§15.1) |
+| Concurrency backstop | No revision token; last-write-wins | Monotonic `:rev` + stale-base rejection (§15.2–15.3) |
+| Failure handling | `System/exit` on DB/audit error | Per-client error + dead-letter, never exit (§15.3) |
+| Audit | No diffs, no per-doc index, transitions unaudited | Before/after diffs, per-doc index, transitions audited (§15.4) |
+| Post-submit editing | Document stays editable | Hard read-only on submitted views (§15.5) |
+| Data-source SSRF | Params allowlisted, host/path not | Host+path allowlist per source (§15.6) |
+| Source pluggability | Split multimethod + hard-coded `case` | One `:kind` multimethod for all sources/imports (§15.6–15.7) |
+| Code-as-config safety | Full `clojure.core/eval` | **sci** sandbox everywhere (§15.11) |
+| Reusable blocks | Frozen at write time (stale) | Spliced at load / version-pinned partials (§15.9) |
+| Workflow graph | Unvalidated, scattered transitions | Validated transition table, declared on the form (§15.10) |
+| Workflow durability | No instance/event log | Durable workflow-event log = transition audit (§15.10) |
+| Multi-step actions | Fail-fast, no rollback | Idempotency keys + compensation (§15.10) |
+| External clients | Ad-hoc fn namespaces | Uniform client protocol w/ retry+timeout+breaker (§15.11) |
+| Service topology | Two services + JWT handoff + 409s | Single process; directives applied in-process (§15.12) |
+
+### 15.15 Suggested build order
+
+1. **§15.1–15.2** versioned form store + pinned document record (foundation).
+2. **§15.4** audit store (everything below writes to it).
+3. **§15.3** durability hardening (`:rev`, no-exit, lock/presence stores).
+4. **§15.8 + §15.5** validation vocabulary → submission/approval + post-submit
+   read-only.
+5. **§15.6–15.7** unify sources + imports under one resolver.
+6. **§15.9** partials.
+7. **§15.10–15.12** workflow states/actions/steps + directive layer + client
+   protocol.
+8. **§15.13** pages, index lookups, query-DB backends, PDF, OIDC.
+
+Each step lands behind the existing store/cell abstractions with its own tests and
+a storyboard scenario, so the system stays green throughout.
