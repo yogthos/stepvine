@@ -1,0 +1,105 @@
+;; Widget showcase — a single document exercising every widget in the library,
+;; used as a comprehensive smoke test. Reactivity is demonstrated by a greeting
+;; reaction (over :name) and a BMI-style category reaction (over :rating).
+{:id :showcase
+ :title "Widget Showcase"
+ :version 1
+
+ :data
+ {:model
+  [[:name      {:id :name      :type :string}]
+   [:bio       {:id :bio       :type :string}]
+   [:age       {:id :age       :type :number}]
+   [:color     {:id :color     :type :string}]
+   [:size      {:id :size      :type :string}]
+   [:plan      {:id :plan      :type :string}]
+   [:tool      {:id :tool      :type :string}]
+   [:agree     {:id :agree     :type :string}]
+   [:rating    {:id :rating    :type :number}]
+   [:birthday  {:id :birthday  :type :string}]
+   [:meeting   {:id :meeting   :type :string}]
+   [:fruit     {:id :fruit     :type :string}]
+   [:people
+    {:id :people :collection? true :index-id :pid
+     :schema {:model [[:pid   {:id :pid}]
+                      [:first {:id :first :type :string}]
+                      [:last  {:id :last  :type :string}]
+                      [:full  {:id :full  :type :string}]]
+              :events [{:id :calc-full :inputs [:first :last] :outputs [:full]
+                        :handler (fn [{{:keys [first last]} :inputs}]
+                                   {:full (str (or first "") (when (and first last) " ") (or last ""))})}]}}]
+   [:tasks
+    {:id :tasks :collection? true :index-id :tid
+     :schema {:model [[:tid      {:id :tid}]
+                      [:title    {:id :title    :type :string}]
+                      [:priority {:id :priority :type :number}]]}}]]
+
+  :reactions
+  [{:id :greeting :args [:name]
+    :fn (fn [n] (if (seq (str n)) (str "Hello, " n "!") "Enter your name above."))}
+   {:id :rating-label :args [:rating]
+    :fn (fn [r] (cond (nil? r) "n/a" (< r 3) "low" (< r 7) "medium" :else "high"))}
+   {:id :high-rating? :args [:rating] :fn (fn [r] (>= (or r 0) 7))}]}
+
+ :exports
+ {:summary {:label "Export summary"
+            :template {:name :name :age :age :color :color :rating :rating
+                       :category :rating-label}}}
+
+ :views
+ {:default
+  {:title "Widget Showcase"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Widget Showcase"]
+    [:p "A live document exercising every widget. Edits propagate to all viewers."]
+
+    [:c/section {:title "Text"}
+     [:c/input-field {:id :name :label "Name"}]
+     [:c/label {:rxn :greeting}]
+     [:c/textarea {:id :bio :label "Bio" :rows 3 :placeholder "About you…"}]
+     [:c/input-field {:id :age :label "Age"}]]
+
+    [:c/section {:title "Choices"}
+     [:c/dropdown {:id :color :label "Favorite color"
+                   :options [["Red" "red"] ["Green" "green"] ["Blue" "blue"]]}]
+     [:c/radio {:id :size :label "Size"
+                :options [["Small" "s"] ["Medium" "m"] ["Large" "l"]] :stacked true}]
+     [:c/selections {:id :plan :label "Plan"
+                     :options [["Free" "free"] ["Pro" "pro"] ["Team" "team"]]}]
+     [:c/menu {:id :tool :label "Tool"
+               :options [["Pen" "pen"] ["Brush" "brush"] ["Eraser" "eraser"]]}]
+     [:c/checkbox {:id :agree :label "I agree to the terms"}]]
+
+    [:c/section {:title "Ranges & dates"}
+     [:c/slider {:id :rating :label "Rating" :min 0 :max 10 :step 1}]
+     [:p "Rating category: " [:c/label {:rxn :rating-label}]]
+     [:c/show {:when :high-rating?}
+      [:c/alert {:class "alert-success" :label "That's a high rating — thank you!"}]]
+     [:c/date-picker {:id :birthday :label "Birthday"}]
+     [:c/input-time {:id :meeting :label "Meeting time"}]]
+
+    [:c/section {:title "Autocomplete"}
+     [:c/typeahead {:id :fruit :label "Fruit"
+                    :options [["Apple" "apple"] ["Banana" "banana"] ["Cherry" "cherry"]]
+                    :placeholder "Start typing…"}]]
+
+    [:c/section {:title "Collection (people)"}
+     [:c/collection {:id :people}
+      [:c/input-field {:id :first :label "First"}]
+      [:c/input-field {:id :last :label "Last"}]
+      [:p "Full: " [:c/value {:id :full}]]]]
+
+    [:c/section {:title "Table (tasks)"}
+     [:c/table {:id :tasks
+                :columns [{:path :title :label "Title" :sortable? true
+                           :widget :stepvine.components/input-field}
+                          {:path :priority :label "Priority" :sortable? true
+                           :widget :stepvine.components/input-field}]
+                :can-add-rows? true :can-delete-rows? true :can-move-rows? true
+                :can-clear-table? true :paged? true :page-size 5 :striped? true}]]
+
+    [:p.presence "Editors online: " [:span {:data-text "$presence"}]]
+    [:c/action {:action :summary :label "Export summary"}]
+    [:pre {:id "export-result"}]]}}}

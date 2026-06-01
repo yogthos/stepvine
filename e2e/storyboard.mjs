@@ -180,6 +180,29 @@ try {
   await page.click('.widget-table-pager a:has-text("»")'); await page.waitForTimeout(400);
   (await page.locator('.widget-table-pager').innerText()).includes('Page 2 of 2') ? ok('paged to page 2') : bad('next page failed');
 
+  // ---- 8. Widget showcase — all widgets render + reactivity -------------
+  step('8. Widget showcase — render + reactivity');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Widget Showcase")'), '#name');
+  ok('opened the widget showcase');
+  // every widget kind is present
+  const present = await page.evaluate(() => [
+    '.widget.dropdown', '.widget.radio', '.widget.selections', '.widget.menu',
+    '.widget.checkbox', '.widget.slider', '.widget.date-picker', '.widget.input-time',
+    '.widget.typeahead', '.widget.textarea', '.widget-table',
+  ].filter((s) => !document.querySelector(s)));
+  present.length === 0 ? ok('all widget kinds rendered') : bad(`missing widgets: ${present}`);
+  // reaction: greeting follows the name field
+  await page.fill('#name', 'World'); await page.waitForTimeout(500);
+  (await page.locator('[data-text="$greeting"]').innerText()) === 'Hello, World!'
+    ? ok('greeting reaction updated live') : bad(`greeting wrong: ${await page.locator('[data-text="$greeting"]').innerText()}`);
+  // slider drives a category reaction + conditional alert
+  await page.locator('#rating').fill('8'); await page.waitForTimeout(500);
+  (await page.locator('[data-text="$rating_label"]').innerText()) === 'high'
+    ? ok('slider drove rating-label reaction = high') : bad(`rating-label wrong: ${await page.locator('[data-text="$rating_label"]').innerText()}`);
+  (await page.locator('.widget.alert').isVisible())
+    ? ok('conditional alert shown for high rating') : bad('alert not shown');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');
