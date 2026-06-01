@@ -16,7 +16,7 @@
    [yogthos.stepvine.options :as options]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
-   yogthos.stepvine.widgets   ; register all widget render methods
+   yogthos.stepvine.components   ; register all widget render methods
    [starfederation.datastar.clojure.api :as d*]))
 
 (defn coerce

@@ -220,8 +220,8 @@
                  (concat field-ids rxn-ids))
            (collection-signal-map (collections-data session))))))
 
-;; Concrete widgets live in `yogthos.stepvine.widgets.*` (registered via the
-;; `yogthos.stepvine.widgets` namespace) — render.clj is just the engine.
+;; Concrete components live under `yogthos.stepvine.components.*` (registered via
+;; the `yogthos.stepvine.components` namespace) — render.clj is just the engine.
 
 ;; --- Public entry points --------------------------------------------------
 

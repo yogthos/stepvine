@@ -11,7 +11,7 @@
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
    [starfederation.datastar.clojure.adapter.test :as ds-test]
-   yogthos.stepvine.widgets   ; register widget render methods
+   yogthos.stepvine.components   ; register widget render methods
    [yogthos.stepvine.editor.impl :as impl]))
 
 (defn- mgr+ []

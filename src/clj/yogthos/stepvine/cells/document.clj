@@ -22,7 +22,7 @@
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
    [yogthos.stepvine.users :as users]
-   yogthos.stepvine.widgets   ; register all widget render methods
+   yogthos.stepvine.components   ; register all widget render methods
    [yogthos.stepvine.web.security :as security])
   (:import
    [java.util Date]))
