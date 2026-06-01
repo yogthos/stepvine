@@ -31,3 +31,11 @@
 (def build
   (myc/pre-compile {:cells    {:start :doc/parse :build :doc/build}
                     :pipeline [:start :build]}))
+
+(def submit
+  (myc/pre-compile {:cells    {:start :doc/parse-view-op :submit :doc/submit}
+                    :pipeline [:start :submit]}))
+
+(def revise
+  (myc/pre-compile {:cells    {:start :doc/parse-view-op :revise :doc/revise}
+                    :pipeline [:start :revise]}))

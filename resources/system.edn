@@ -49,7 +49,8 @@
   :hub            #ig/ref :datastar/hub
   :options-store  #ig/ref :store/options
   :patient-client #ig/ref :clients/patient
-  :users          #ig/ref :store/users}
+  :users          #ig/ref :store/users
+  :audit          #ig/ref :store/audit}
 
  ;; --- Form-document engine -------------------------------------------------
  ;; Form definitions live on disk as one EDN file per form; the store scans this
@@ -76,6 +77,12 @@
  {:file #profile {:dev  "data/documents.edn"
                   :test nil
                   :prod #or [#env DOCUMENTS_FILE "data/documents.edn"]}}
+
+ ;; Append-only audit log (§15.4); duratom on disk in dev/prod, in-memory for tests
+ :store/audit
+ {:file #profile {:dev  "data/audit.edn"
+                  :test nil
+                  :prod #or [#env AUDIT_FILE "data/audit.edn"]}}
 
  ;; User accounts; duratom-persisted in dev/prod, in-memory for tests.
  ;; A dev admin (admin/admin) is seeded when the store is empty.

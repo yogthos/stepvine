@@ -10,7 +10,9 @@
    [clojure.string :as str]
    [jsonista.core :as json]
    [mycelium.core :as myc]
+   [yogthos.stepvine.audit :as audit]
    [yogthos.stepvine.docs :as docs]
+   [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.hub :as hub]
    [yogthos.stepvine.imports :as imports]
    [yogthos.stepvine.options :as options]
@@ -58,18 +60,27 @@
         (session/apply-change! session-manager doc-id changes)))))
 
 (myc/defcell :form/apply-field
-  {:requires [:forms :documents :session-manager :patient-client]
+  {:requires [:forms :documents :session-manager :patient-client :audit]
    :input    {:doc-id :any :field-id :any :uid :any :raw-value :any}
    :output   {:status :int :body :string}
-   :doc      "Coerce + transact the change (lock-aware), then run any triggered import."}
-  (fn [{:keys [session-manager patient-client] :as resources} {:keys [doc-id field-id uid raw-value]}]
+   :doc      "Coerce + transact the change (lock-aware + finalized-doc-aware), audit
+              the before/after diff, then run any triggered import."}
+  (fn [{:keys [session-manager patient-client documents audit] :as resources}
+       {:keys [doc-id field-id uid raw-value]}]
     (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
-      (let [sess  (session/current session-manager doc-id)
-            fid   (keyword field-id)
-            value (coerce (get-in sess [:field-opts fid]) raw-value)]
-        (session/apply-field-as! session-manager doc-id uid fid value)
-        (run-imports! session-manager patient-client form-raw doc-id fid value)
-        {:status 204 :body ""})
+      (if (documents/locked? (documents/get-document documents doc-id))
+        {:status 409 :body "Document is read-only (finalized)."}   ; §15.5 enforcement
+        (let [sess   (session/current session-manager doc-id)
+              fid    (keyword field-id)
+              value  (coerce (get-in sess [:field-opts fid]) raw-value)
+              before (session/value session-manager doc-id fid)]
+          (session/apply-field-as! session-manager doc-id uid fid value)
+          (let [after (session/value session-manager doc-id fid)]
+            (when (not= before after)                              ; skip no-ops / lock-rejected
+              (audit/record! audit {:doc-id doc-id :by uid :action :field/save
+                                    :path [fid] :before before :after after})))
+          (run-imports! session-manager patient-client form-raw doc-id fid value)
+          {:status 204 :body ""}))
       {:status 404 :body (str "No such document: " doc-id)})))
 
 (myc/defcell :form/lock-field

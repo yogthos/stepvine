@@ -203,6 +203,23 @@ try {
   (await page.locator('.widget.alert').isVisible())
     ? ok('conditional alert shown for high rating') : bad('alert not shown');
 
+  // ---- 9. Document lifecycle — submit locks, revise reopens -------------
+  step('9. Document lifecycle — submit / revise');
+  await page.click('.submit-btn');
+  await page.waitForTimeout(500);
+  (await page.locator('.sv-status').isVisible())
+    ? ok('submit finalized the document (read-only banner shown)') : bad('no read-only banner after submit');
+  (await page.locator('.submit-btn').isVisible())
+    ? bad('submit button still visible after submit') : ok('submit button hidden once finalized');
+  (await page.locator('.revise-btn').isVisible())
+    ? ok('revise button shown while locked') : bad('revise button not shown while locked');
+  await page.click('.revise-btn');
+  await page.waitForTimeout(500);
+  (await page.locator('.sv-status').isVisible())
+    ? bad('read-only banner still shown after revise') : ok('revise reopened the document');
+  (await page.locator('.submit-btn').isVisible())
+    ? ok('submit button restored after revise') : bad('submit button not restored after revise');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

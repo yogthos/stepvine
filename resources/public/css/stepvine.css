@@ -157,6 +157,20 @@ body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; 
 @keyframes sv-throb { 0% { opacity: 1; } 100% { opacity: .15; } }
 .throbber-label { color: #6b7280; font-size: .85rem; }
 
+/* ── Document lifecycle (submit / revise / read-only) ─────────────────── */
+.sv-status { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e;
+             padding: .5rem .75rem; border-radius: .375rem; margin: .5rem 0; }
+.sv-notice { background: #fee2e2; border: 1px solid #fecaca; color: #991b1b;
+             padding: .5rem .75rem; border-radius: .375rem; margin: .5rem 0; }
+.sv-readonly input, .sv-readonly select, .sv-readonly textarea {
+  pointer-events: none; background: #f3f4f6; color: #6b7280; }
+.submit-btn { padding: .4rem .9rem; background: #16a34a; color: #fff; border: none;
+              border-radius: .375rem; cursor: pointer; }
+.submit-btn:hover { background: #15803d; }
+.revise-btn { padding: .4rem .9rem; background: #fff; color: #374151;
+              border: 1px solid #d1d5db; border-radius: .375rem; cursor: pointer; }
+.revise-btn:hover { background: #f3f4f6; }
+
 /* ── Layout primitives (scroller / border / gap / line) ───────────────── */
 .scroller { overflow: auto; }
 .scroller-sm { max-height: 8rem; } .scroller-md { max-height: 16rem; } .scroller-lg { max-height: 24rem; }

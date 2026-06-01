@@ -24,11 +24,16 @@
         array? (into #{} (keep (fn [[id opts]] (when (= :array (:type opts))
                                                  (render/signal-name id)))
                                (:field-opts ctx)))
+        ;; lifecycle signals (§15.5): `locked` reflects a finalized/read-only
+        ;; document (seeded from the doc status, flipped live on submit/revise);
+        ;; `notice` carries transient server messages (failed submit guards).
         seed (into {} (map (fn [[k v]] [k (cond (some? v)  v
                                                 (bool? k)  false
                                                 (array? k) []
                                                 :else      "")]))
-                   (merge (render/signal-map ctx) {"uid" uid "presence" 1 "locks" {}}))]
+                   (merge (render/signal-map ctx)
+                          {"uid" uid "presence" 1 "locks" {}
+                           "locked" (boolean (:locked? ctx)) "notice" ""}))]
     ;; Rendered as a <div>, not a <form>: there is no submit (inputs POST via
     ;; data-on:input), and an empty data-on:submit value crashes Datastar's
     ;; engine (ValueRequired), which would break every binding on the page.
@@ -36,4 +41,11 @@
     [:div (merge {"data-signals" (json/write-value-as-string seed)
                   "data-init"    (str "@get('/doc/" (:doc-id ctx) "/sse')")}
                  (dissoc attrs :id))
-     (render/render-children ctx body)]))
+     ;; transient notice + persistent read-only banner
+     [:div.sv-notice {"data-show" "$notice" "data-text" "$notice"}]
+     [:div.sv-status {"data-show" "$locked"}
+      "This document has been submitted and is read-only. Use Revise to reopen it."]
+     ;; finalized documents render read-only: a class drives input dimming, and
+     ;; the server rejects any write that slips through (§15.5 enforcement)
+     (into [:div {"data-class:sv-readonly" "$locked"}]
+           (render/render-children ctx body))]))

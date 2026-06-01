@@ -20,14 +20,15 @@
    [yogthos.stepvine.workflows.document :as doc]
    [yogthos.stepvine.workflows.form :as form]))
 
-(defn page-routes [{:keys [forms documents session hub options-store patient-client users]}]
+(defn page-routes [{:keys [forms documents session hub options-store patient-client users audit]}]
   (let [resources  {:forms           forms
                     :documents       documents
                     :session-manager session
                     :hub             hub
                     :options-store   options-store
                     :patient-client  patient-client
-                    :users           users}
+                    :users           users
+                    :audit           audit}
         page (fn [wf] {:get  {:handler (mw/workflow-handler wf {:resources resources})}})
         post (fn [wf] {:post {:handler (mw/workflow-handler
                                         wf {:resources resources
@@ -49,6 +50,8 @@
                                                     :forms forms :documents documents})}}]
       ["/share"  (af (post doc/share))]
       ["/delete" (af (post doc/delete))]
+      ["/submit" (ds (post doc/submit))]
+      ["/revise" (ds (post doc/revise))]
       ["/field/:fid"         (ds (post form/update-field))]
       ["/field/:fid/lock"    (ds (post form/lock-field))]
       ["/field/:fid/unlock"  (ds (post form/unlock-field))]

@@ -12,6 +12,7 @@
     ;; Form-document engine
    [yogthos.stepvine.forms]
    [yogthos.stepvine.documents]
+   [yogthos.stepvine.audit]
    [yogthos.stepvine.hub]
    [yogthos.stepvine.session]
    [yogthos.stepvine.options]

@@ -461,10 +461,16 @@ frozen version (no auto-migration), and `docs/rebase!` is the opt-in forward pat
 (§15.1–15.2). *Deferred to Phase 8:* using `:rev` to reject stale writes, the
 `:meta` write allowlist, and a drafts authoring flow.
 
-**Phase 8 — Lifecycle, audit & submission.** Declared state machine on the form,
-durable append-only audit log with before/after diffs, per-view submission +
-approvals, soft delete, and hard read-only enforcement after finalization
-(§15.3–15.5).
+**Phase 8 — Lifecycle, audit & submission. ✅ core done.** Durable append-only
+audit log (`yogthos.stepvine.audit`) with before/after diffs and a per-document
+view, fed by field-saves and lifecycle transitions; writes are fire-and-forget
+and never crash the caller. Per-view submission + an append-only approval log +
+an immutable snapshot (`documents/submit!` / `revise!`), guarded by a sole-editor
+check and an optional validity reaction (`:submit-when`); finalized documents are
+**hard read-only** — the field-save cell rejects writes (409) and the form
+renders disabled with a banner, flipped live via a `$locked` signal (§15.4–15.5).
+*Deferred to Phase 11 (multi-node):* using `:rev` to reject stale writes and
+moving lock/presence into a shared store (§15.3 — only needed off single-node).
 
 **Phase 9 — Pluggable sources, imports & partials.** Uniform source resolver
 (multimethod by kind), lazy diff-based imports, conditional validation, and

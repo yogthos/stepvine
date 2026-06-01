@@ -11,9 +11,11 @@
    [jsonista.core :as json]
    [mycelium.core :as myc]
    [selmer.parser :as selmer]
+   [yogthos.stepvine.audit :as audit]
    [yogthos.stepvine.builder :as builder]
    [yogthos.stepvine.docs :as docs]
    [yogthos.stepvine.documents :as documents]
+   [yogthos.stepvine.editor.impl :as impl]
    [yogthos.stepvine.exports :as exports]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.hub :as hub]
@@ -128,13 +130,15 @@
    :input    {:doc-id :any :view-id :any :user-id :any}
    :output   {:html :string}
    :doc      "Ensure the document's session and render the requested view."}
-  (fn [{:keys [session-manager options-store] :as resources} {:keys [doc-id view-id user-id]}]
+  (fn [{:keys [session-manager options-store documents] :as resources} {:keys [doc-id view-id user-id]}]
     (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
       (let [sess (session/current session-manager doc-id)
             vid  (let [v (keyword view-id)]
                    (if (get-in sess [:form :views v]) v :default))
             ctx  (-> (render/session->context sess vid doc-id)
                      (assoc :uid user-id)   ; the authenticated user drives lock comparison
+                     ;; finalized documents render read-only (§15.5)
+                     (assoc :locked? (documents/locked? (documents/get-document documents doc-id)))
                      ;; resolve option sources for top-level AND collection-item fields
                      (assoc :options (options/resolve-field-options options-store (render/all-field-opts sess))))
             view (render/render-view ctx (render/view-markup sess vid))]
@@ -166,6 +170,71 @@
             json   (json/write-value-as-string result pretty)
             html   (str (h/html [:pre {:id "export-result"} json]))]
         (hub/broadcast-elements! hub doc-id html)))
+    {:status 204 :body ""}))
+
+;; --- POST /doc/:id/submit | /revise (§15.5) -------------------------------
+
+(myc/defcell :doc/parse-view-op
+  {:input  {:http-request :map}
+   :output {:doc-id :any :view-id :any :uid :any}
+   :doc    "Document id (path), target view (query, default :default), acting user."}
+  (fn [_ {req :http-request}]
+    {:doc-id  (get-in req [:path-params :id])
+     :view-id (keyword (or (get-in req [:query-params "view"]) "default"))
+     :uid     (get-in req [:session :user-id])}))
+
+(defn- broadcast-lock! [hub doc-id locked?]
+  (hub/broadcast-signals! hub doc-id {"locked" locked?}))
+
+(defn- notice! [hub doc-id msg]
+  ;; a transient message surfaced by the form's status region
+  (hub/broadcast-signals! hub doc-id {"notice" msg}))
+
+(myc/defcell :doc/submit
+  {:requires [:forms :documents :session-manager :hub :audit]
+   :input    {:doc-id :any :view-id :any :uid :any}
+   :output   {:status :int :body :string}
+   :doc      "Finalize a view: guard sole-editor + validity, snapshot, approve, lock."}
+  (fn [{:keys [session-manager hub documents audit] :as resources} {:keys [doc-id view-id uid]}]
+    (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
+      (let [doc         (documents/get-document documents doc-id)
+            others      (disj (hub/users hub doc-id) uid)
+            submit-when (get-in form-raw [:views view-id :opts :submit-when])
+            valid?      (or (nil? submit-when)
+                            (boolean (session/value session-manager doc-id submit-when)))]
+        (cond
+          (documents/submitted-for? doc view-id)
+          {:status 409 :body "Already submitted."}
+
+          (seq others)                                  ; sole-editor guard
+          (do (notice! hub doc-id "Can't submit while others are editing this document.")
+              {:status 409 :body "Other editors present."})
+
+          (not valid?)                                  ; validity gate
+          (do (notice! hub doc-id "Can't submit — please fix the highlighted fields.")
+              {:status 409 :body "Document is not valid."})
+
+          :else
+          (let [snapshot (impl/db (session/current session-manager doc-id))]
+            (documents/submit! documents doc-id view-id uid snapshot)
+            (audit/record! audit {:doc-id doc-id :by uid :action :doc/submit
+                                  :detail {:view view-id}})
+            (broadcast-lock! hub doc-id true)
+            {:status 204 :body ""})))
+      {:status 404 :body (str "No such document: " doc-id)})))
+
+(myc/defcell :doc/revise
+  {:requires [:forms :documents :session-manager :hub :audit]
+   :input    {:doc-id :any :view-id :any :uid :any}
+   :output   {:status :int :body :string}
+   :doc      "Re-open a submitted view; broadcast the unlocked state."}
+  (fn [{:keys [hub documents audit] :as resources} {:keys [doc-id view-id uid]}]
+    (when (docs/ensure! resources doc-id)
+      (documents/revise! documents doc-id view-id)
+      (audit/record! audit {:doc-id doc-id :by uid :action :doc/revise
+                            :detail {:view view-id}})
+      (broadcast-lock! hub doc-id
+                       (documents/locked? (documents/get-document documents doc-id))))
     {:status 204 :body ""}))
 
 ;; --- POST /doc/:id/share | /delete (owner-only) ---------------------------

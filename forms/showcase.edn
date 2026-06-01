@@ -225,10 +225,13 @@
                    :can-clear-table? true :paged? true :page-size 5 :striped? true}]]]
 
       [:section#sec-actions.sv-panel
-       [:h2 "Actions" [:span.sv-kw ":action"]]
-       [:p.sv-desc "Trigger a server-side action — here a templated export of the current values."]
+       [:h2 "Actions" [:span.sv-kw ":action  :submit  :revise"]]
+       [:p.sv-desc "Trigger a server-side action (a templated export), or finalize the document. Submitting snapshots + locks it read-only; Revise reopens it."]
        [:div.sv-demo
         [:c/action {:action :summary :label "Export summary"}]
-        [:pre {:id "export-result"}]]]
+        [:pre {:id "export-result"}]
+        [:c/h-box {:gap :sm :align :center}
+         [:c/submit {:view :default :label "Submit document"}]
+         [:c/revise {:view :default :label "Revise"}]]]]
 
       [:p.sv-presence "Editors online: " [:span {:data-text "$presence"}]]]]]}}}

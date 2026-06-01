@@ -69,6 +69,15 @@
 
 ;; --- Access control -------------------------------------------------------
 
+(def locked-statuses
+  "Statuses in which a document is read-only — edits are rejected (§15.5)."
+  #{:submitted :completed :cancelled})
+
+(defn locked?
+  "True if the document is in a read-only (finalized) status."
+  [doc]
+  (boolean (locked-statuses (:status doc))))
+
 (defn owner? [doc user-id] (= user-id (:created-by doc)))
 
 (defn can-access?
@@ -101,6 +110,51 @@
                                     (update :rev (fnil inc 0))
                                     (assoc-in [:meta :modified-at]
                                               (System/currentTimeMillis)))))))))
+
+;; --- Submission / approval (§15.5) ----------------------------------------
+
+(defn submitted-for?
+  "True if `view-id` has been submitted on this document."
+  [doc view-id]
+  (boolean (contains? (set (get-in doc [:meta :submitted-views])) view-id)))
+
+(defn submit!
+  "Finalize a view: record an append-only approval + an immutable snapshot, add
+   the view to `:submitted-views`, set `:status :submitted`, bump `:rev`."
+  [store id view-id uid snapshot]
+  (swap! store
+         (fn [m]
+           (cond-> m
+             (contains? m id)
+             (update id
+                     (fn [doc]
+                       (let [now (System/currentTimeMillis)]
+                         (-> doc
+                             (update-in [:meta :submitted-views] (fnil conj #{}) view-id)
+                             (update-in [:meta :approvals] (fnil conj [])
+                                        {:view view-id :by uid :at now})
+                             (update-in [:meta :reports] (fnil conj [])
+                                        {:view view-id :by uid :at now
+                                         :form-version (:form-version doc)
+                                         :snapshot snapshot})
+                             (assoc :status :submitted)
+                             (update :rev (fnil inc 0))))))))))
+
+(defn revise!
+  "Re-open a submitted view (keeps the approval log — append-only). Returns the
+   document to `:in-progress` only when no submitted views remain."
+  [store id view-id]
+  (swap! store
+         (fn [m]
+           (cond-> m
+             (contains? m id)
+             (update id
+                     (fn [doc]
+                       (let [views (disj (set (get-in doc [:meta :submitted-views])) view-id)]
+                         (-> doc
+                             (assoc-in [:meta :submitted-views] views)
+                             (assoc :status (if (seq views) :submitted :in-progress))
+                             (update :rev (fnil inc 0))))))))))
 
 (defn delete!
   [store id]
