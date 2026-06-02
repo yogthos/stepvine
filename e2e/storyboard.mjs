@@ -368,6 +368,21 @@ try {
   (await page.locator('h2:has-text("Demo App")').count()) > 0
     ? ok('the new app appears on the landing') : bad('new app not on the landing');
 
+  // a multi-page form previews its first page (not blank) + offers a view picker
+  await page.goto(BASE + '/admin/forms/onboarding/edit');
+  await page.waitForSelector('.cm-editor', { timeout: 20000 });
+  await page.waitForTimeout(1500);
+  (await page.frameLocator('#preview').locator('h1:has-text("Account")').count()) > 0
+    ? ok('multi-page form previews its first page') : bad('multi-page preview was blank');
+  await page.waitForSelector('#preview-view');
+  (await page.locator('#preview-view option').count()) === 3
+    ? ok('preview view picker lists all three pages') : bad('view picker missing pages');
+  // switch the previewed page
+  await page.selectOption('#preview-view', 'review');
+  await page.waitForTimeout(800);
+  (await page.frameLocator('#preview').locator('h1:has-text("Review")').count()) > 0
+    ? ok('picking a view re-renders that page in the preview') : bad('view picker did not switch the preview');
+
   // ---- 15. Multi-page form — in-place page switch, URLs, validation gating
   step('15. Multi-page form navigation (no-reload + gating)');
   await page.goto(BASE + '/');
