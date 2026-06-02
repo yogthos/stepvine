@@ -110,19 +110,26 @@
   (fn [req]
     (page (auth/current-user req users-store) "Forms"
           [:div
-           [:p.muted "Restrict a form to roles (space-separated). Empty = open to "
-            "all signed-in users."]
-           (into [:table [:tr [:th "Form"] [:th "Required roles"] [:th]]]
-                 (for [id (sort (forms/list-forms forms-store))]
+           [:p.muted "Edit an app's EDN + CSS live, or restrict it to roles "
+            "(space-separated; empty = open to all signed-in users)."]
+           (into [:table [:tr [:th "App"] [:th "Required roles"] [:th] [:th]]]
+                 (for [id (sort-by name (forms/list-forms forms-store))]
                    [:tr
                     [:td (or (:title (forms/get-form forms-store id)) (name id)) " "
-                     [:small.muted (name id)]]
+                     [:small.muted (name id) (when (forms/css forms-store id) " · styled")]]
                     [:td
                      [:form {:method "post" :action (str "/admin/forms/" (name id) "/roles")}
                       (security/csrf-field)
-                      [:input {:name "roles" :value (roles-str (access/form-roles access-store id)) :size 24}]
+                      [:input {:name "roles" :value (roles-str (access/form-roles access-store id)) :size 18}]
                       " " [:button "Save"]]]
-                    [:td.muted (when (empty? (access/form-roles access-store id)) "open")]]))])))
+                    [:td.muted (when (empty? (access/form-roles access-store id)) "open")]
+                    [:td [:a {:href (str "/admin/forms/" (name id) "/edit")} "Edit"]]]))
+           [:h2 "New app"]
+           [:form {:method "post" :action "/admin/forms/new"}
+            (security/csrf-field)
+            [:input {:name "id" :placeholder "app-id (keyword)" :required true}] " "
+            [:input {:name "title" :placeholder "title"}] " "
+            [:button "Create & edit"]]])))
 
 (defn set-form-roles [access-store]
   (fn [req]

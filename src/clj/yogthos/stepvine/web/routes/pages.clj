@@ -19,6 +19,7 @@
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.web.admin :as admin]
    [yogthos.stepvine.web.auth :as auth]
+   [yogthos.stepvine.web.editor :as editor]
    [yogthos.stepvine.web.oauth :as oauth]
    [yogthos.stepvine.web.security :as security]
    [yogthos.stepvine.web.sse :as sse]
@@ -88,7 +89,11 @@
       ["/users/:id/password" (af {:post (admin/set-user-password users)})]
       ["/users/:id/delete"   (af {:post (admin/delete-user users)})]
       ["/forms"              (af {:get  (admin/forms-page forms access users)})]
-      ["/forms/:id/roles"    (af {:post (admin/set-form-roles access)})]]
+      ["/forms/new"          (af {:post (editor/create-form forms)})]
+      ["/forms/preview"      (ds {:post (editor/preview-handler forms options-store)})]
+      ["/forms/:id/roles"    (af {:post (admin/set-form-roles access)})]
+      ["/forms/:id/edit"     (af {:get  (editor/edit-page forms access users)})]
+      ["/forms/:id/save"     (ds {:post (editor/save forms)})]]
      ;; document routes — access-controlled
      ["/doc/:id" {:middleware [doc-access]}
       [""        (page doc/render-doc)]

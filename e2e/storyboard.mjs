@@ -329,6 +329,30 @@ try {
     : bad(`non-admin reached admin UI: ${rpage.url()}`);
   await rctx.close();
 
+  // ---- 14. Admin live app editor — create, preview, save ---------------
+  step('14. Admin live app editor');
+  await page.goto(BASE + '/admin/forms');
+  await page.fill('input[name=id]', 'demo-app');
+  await page.fill('input[name=title]', 'Demo App');
+  await Promise.all([page.waitForURL(/\/admin\/forms\/demo-app\/edit/),
+                     page.click('button:has-text("Create & edit")')]);
+  ok('created a new app and opened the editor');
+  await page.waitForSelector('.cm-editor', { timeout: 20000 });   // CodeMirror from the CDN
+  ok('CodeMirror editor mounted');
+  // the live preview renders the scaffold inside the iframe
+  await page.waitForTimeout(2000);
+  (await page.frameLocator('#preview').locator('h1:has-text("Demo App")').count()) > 0
+    ? ok('live preview rendered the form') : bad('live preview did not render');
+  // save persists the app to the DB
+  await page.click('#save');
+  await page.waitForTimeout(800);
+  (await page.locator('#savemsg').innerText()).includes('Saved')
+    ? ok('saved the app live') : bad(`save failed: ${await page.locator('#savemsg').innerText()}`);
+  // the new app is now available
+  await page.goto(BASE + '/');
+  (await page.locator('h2:has-text("Demo App")').count()) > 0
+    ? ok('the new app appears on the landing') : bad('new app not on the landing');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

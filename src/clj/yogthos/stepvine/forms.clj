@@ -45,13 +45,16 @@
 
 ;; --- Authoring (pure-ish helpers) -----------------------------------------
 
-(defn- prepare
+(defn prepare-form
   "Resolve a served form: splice partials (§15.9) then compile its declarative
-   validation into error + :valid? reactions (§15.8)."
+   validation into error + :valid? reactions (§15.8). Public so the live editor
+   can preview a form exactly as it will be served."
   [store form]
   (some->> form
            (partials/splice (:partials store))
            validation/compile-validations))
+
+(def ^:private prepare prepare-form)
 
 (defn- edn-file? [^java.io.File f]
   (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
@@ -169,6 +172,11 @@
   (prepare store (-form store (keyword id))))
 
 (defn list-forms [store] (-form-ids store))
+
+(defn raw-form
+  "The raw working form (un-prepared, incl. :css) for editing/inspection, or nil."
+  [store id]
+  (-form store (keyword id)))
 
 (defn latest-published
   "The highest published version number for a form, falling back to the working
