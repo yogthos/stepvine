@@ -51,7 +51,17 @@
   :patient-client #ig/ref :clients/patient
   :users          #ig/ref :store/users
   :audit          #ig/ref :store/audit
-  :reports-dir    #or [#env REPORTS_DIR "data/reports"]}
+  :reports-dir    #or [#env REPORTS_DIR "data/reports"]
+  ;; OAuth2/OIDC providers (§15.13). Dev/test ship a self-contained :mock provider
+  ;; that short-circuits the external round trip; prod configures real providers
+  ;; (client-id/secret/authorize-url/token-url) and must NOT expose :mock.
+  :oauth #profile {:dev  {:providers {:mock {:mock? true :label "Demo SSO"
+                                             :mock-profile {:provider :mock :subject "mock-sub-1"
+                                                            :email "demo@example.com" :name "Demo User"}}}}
+                   :test {:providers {:mock {:mock? true :label "Demo SSO"
+                                             :mock-profile {:provider :mock :subject "mock-sub-1"
+                                                            :email "demo@example.com" :name "Demo User"}}}}
+                   :prod {:providers {}}}}
 
  ;; --- Form-document engine -------------------------------------------------
  ;; Form definitions live on disk as one EDN file per form; the store scans this

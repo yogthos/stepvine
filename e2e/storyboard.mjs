@@ -262,6 +262,19 @@ try {
   (await page.locator('.badge:has-text("in-progress")').first().isVisible())
     ? ok('document list filters + shows status badges') : bad('status badge/filter missing');
 
+  // ---- 12. OAuth / OIDC — mock SSO login -------------------------------
+  step('12. OAuth / OIDC — mock SSO login');
+  const octx = await browser.newContext();           // fresh session, so admin is untouched
+  const opage = await octx.newPage();
+  watch(opage, 'sso');
+  await opage.goto(BASE + '/login');
+  (await opage.locator('a.oauth:has-text("Demo SSO")').isVisible())
+    ? ok('login page offers the SSO provider') : bad('SSO provider link missing');
+  await Promise.all([opage.waitForURL(BASE + '/'), opage.click('a.oauth:has-text("Demo SSO")')]);
+  (await opage.locator('h1:has-text("Stepvine documents")').isVisible())
+    ? ok('mock SSO logged in and reached the app') : bad('SSO did not reach the app');
+  await octx.close();
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

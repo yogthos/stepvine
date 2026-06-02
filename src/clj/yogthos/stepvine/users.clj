@@ -42,6 +42,27 @@
   [user password]
   (boolean (and user (:valid (hashers/verify password (:password-hash user))))))
 
+;; --- OAuth / OIDC identities (§15.13) -------------------------------------
+
+(defn find-by-oauth
+  "The user federated from `[provider subject]`, or nil."
+  [store provider subject]
+  (first (filter (fn [u] (= {:provider provider :subject subject} (:oauth u)))
+                 (vals @store))))
+
+(defn find-or-create-oauth!
+  "Find the user for an OIDC profile `{:provider :subject :email :name}`, creating
+   a password-less federated account on first sign-in. Returns the user."
+  [store {:keys [provider subject email name]}]
+  (or (find-by-oauth store provider subject)
+      (let [user {:id           (str (UUID/randomUUID))
+                  :username     (or email subject)
+                  :display-name (or name email subject)
+                  :oauth        {:provider provider :subject subject}
+                  :created-at   (System/currentTimeMillis)}]
+        (swap! store assoc (:id user) user)
+        user)))
+
 (defn- seed-admin! [store]
   (when (empty? @store)
     (create! store {:username "admin" :password "admin" :display-name "Admin"})

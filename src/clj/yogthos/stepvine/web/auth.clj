@@ -32,7 +32,7 @@
                        "a{color:#2563eb}")]]
          [:body form]])))
 
-(defn login-page [{:keys [error]}]
+(defn login-page [{:keys [error providers]}]
   (auth-page "Sign in"
              [:div
               [:h1 "Sign in"]
@@ -44,6 +44,10 @@
                [:label {:for "password"} "Password"]
                [:input {:id "password" :name "password" :type "password"}]
                [:button "Sign in"]]
+              ;; OAuth/OIDC sign-in (§15.13) — one link per configured provider
+              (when (seq providers)
+                [:p (for [{:keys [id label]} providers]
+                      [:a.oauth {:href (str "/oauth/" (name id))} (str "Sign in with " label)])])
               [:p "No account? " [:a {:href "/register"} "Register"]]]))
 
 (defn register-page [{:keys [error]}]
@@ -71,15 +75,20 @@
 
 ;; --- Handlers -------------------------------------------------------------
 
-(defn login-get  [_req] (html (login-page {}) 200))
+(defn login-get
+  "Returns the GET /login handler, rendering provider sign-in buttons."
+  [providers]
+  (fn [_req] (html (login-page {:providers providers}) 200)))
 (defn register-get [_req] (html (register-page {}) 200))
 
-(defn login-post [users-store]
-  (fn [req]
-    (let [{:keys [username password]} (:params req)]
-      (if-let [user (auth/authenticate users-store username password)]
-        (login! req user)
-        (html (login-page {:error "Invalid username or password."}) 401)))))
+(defn login-post
+  ([users-store] (login-post users-store nil))
+  ([users-store providers]
+   (fn [req]
+     (let [{:keys [username password]} (:params req)]
+       (if-let [user (auth/authenticate users-store username password)]
+         (login! req user)
+         (html (login-page {:error "Invalid username or password." :providers providers}) 401))))))
 
 (defn register-post [users-store]
   (fn [req]
@@ -110,6 +119,7 @@
   (fn [req]
     (if (or (contains? public-paths (:uri req))
             (str/starts-with? (or (:uri req) "") "/api")
+            (str/starts-with? (or (:uri req) "") "/oauth")   ; OAuth flow is pre-login
             (auth/authenticated? req))
       (handler req)
       (resp/redirect "/login" :see-other))))

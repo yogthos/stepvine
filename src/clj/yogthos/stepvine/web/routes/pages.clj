@@ -17,6 +17,7 @@
    [mycelium.middleware :as mw]
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.web.auth :as auth]
+   [yogthos.stepvine.web.oauth :as oauth]
    [yogthos.stepvine.web.security :as security]
    [yogthos.stepvine.web.sse :as sse]
    [yogthos.stepvine.workflows.document :as doc]
@@ -37,7 +38,7 @@
          :body    (io/file path)}
         {:status 404 :body "No such report."}))))
 
-(defn page-routes [{:keys [forms documents session hub options-store patient-client users audit reports-dir]}]
+(defn page-routes [{:keys [forms documents session hub options-store patient-client users audit reports-dir oauth]}]
   (let [resources  {:forms           forms
                     :documents       documents
                     :session-manager session
@@ -55,9 +56,14 @@
         ds   #(assoc % :middleware [security/wrap-require-datastar])  ; datastar CSRF
         doc-access (security/wrap-doc-access documents)]
     [;; public auth routes (anti-forgery tokens)
-     ["/login"    (af {:get auth/login-get    :post (auth/login-post users)})]
+     ["/login"    (af {:get  (auth/login-get (oauth/provider-list (:providers oauth)))
+                       :post (auth/login-post users (oauth/provider-list (:providers oauth)))})]
      ["/register" (af {:get auth/register-get :post (auth/register-post users)})]
      ["/logout"   (af {:post auth/logout})]
+     ;; OAuth2 / OIDC flow (§15.13) — pre-login, no anti-forgery (GET redirects)
+     ["/oauth/:provider"          {:get {:handler (oauth/start (:providers oauth))}}]
+     ["/oauth/:provider/callback" {:get {:handler (oauth/callback (:providers oauth) users
+                                                                  {:exchange-fn (:exchange-fn oauth)})}}]
      ;; landing + create (anti-forgery)
      ["/"             (af (page doc/index))]
      ["/form/:id/new" (af (merge (page doc/new-page) (post doc/create)))]
