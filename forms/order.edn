@@ -68,6 +68,20 @@
                (when (> (or (:total inputs) 0) 100)
                  {:kind :notify :message "Large order — flagged for review."}))}]}
 
+ ;; An in-browser HTML/Markdown report (parity): a static snapshot rendered with
+ ;; value substitution + transforms (:fmt) + markdown — viewable in the browser.
+ :reports
+ {:summary
+  {:title "Order Summary"
+   :body  [:div
+           [:markdown "## Order Summary\n\nThank you for your **order**."]
+           [:table
+            [:tr [:th "Line"] [:th "Amount"]]
+            [:tr [:td "Subtotal"] [:td [:val :subtotal {:fmt "$%.2f"}]]]
+            [:tr [:td "Discount"] [:td [:val :discount {:fmt "$%.2f"}]]]
+            [:tr [:td "Tax"]      [:td [:val :tax {:fmt "$%.2f"}]]]
+            [:tr [:td [:strong "Total"]] [:td [:strong [:val :total {:fmt "$%.2f"}]]]]]]}}
+
  :views
  {:default
   {:title "Order Calculator"
@@ -90,4 +104,6 @@
     [:c/labeled-value {:label "Total"    :id :total    :fmt "$%.2f" :default "$0.00"}]
     [:c/show {:when :free-shipping?}
      [:p.alert.alert-success "Free shipping — subtotal is over $100."]]
+    [:p [:c/hyperlink {:doc-path "reports/summary" :label "View order summary report →"
+                       :target "_blank"}]]
     [:p.presence "Editors online: " [:span {:data-text "$presence"}]]]}}}

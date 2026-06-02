@@ -23,6 +23,7 @@
    [yogthos.stepvine.web.oauth :as oauth]
    [yogthos.stepvine.web.pagenav :as pagenav]
    [yogthos.stepvine.web.queue :as queue]
+   [yogthos.stepvine.web.report :as report]
    [yogthos.stepvine.web.search :as search]
    [yogthos.stepvine.web.security :as security]
    [yogthos.stepvine.web.sse :as sse]
@@ -119,6 +120,8 @@
       ["/revise" (ds (post doc/revise))]
       ["/wf/:action" (ds (post wf/run-action))]
       ["/report/:idx" {:get {:handler (report-handler documents)}}]
+      ;; in-browser HTML/Markdown report (declared :reports), not the PDF
+      ["/reports/:rid" {:get {:handler (report/handler resources)}}]
       ["/field/:fid"         (ds (post form/update-field))]
       ["/field/:fid/lock"    (ds (post form/lock-field))]
       ["/field/:fid/unlock"  (ds (post form/unlock-field))]

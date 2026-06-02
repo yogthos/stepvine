@@ -497,6 +497,21 @@ try {
     .then(() => ok('a domino effect signalled the host, which raised a notice (total > threshold)'))
     .catch(() => bad('threshold effect did not raise a notice'));
 
+  // -- in-browser HTML/Markdown report: a snapshot with value transforms ------
+  const orderDocUrl = page.url().replace(/\?.*$/, '');
+  await page.goto(orderDocUrl + '/reports/summary');
+  await page.waitForSelector('.sv-report');
+  const reportHtml = await page.locator('.sv-report').innerHTML();
+  /<h2>Order Summary<\/h2>/.test(reportHtml) && /<strong>order<\/strong>/.test(reportHtml)
+    ? ok('the report renders a Markdown block (heading + bold)')
+    : bad('markdown not rendered in the report');
+  const reportText = await page.locator('.sv-report').innerText();
+  reportText.includes('$116.64')
+    ? ok('the report substitutes the live total, currency-formatted via :fmt')
+    : bad(`report total wrong: ${reportText}`);
+  (await page.locator('.sv-report-print').count()) > 0
+    ? ok('the report offers a Print action') : bad('no print button on the report');
+
   // ---- 17. Work queues — documents by workflow state, across owners ----
   step('17. Work queues');
   await page.goto(BASE + '/');
