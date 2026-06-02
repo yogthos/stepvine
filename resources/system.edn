@@ -79,10 +79,11 @@
               "p2" {:given "Alan" :family "Turing"   :dob "1912-06-23"}}}
 
  ;; Document instances; duratom-persisted on disk in dev/prod, in-memory for tests
+ ;; Document store: embedded SQLite query backend (§15.13) in dev/prod, in-memory
+ ;; atom for tests. (Set :backend :atom + :file to fall back to the duratom EDN store.)
  :store/documents
- {:file #profile {:dev  "data/documents.edn"
-                  :test nil
-                  :prod #or [#env DOCUMENTS_FILE "data/documents.edn"]}}
+ {:backend #profile {:dev :sql :test :atom :prod :sql}
+  :db-file #or [#env DOCUMENTS_DB "data/documents.db"]}
 
  ;; Append-only audit log (§15.4); duratom on disk in dev/prod, in-memory for tests
  :store/audit
