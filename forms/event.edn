@@ -1,0 +1,26 @@
+;; Cross-field declarative validation. Check-out must be AFTER check-in, and the
+;; confirmation email must EQUAL the email — both compiled into error reactions
+;; that reference the other field, so they update live as either field changes.
+{:id    :event
+ :title "Event Booking"
+
+ :data
+ {:model
+  [[:checkin  {:id :checkin  :type :string}]
+   [:checkout {:id :checkout :type :string
+               :validation [[:after :checkin "Check-out must be after check-in"]]}]
+   [:email    {:id :email    :type :string}]
+   [:confirm  {:id :confirm  :type :string
+               :validation [[:field-must-equal :email "Emails must match"]]}]]}
+
+ :views
+ {:default
+  {:title "Event Booking"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Event Booking"]
+    [:c/input-field {:id :checkin  :label "Check-in (yyyy-mm-dd)"}]
+    [:c/input-field {:id :checkout :label "Check-out (yyyy-mm-dd)" :error :checkout-error}]
+    [:c/input-field {:id :email    :label "Email"}]
+    [:c/input-field {:id :confirm  :label "Confirm email" :error :confirm-error}]]}}}

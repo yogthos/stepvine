@@ -651,6 +651,31 @@ try {
   (await page.locator('.sv-page:has-text("Review")').count()) > 0
     ? ok('an admin sees the reviewer-only page in the nav') : bad('admin missing the gated page');
 
+  // ---- 22. Cross-field declarative validation ------------------------
+  step('22. Cross-field validation');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Event Booking")'), '#checkin');
+  ok('opened the event booking form');
+  // check-out before check-in -> a cross-field error appears
+  await page.fill('#checkin', '2026-06-10');
+  await page.fill('#checkout', '2026-06-05');
+  await page.waitForFunction(() => /Check-out must be after check-in/.test(document.body.textContent),
+                             null, { timeout: 5000 })
+    .then(() => ok('check-out before check-in raised a cross-field error')).catch(() => bad('date validation did not fire'));
+  // fixing it (later date) clears the error live
+  await page.fill('#checkout', '2026-06-15');
+  await page.waitForFunction(() => !/Check-out must be after check-in/.test(document.body.textContent),
+                             null, { timeout: 5000 })
+    .then(() => ok('a later check-out clears the error')).catch(() => bad('date error did not clear'));
+  // mismatched confirm email -> error; matching -> clears
+  await page.fill('#email', 'a@b.com');
+  await page.fill('#confirm', 'x@y.com');
+  await page.waitForFunction(() => /Emails must match/.test(document.body.textContent), null, { timeout: 5000 })
+    .then(() => ok('mismatched confirm email raised an error')).catch(() => bad('field-must-equal did not fire'));
+  await page.fill('#confirm', 'a@b.com');
+  await page.waitForFunction(() => !/Emails must match/.test(document.body.textContent), null, { timeout: 5000 })
+    .then(() => ok('matching the email clears the error')).catch(() => bad('field-must-equal did not clear'));
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');
