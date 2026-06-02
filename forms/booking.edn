@@ -1,0 +1,33 @@
+;; Cascading / dependent dropdowns. The Clinic dropdown :depends-on the Region:
+;; each clinic option carries a :when tag, and the Clinic select shows only the
+;; options whose :when matches the chosen Region. When Region changes the server
+;; re-renders the Clinic select (clearing a now-invalid choice) and pushes it —
+;; server-authoritative, no client logic.
+{:id    :booking
+ :title "Clinic Booking"
+
+ :data
+ {:model
+  [[:region {:id :region :type :string}]
+   [:clinic {:id :clinic :type :string}]
+   [:reason {:id :reason :type :string}]]}
+
+ :views
+ {:default
+  {:title "Clinic Booking"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Clinic Booking"]
+    [:p "Pick a region — the clinics list narrows to that region."]
+    [:c/dropdown-select {:id :region :label "Region"
+                         :options [["North" "north"] ["South" "south"]]}]
+    ;; the dependent dropdown: options filtered by the chosen region
+    [:c/dropdown-select {:id :clinic :label "Clinic" :depends-on :region
+                         :placeholder "— choose a region first —"
+                         :options [{:value "north-general" :label "North General"  :when "north"}
+                                   {:value "north-harbor"  :label "North Harbor"   :when "north"}
+                                   {:value "south-central" :label "South Central"  :when "south"}
+                                   {:value "south-bay"     :label "South Bay"      :when "south"}]}]
+    [:c/input-field {:id :reason :label "Reason for visit"}]
+    [:p "Booking: " [:c/value {:id :region}] " / " [:c/value {:id :clinic}]]]}}}

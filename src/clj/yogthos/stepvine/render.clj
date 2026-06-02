@@ -339,3 +339,22 @@
   (when-let [node (find-collection-node (view-markup session view-id)
                                         (:aliases ctx) coll-id)]
     (str (h/html (render-node ctx node)))))
+
+(def ^:private dropdown-widgets
+  #{:stepvine.components/dropdown :stepvine.components/dropdown-select})
+
+(defn dependent-dropdown-nodes
+  "Top-level dropdown markup nodes whose `:depends-on` is `parent-id`, each with
+   its field id — for re-rendering a dependent select when its parent changes.
+   `parent-id` is a keyword."
+  [markup aliases parent-id]
+  (let [found (atom [])]
+    (walk/prewalk
+     (fn [n]
+       (when (and (widget-node? n)
+                  (dropdown-widgets (resolve-component aliases (first n)))
+                  (= parent-id (some-> (:depends-on (second n)) keyword)))
+         (swap! found conj {:id (:id (second n)) :node n}))
+       n)
+     markup)
+    @found))

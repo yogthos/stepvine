@@ -23,15 +23,34 @@
       (apply format fmt-str (map #(get option %) fmt-args)))
     option))
 
+(defn- filter-by-parent
+  "Cascading/dependent dropdowns (§ parity): when the dropdown `:depends-on` a
+   parent field, keep only options whose `:when` equals the parent's current
+   value. Options with no `:when` always show. When the parent is unset, only the
+   always-on options remain — so the child is empty until the parent is chosen."
+  [ctx depends-on opts]
+  (if-let [pid (some-> depends-on keyword)]
+    (let [pv (get-in ctx [:values pid])]
+      (filterv (fn [o]
+                 (let [w (when (map? o) (:when o))]
+                   (or (nil? w) (= (str w) (str pv)))))
+               opts))
+    opts))
+
 (defn render-dropdown
   "Render a labelled <select> bound to a (possibly item-scoped) signal, with
-   options from the `:options` attr or the resolved option sources in the ctx."
-  [ctx {:keys [id label options placeholder fmt read-only]}]
+   options from the `:options` attr or the resolved option sources in the ctx. A
+   top-level dropdown that `:depends-on` another field filters its options by that
+   parent's value, and carries a `field-<id>` wrapper id so the server can re-render
+   it when the parent changes."
+  [ctx {:keys [id label options placeholder fmt read-only depends-on]}]
   (let [sig      (render/item-signal-name ctx id)
         in-item? (boolean (:item ctx))
         current  (get-in ctx [:values id])
-        opts     (or options (get-in ctx [:options id]) [])]
+        opts0    (or options (get-in ctx [:options id]) [])
+        opts     (if in-item? opts0 (filter-by-parent ctx depends-on opts0))]
     [:div.widget.dropdown.field
+     (when (and id (not in-item?) depends-on) {:id (str "field-" (name id))})
      [:label {:for (when-not in-item? (name id))}
       (or label (name id))]
      (into [:select

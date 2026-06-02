@@ -519,6 +519,29 @@ try {
   await page.waitForSelector('h1:has-text("Support Ticket")');
   ok('opened a document from the queue');
 
+  // ---- 18. Cascading / dependent dropdowns -----------------------------
+  step('18. Cascading dropdowns');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Clinic Booking")'), '#region');
+  ok('opened the clinic booking form');
+  // the dependent Clinic select is empty (placeholder only) until a region is set
+  (await page.locator('#clinic option').count()) === 1
+    ? ok('clinic dropdown empty until a region is chosen') : bad('clinic not empty initially');
+  // choosing a region re-renders the clinic select to that region's clinics
+  await page.selectOption('#region', 'north');
+  await page.waitForFunction(() => {
+    const o = [...document.querySelectorAll('#clinic option')].map((e) => e.textContent);
+    return o.includes('North General') && !o.includes('South Bay');
+  }, null, { timeout: 5000 }).then(() => ok('selecting North narrowed the clinics to the North list'))
+    .catch(() => bad('clinic options did not cascade for North'));
+  // switching region re-narrows the dependent options
+  await page.selectOption('#region', 'south');
+  await page.waitForFunction(() => {
+    const o = [...document.querySelectorAll('#clinic option')].map((e) => e.textContent);
+    return o.includes('South Bay') && !o.includes('North General');
+  }, null, { timeout: 5000 }).then(() => ok('switching to South re-narrowed the clinics to the South list'))
+    .catch(() => bad('clinic options did not re-cascade for South'));
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

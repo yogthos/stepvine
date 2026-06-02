@@ -48,12 +48,33 @@
        ;; posted value by the sanitized name, not the raw path-param field id
        :raw-value (get signals (render/signal-name (keyword field-id)))})))
 
+(defn- rerender-dependents!
+  "Cascading dropdowns: when `changed-fid` changes, re-render every top-level
+   dropdown that `:depends-on` it — clearing a now-invalid child selection — and
+   patch each select (by its wrapper id) to all peers. One level deep."
+  [{:keys [session-manager hub options-store]} doc-id changed-fid]
+  (let [sess (session/current session-manager doc-id)
+        deps (render/dependent-dropdown-nodes
+              (render/view-markup sess :default)
+              (get-in sess [:form :views :default :opts :widget-namespaces])
+              changed-fid)]
+    (when (seq deps)
+      (doseq [{:keys [id]} deps :when id]                 ; clear stale child selections
+        (session/apply-change! session-manager doc-id [[(keyword id) ""]]))
+      (let [sess2 (session/current session-manager doc-id)
+            ctx   (-> (render/session->context sess2 :default doc-id)
+                      (assoc :options (options/resolve-field-options
+                                       options-store (render/all-field-opts sess2))))]
+        (doseq [{:keys [node]} deps]
+          (hub/broadcast-elements! hub doc-id (render/render-view ctx node)))))))
+
 (myc/defcell :form/apply-field
-  {:requires [:forms :documents :session-manager :patient-client :audit]
+  {:requires [:forms :documents :session-manager :patient-client :audit :hub :options-store]
    :input    {:doc-id :any :field-id :any :uid :any :raw-value :any}
    :output   {:status :int :body :string}
    :doc      "Coerce + transact the change (lock-aware + finalized-doc-aware), audit
-              the before/after diff, then run any triggered import."}
+              the before/after diff, run any triggered import, then re-render any
+              dependent (cascading) dropdowns."}
   (fn [{:keys [session-manager patient-client documents audit] :as resources}
        {:keys [doc-id field-id uid raw-value]}]
     (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
@@ -67,7 +88,8 @@
           (let [after (session/value session-manager doc-id fid)]
             (when (not= before after)                              ; skip no-ops / lock-rejected
               (audit/record! audit {:doc-id doc-id :by uid :action :field/save
-                                    :path [fid] :before before :after after})))
+                                    :path [fid] :before before :after after})
+              (rerender-dependents! resources doc-id fid)))        ; cascading dropdowns
           (docs/run-imports! resources form-raw doc-id fid)
           {:status 204 :body ""}))
       {:status 404 :body (str "No such document: " doc-id)})))
