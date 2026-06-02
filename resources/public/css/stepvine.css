@@ -329,6 +329,13 @@ body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #
 .modal-close { background: none; border: none; font-size: 1.5rem; line-height: 1;
                cursor: pointer; color: #6b7280; }
 .modal-body { padding: 1.25rem; }
+.modal-footer { display: flex; justify-content: flex-end; gap: .6rem;
+                padding: .9rem 1.25rem; border-top: 1px solid #e5e7eb; }
+.modal-cancel { padding: .4rem .9rem; border: 1px solid #d1d5db; border-radius: .375rem;
+                background: #fff; color: #374151; cursor: pointer; }
+.modal-add { padding: .4rem 1rem; border: 1px solid #2563eb; border-radius: .375rem;
+             background: #2563eb; color: #fff; cursor: pointer; }
+.modal-add:hover { background: #1d4ed8; }
 
 /* ── Popover ──────────────────────────────────────────────────────────── */
 .popover-anchor { position: relative; display: inline-block; }

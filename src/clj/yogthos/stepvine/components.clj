@@ -45,6 +45,7 @@
    yogthos.stepvine.components.widgets.navigation.tabs
    ;; overlays
    yogthos.stepvine.components.widgets.overlays.modal-panel
+   yogthos.stepvine.components.widgets.overlays.entry-modal
    yogthos.stepvine.components.widgets.overlays.popover
    ;; tables / collections
    yogthos.stepvine.components.widgets.tables.collection

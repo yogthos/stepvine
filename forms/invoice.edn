@@ -1,0 +1,40 @@
+;; Modal data-entry parity (stepvine-ugx): line items are entered in a modal
+;; sub-form made of scratch (temp) fields, then committed as a row in the :lines
+;; collection. :c/entry-modal hosts the scratch fields and, on "Add line", posts
+;; them to /coll/lines/add-from — the server builds the row, clears the temp
+;; fields and closes the modal. No client state machine, just data.
+{:id    :invoice
+ :title "Invoice"
+
+ :data
+ {:model
+  [;; scratch/temp fields — edited only inside the modal, reset after each commit
+   [:new-item {:id :new-item :type :string}]
+   [:new-qty  {:id :new-qty  :type :number}]
+   ;; the committed line items
+   [:lines
+    {:id :lines :collection? true :index-id :lid
+     :schema
+     {:model
+      [[:lid  {:id :lid}]
+       [:item {:id :item :type :string}]
+       [:qty  {:id :qty  :type :number}]]}}]]}
+
+ :views
+ {:default
+  {:title "Invoice"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Invoice"]
+    [:h2 "Line items"]
+    ;; the committed rows (each item is editable in place after entry)
+    [:c/collection {:id :lines}
+     [:c/input-field {:id :item :label "Item"}]
+     [:c/input-field {:id :qty  :label "Qty"}]]
+    ;; the modal sub-form: scratch fields committed as a new row on "Add line"
+    [:c/entry-modal {:coll :lines :signal "addLine" :title "Add line item"
+                     :trigger-label "+ Add line item" :add-label "Add line"
+                     :fields {:item :new-item :qty :new-qty}}
+     [:c/input-field {:id :new-item :label "Item"}]
+     [:c/input-field {:id :new-qty  :label "Qty"}]]]}}}

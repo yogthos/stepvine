@@ -43,6 +43,22 @@
         (is (= [i1] (get-in (render/collections-data (session/current mgr "roster"))
                             [:members :order])))))))
 
+(deftest add-item-with-populates-a-row-in-one-transact
+  ;; the core of the modal data-entry commit (§ugx): a populated add that lets
+  ;; per-item derived fields recompute in the same transact.
+  (let [[_ _ mgr] (mgr+)
+        form (forms/load-form "roster")]
+    (session/ensure-document! mgr "roster" form {})
+    (let [idx  (session/add-item-with! mgr "roster" :members {:first "Ada" :last "Lovelace"})
+          sess (session/current mgr "roster")]
+      (testing "the new row carries the supplied values"
+        (is (= "Ada"      (impl/value sess [:members idx :first])))
+        (is (= "Lovelace" (impl/value sess [:members idx :last]))))
+      (testing "a per-item derived field computes from the populated values"
+        (is (= "Ada Lovelace" (impl/value sess [:members idx :full]))))
+      (testing "it is a single ordered item in the collection"
+        (is (= [idx] (get-in (render/collections-data sess) [:members :order])))))))
+
 (deftest collection-change-broadcasts-to-peers
   (let [[_ h mgr] (mgr+)
         form (forms/load-form "roster")

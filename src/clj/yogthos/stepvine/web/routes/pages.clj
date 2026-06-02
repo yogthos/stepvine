@@ -22,6 +22,7 @@
    [yogthos.stepvine.web.editor :as editor]
    [yogthos.stepvine.web.oauth :as oauth]
    [yogthos.stepvine.web.pagenav :as pagenav]
+   [yogthos.stepvine.web.collection-entry :as collection-entry]
    [yogthos.stepvine.web.queue :as queue]
    [yogthos.stepvine.web.report :as report]
    [yogthos.stepvine.web.search :as search]
@@ -126,6 +127,8 @@
       ["/field/:fid/lock"    (ds (post form/lock-field))]
       ["/field/:fid/unlock"  (ds (post form/unlock-field))]
       ["/coll/:coll/add"             (ds (post form/coll-add))]
+      ;; modal data-entry: commit scratch/temp fields as a new row (§ugx)
+      ["/coll/:coll/add-from" (ds {:post {:handler (collection-entry/handler resources)}})]
       ["/coll/:coll/:idx/remove"     (ds (post form/coll-remove))]
       ["/coll/:coll/:idx/field/:fid"        (ds (post form/coll-field))]
       ["/coll/:coll/:idx/field/:fid/lock"   (ds (post form/coll-lock))]

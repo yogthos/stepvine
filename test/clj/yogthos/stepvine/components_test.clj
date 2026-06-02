@@ -771,3 +771,38 @@
     (is (str/includes? html "readonly"))
     (is (not (str/includes? html "date-helper")))
     (is (not (str/includes? html "@post")))))
+
+;; --- Modal data-entry sub-form (stepvine-ugx) -----------------------------
+
+(deftest entry-modal-renders-scratch-form-and-commit-trigger
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/entry-modal
+                {:coll :lines :signal "addLine" :title "Add line"
+                 :trigger-label "+ Add line" :add-label "Add"
+                 :fields {:item :new-item :qty :new-qty}}
+                [:stepvine.components/input-field {:id :new-item :label "Item"}]
+                [:stepvine.components/input-field {:id :new-qty  :label "Qty"}]]))]
+    (testing "a trigger button opens the modal (client-only UI signal)"
+      (is (str/includes? html "modal-trigger"))
+      (is (str/includes? html "+ Add line"))
+      (is (str/includes? html "$addLine = true")))
+    (testing "the scratch fields render, bound to the temp signals"
+      (is (str/includes? html "data-bind=\"new_item\""))
+      (is (str/includes? html "data-bind=\"new_qty\"")))
+    (testing "the Add button commits to the add-from endpoint with the field mapping"
+      (is (str/includes? html "modal-add"))
+      (is (str/includes? html "/doc/test-doc/coll/lines/add-from?modal=addLine"))
+      ;; & is HTML-escaped in the attribute; the mapping itself is intact
+      (is (str/includes? html "fields=item:new-item,qty:new-qty")))
+    (testing "Add also closes the modal locally for instant feedback"
+      (is (str/includes? html "$addLine = false")))))
+
+(deftest entry-modal-defaults-the-open-signal
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/entry-modal
+                {:coll :lines :title "Add" :fields {:item :new-item}}
+                [:stepvine.components/input-field {:id :new-item :label "Item"}]]))]
+    (is (str/includes? html "$entryOpen = true"))
+    (is (str/includes? html "$entryOpen = false"))))

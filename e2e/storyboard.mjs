@@ -808,6 +808,56 @@ try {
   (await page.locator('#preferred').inputValue()) === expectNext
     ? ok('the quick-set date persisted (round-trips through SSE)') : bad('date did not persist');
 
+  // ---- 27. Modal data-entry sub-form (temp fields -> collection row) ----
+  step('27. Modal data-entry sub-form');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Invoice")'), '.modal-trigger');
+  ok('opened the invoice form');
+  // the collection starts empty (the modal is the way to add rows)
+  const lineInputs = () => page.locator('.collection .coll-item input[data-bind^="lines_"]');
+  // open the modal sub-form
+  await page.click('.modal-trigger:has-text("Add line item")');
+  await page.waitForSelector('.modal-overlay', { state: 'visible' });
+  ok('the trigger opens the modal sub-form');
+  // fill the scratch fields and commit
+  await page.fill('#new-item', 'Widget');
+  await page.fill('#new-qty', '3');
+  await settleFields(page);
+  await page.click('.modal-add:has-text("Add line")');
+  // a new collection row appears, populated from the scratch fields
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('.collection .coll-item input[data-bind$="_item"]')]
+      .some((i) => i.value === 'Widget'),
+    null, { timeout: 4000 })
+    .then(() => ok('the scratch fields committed as a new collection row (Item = Widget)'))
+    .catch(() => bad('the modal entry did not append a row'));
+  const qtyOk = await page.evaluate(() =>
+    [...document.querySelectorAll('.collection .coll-item input[data-bind$="_qty"]')].some((i) => i.value === '3'));
+  qtyOk ? ok('the committed row carries the numeric qty (3)') : bad('committed qty wrong');
+  // the modal closed on commit
+  await page.waitForSelector('.modal-overlay', { state: 'hidden' });
+  ok('the modal closed after committing');
+  // the scratch fields were reset (so they can be reused / not submitted)
+  (await page.locator('#new-item').inputValue()) === ''
+    ? ok('the scratch fields reset after the commit') : bad('scratch fields not cleared');
+  // a second entry appends a distinct row
+  await page.click('.modal-trigger:has-text("Add line item")');
+  await page.waitForSelector('.modal-overlay', { state: 'visible' });
+  await page.fill('#new-item', 'Gadget');
+  await page.fill('#new-qty', '5');
+  await settleFields(page);
+  await page.click('.modal-add:has-text("Add line")');
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('.collection .coll-item input[data-bind$="_item"]')]
+      .filter((i) => i.value === 'Widget' || i.value === 'Gadget').length === 2,
+    null, { timeout: 4000 })
+    .then(() => ok('a second modal entry appended a distinct row (two line items)'))
+    .catch(() => bad('second entry did not append'));
+  // the committed rows persist through SSE (reload re-renders them from the doc)
+  await openDoc(page, () => page.reload(), '.collection');
+  (await lineInputs().count()) >= 2
+    ? ok('the committed line items persisted (round-trip through SSE)') : bad('rows did not persist');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

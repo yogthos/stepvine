@@ -118,6 +118,15 @@
     (apply-change! manager doc-id [[[coll-id idx] {}]])
     idx))
 
+(defn add-item-with!
+  "Add a new collection item pre-populated from `values` (a {item-field -> value}
+   map); returns its index. Used by the modal data-entry pattern (§ugx) to commit
+   scratch fields into a row in one transact."
+  [manager doc-id coll-id values]
+  (let [idx (new-index)]
+    (apply-change! manager doc-id [[[coll-id idx] (or values {})]])
+    idx))
+
 (defn remove-item!
   "Remove a collection item by index (setting it nil removes the child)."
   [manager doc-id coll-id idx]
