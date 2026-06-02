@@ -10,10 +10,12 @@
    [clojure.string :as str]
    [jsonista.core :as json]
    [mycelium.core :as myc]
+   [yogthos.stepvine.access :as access]
    [yogthos.stepvine.audit :as audit]
    [yogthos.stepvine.docs :as docs]
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.effects :as effects]
+   [yogthos.stepvine.users :as users]
    [yogthos.stepvine.hub :as hub]
    [yogthos.stepvine.options :as options]
    [yogthos.stepvine.render :as render]
@@ -70,18 +72,27 @@
           (hub/broadcast-elements! hub doc-id (render/render-view ctx node)))))))
 
 (myc/defcell :form/apply-field
-  {:requires [:forms :documents :session-manager :patient-client :audit :hub :options-store]
+  {:requires [:forms :documents :session-manager :patient-client :audit :hub :options-store :users]
    :input    {:doc-id :any :field-id :any :uid :any :raw-value :any}
    :output   {:status :int :body :string}
    :doc      "Coerce + transact the change (lock-aware + finalized-doc-aware), then
               audit the diff, re-render dependent (cascading) dropdowns from the
               change-set, and perform the side-effect intents the engine emitted
               (email / notify / import)."}
-  (fn [{:keys [session-manager patient-client documents audit] :as resources}
+  (fn [{:keys [session-manager patient-client documents audit users] :as resources}
        {:keys [doc-id field-id uid raw-value]}]
     (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
-      (if (documents/locked? (documents/get-document documents doc-id))
+      (cond
+        (documents/locked? (documents/get-document documents doc-id))
         {:status 409 :body "Document is read-only (finalized)."}   ; §15.5 enforcement
+
+        ;; granular per-field permission: reject writes to a field the user's roles
+        ;; don't permit (the read-only render is UX; this is the security boundary)
+        (let [wroles (:write-roles (get-in (session/current session-manager doc-id) [:field-opts (keyword field-id)]))]
+          (and (seq wroles) users (not (access/role-permitted? (users/get-user users uid) wroles))))
+        {:status 403 :body "You don't have permission to edit this field."}
+
+        :else
         (let [sess   (session/current session-manager doc-id)
               fid    (keyword field-id)
               value  (coerce (get-in sess [:field-opts fid]) raw-value)

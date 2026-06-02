@@ -224,9 +224,10 @@
    first page of a multi-page form (or :default). Returns
    `{:vid :html :form-raw :pages :doc}` or nil when the document doesn't exist.
    Shared by the full-page render and the in-place page switch."
-  [{:keys [session-manager options-store documents] :as resources} doc-id view-id user-id]
+  [{:keys [session-manager options-store documents users] :as resources} doc-id view-id user-id]
   (when-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
     (let [sess (session/current session-manager doc-id)
+          user (users/get-user users user-id)
           vid  (let [v     (keyword view-id)
                      views (get-in sess [:form :views])]
                  (cond
@@ -237,6 +238,9 @@
           doc  (documents/get-document documents doc-id)
           ctx  (-> (render/session->context sess vid doc-id)
                    (assoc :uid user-id)   ; the authenticated user drives lock comparison
+                   ;; granular field permissions (§parity): hide :read-roles fields
+                   ;; and force :write-roles fields read-only for this user
+                   (assoc :perm-roles (users/roles user) :perm-admin? (users/admin? user))
                    ;; finalized documents render read-only (§15.5)
                    (assoc :locked? (documents/locked? doc))
                    ;; current workflow state, for $state-driven action buttons (§15.10)

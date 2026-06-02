@@ -1,0 +1,26 @@
+;; Granular per-field permissions. A field's model opts may carry :write-roles
+;; (who may edit it — others see it read-only) and :read-roles (who may see it at
+;; all — others don't get the field). Admins are always permitted. The read-only /
+;; hidden rendering is UX; the server also REJECTS an unauthorized field write.
+;;
+;; Here anyone on the form may edit the submission, but only a :reviewer may set the
+;; decision, and the internal score is visible only to a :reviewer.
+{:id    :review
+ :title "Submission Review"
+
+ :data
+ {:model
+  [[:submission {:id :submission :type :string}]
+   [:decision   {:id :decision   :type :string :write-roles #{:reviewer}}]
+   [:score      {:id :score      :type :number :read-roles #{:reviewer}}]]}
+
+ :views
+ {:default
+  {:title "Submission Review"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Submission Review"]
+    [:c/input-field {:id :submission :label "Submission"}]
+    [:c/input-field {:id :decision   :label "Decision (reviewers only)"}]
+    [:c/input-field {:id :score      :label "Internal score (reviewers only)"}]]}}}

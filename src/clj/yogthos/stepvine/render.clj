@@ -153,10 +153,21 @@
 
 ;; --- Markup walk ----------------------------------------------------------
 
+(defn perm-ok?
+  "Granular field permission (§parity): a field's `:read-roles`/`:write-roles`
+   permit the ctx user when they're empty, the user is admin, or the user holds one
+   of the roles. Only consulted when the ctx carries permission info (`:perm-roles`)
+   — re-render contexts without it render normally and rely on server enforcement."
+  [ctx roles]
+  (or (empty? roles)
+      (:perm-admin? ctx)
+      (boolean (some (set roles) (:perm-roles ctx)))))
+
 (defn render-node
   "Render one markup node to hiccup. Strings pass through (hiccup escapes them);
    plain HTML vectors render as elements with children recursed; namespaced
-   vectors dispatch to render-widget."
+   vectors dispatch to render-widget. A field-bound widget the user may not READ
+   is omitted; one they may not WRITE is forced read-only."
   [ctx node]
   (cond
     (string? node) node
@@ -168,8 +179,16 @@
           has-attrs? (map? a)
           attrs      (if has-attrs? a {})
           body       (if has-attrs? more (when a (cons a more)))
-          component  (resolve-component (:aliases ctx) kw)]
-      (render-widget ctx component attrs body))
+          component  (resolve-component (:aliases ctx) kw)
+          fopts      (when (contains? ctx :perm-roles)
+                       (get-in ctx [:field-opts (:id attrs)]))]
+      (if (and fopts (:read-roles fopts) (not (perm-ok? ctx (:read-roles fopts))))
+        nil                                                  ; field hidden from this user
+        (render-widget ctx component
+                       (cond-> attrs
+                         (and fopts (:write-roles fopts) (not (perm-ok? ctx (:write-roles fopts))))
+                         (assoc :read-only true))            ; read-only when not writable
+                       body)))
 
     (and (vector? node) (html-tag? (first node)))
     (let [[tag a & more] node

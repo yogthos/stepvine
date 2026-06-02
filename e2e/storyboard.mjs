@@ -610,6 +610,32 @@ try {
   /^\d{4}-\d{2}-\d{2}$/.test(await page.locator('#created').inputValue())
     ? ok('created hydrated from today’s date') : bad(`created date not hydrated: ${await page.locator('#created').inputValue()}`);
 
+  // ---- 21. Granular per-field permissions ----------------------------
+  step('21. Granular per-field permissions');
+  // a fresh user with no roles
+  const cctx = await browser.newContext();
+  const cpage = await cctx.newPage();
+  watch(cpage, 'perms');
+  await cpage.goto(BASE + '/register');
+  await cpage.fill('input[name=username]', 'clerk-user');
+  await cpage.fill('input[name=display-name]', 'Clerk User');
+  await cpage.fill('input[name=password]', 'pw');
+  await Promise.all([cpage.waitForURL(BASE + '/'), cpage.click('button:has-text("Create account")')]);
+  await openDoc(cpage, () => cpage.click('button:has-text("New Submission Review")'), '#submission');
+  ok('a non-reviewer opened a review document');
+  (await cpage.locator('#decision').getAttribute('readonly')) !== null
+    ? ok('a :write-roles field is read-only for a non-reviewer') : bad('write-restricted field is editable');
+  (await cpage.locator('#score').count()) === 0
+    ? ok('a :read-roles field is hidden from a non-reviewer') : bad('read-restricted field leaked');
+  (await cpage.locator('#submission').getAttribute('readonly')) === null
+    ? ok('an open field stays editable') : bad('open field wrongly read-only');
+  await cctx.close();
+  // the admin (always permitted) sees + edits everything
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Submission Review")'), '#submission');
+  ((await page.locator('#decision').getAttribute('readonly')) === null && (await page.locator('#score').count()) > 0)
+    ? ok('an admin sees and edits every field') : bad('admin wrongly restricted');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

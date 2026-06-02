@@ -49,6 +49,14 @@
                   (or (users/admin? user)
                       (seq (set/intersection (users/roles user) fr)))))))
 
+(defn role-permitted?
+  "Granular permission check (per-field/per-view): `user` may act under `roles`
+   when they're empty (open), the user is an admin, or the user holds one of them."
+  [user roles]
+  (boolean (or (empty? roles)
+               (users/admin? user)
+               (seq (set/intersection (users/roles user) (set roles))))))
+
 (defn accessible-forms
   "The subset of `form-ids` `user` may use, order preserved."
   [store user form-ids]
