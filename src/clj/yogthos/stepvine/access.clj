@@ -37,6 +37,18 @@
                  (empty? fr)
                  (seq (set/intersection (users/roles user) fr))))))
 
+(defn team-member?
+  "True if `user` is a workflow handler for `form-id`. A *team* exists only for a
+   role-restricted form — assigning roles opts the form into team visibility — and
+   its members are the role holders plus admins. An *open* form (no roles) has no
+   team, so its documents stay owner-private (owner/shared only). Team members may
+   open ANY of the form's documents — the work-queue access rule."
+  [store user form-id]
+  (let [fr (form-roles store form-id)]
+    (boolean (and (seq fr)
+                  (or (users/admin? user)
+                      (seq (set/intersection (users/roles user) fr)))))))
+
 (defn accessible-forms
   "The subset of `form-ids` `user` may use, order preserved."
   [store user form-ids]

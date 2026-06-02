@@ -480,6 +480,33 @@ try {
   await waitVal(page, '#total', v => parseFloat(v) === 116.64);
   ok('editing qty cascaded subtotal→discount→tax→total live (total = 116.64)');
 
+  // ---- 17. Work queues — documents by workflow state, across owners ----
+  step('17. Work queues');
+  await page.goto(BASE + '/');
+  (await page.locator('.sv-topbar a:has-text("Queues")').count()) > 0
+    ? ok('the navbar exposes a Queues link') : bad('no Queues link in the navbar');
+  // restricting a workflowed form to a role turns it into a team form with a queue
+  await page.goto(BASE + '/admin/forms');
+  await page.locator('tr:has-text("Support Ticket") input[name=roles]').fill('support');
+  await page.locator('tr:has-text("Support Ticket") button:has-text("Save")').click();
+  await page.waitForTimeout(300);
+  // the queue index lists the workflowed form
+  await page.goto(BASE + '/queue');
+  (await page.locator('a:has-text("Support Ticket")').count()) > 0
+    ? ok('the workflowed form appears in the work queues') : bad('form missing from queues');
+  // the per-form queue groups documents by workflow state
+  await page.click('a:has-text("Support Ticket")');
+  await page.waitForSelector('h1:has-text("Support Ticket queue")');
+  (await page.locator('.sv-state').count()) >= 1
+    ? ok('the queue groups documents by workflow state') : bad('no state groups in the queue');
+  const qOpen = page.locator('table a:has-text("Open")').first();
+  (await qOpen.count()) > 0
+    ? ok('a queued document is listed with an Open link') : bad('no queued document listed');
+  // opening a queued document works (team-member access)
+  await qOpen.click();
+  await page.waitForSelector('h1:has-text("Support Ticket")');
+  ok('opened a document from the queue');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

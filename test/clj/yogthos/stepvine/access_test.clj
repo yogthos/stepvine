@@ -28,6 +28,21 @@
       (is (= [:intake] (access/accessible-forms store clerk [:intake :ticket])))
       (is (= [:intake :ticket] (access/accessible-forms store admin [:intake :ticket]))))))
 
+(deftest team-membership
+  (let [store (access/store)]
+    (testing "an open form (no roles) has no team — documents stay owner-private"
+      (is (not (access/team-member? store clerk :intake)))
+      (is (not (access/team-member? store nobody :intake))))
+    (testing "a role-restricted form's role holders are its team (workflow handlers)"
+      (access/set-form-roles! store :intake [:clerk :nurse])
+      (is (access/team-member? store clerk :intake))
+      (is (access/team-member? store nurse :intake))
+      (is (not (access/team-member? store nobody :intake))))
+    (testing "admin is a team member of role-restricted forms"
+      (is (access/team-member? store admin :intake)))       ; :intake is restricted above
+    (testing "but an open form (no roles) has no team — not even admin"
+      (is (not (access/team-member? store admin :ticket))))))
+
 (deftest all-roles-in-use
   (let [store (access/store)]
     (access/set-form-roles! store :intake [:clerk :nurse])

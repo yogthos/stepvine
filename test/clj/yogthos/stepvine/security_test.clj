@@ -2,6 +2,7 @@
   "P3: per-document access control + CSRF middleware."
   (:require
    [clojure.test :refer [deftest testing is]]
+   [yogthos.stepvine.access :as access]
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.web.security :as security]))
 
@@ -31,6 +32,25 @@
     (is (= 200 (:status (h (req (:id d) "u2")))) "shared")
     (is (= 403 (:status (h (req (:id d) "u3")))) "no access")
     (is (= 404 (:status (h (req "missing" "u1")))) "no such doc")))
+
+(deftest wrap-doc-access-allows-team-members
+  ;; a role holder of a role-restricted form can open ANY of its documents
+  ;; (work-queue access), beyond owner/shared
+  (let [store  (atom {})
+        d      (documents/create! store :ticket {:created-by "owner"})
+        access (access/store)
+        users  (atom {"rev" {:id "rev" :roles #{:reviewer}}
+                      "joe" {:id "joe" :roles #{:other}}})
+        ok     (constantly {:status 200 :body "ok"})
+        h      ((security/wrap-doc-access store {:users users :access access}) ok)
+        req    (fn [uid] {:path-params {:id (:id d)} :session {:user-id uid}})]
+    (testing "before the form is role-restricted, non-owners are blocked"
+      (is (= 403 (:status (h (req "rev"))))))
+    (testing "once the form is restricted to :reviewer, reviewers may open its docs"
+      (access/set-form-roles! access :ticket [:reviewer])
+      (is (= 200 (:status (h (req "rev")))) "reviewer (team) can open")
+      (is (= 200 (:status (h (req "owner")))) "owner still can")
+      (is (= 403 (:status (h (req "joe")))) "non-reviewer still cannot"))))
 
 (deftest wrap-require-datastar-blocks-tokenless-posts
   (let [h (security/wrap-require-datastar (constantly {:status 200}))]

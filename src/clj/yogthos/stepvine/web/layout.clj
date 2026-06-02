@@ -39,6 +39,7 @@
    [:div.sv-topbar-right
     (if user
       [:span.sv-usermenu
+       [:a.sv-navlink {:href "/queue" :title "Work queues"} "Queues"]
        (when (users/admin? user)
          (list [:a.sv-navlink {:href "/admin/forms" :title "App editor"} "Apps"]
                [:a.sv-navlink {:href "/admin/users"} "Admin"]))

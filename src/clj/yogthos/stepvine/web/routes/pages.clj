@@ -22,6 +22,7 @@
    [yogthos.stepvine.web.editor :as editor]
    [yogthos.stepvine.web.oauth :as oauth]
    [yogthos.stepvine.web.pagenav :as pagenav]
+   [yogthos.stepvine.web.queue :as queue]
    [yogthos.stepvine.web.security :as security]
    [yogthos.stepvine.web.sse :as sse]
    [yogthos.stepvine.workflows.document :as doc]
@@ -68,7 +69,7 @@
                                             :output-fn mw/ring-response})}})
         af   #(assoc % :middleware [security/wrap-anti-forgery])      ; HTML form CSRF
         ds   #(assoc % :middleware [security/wrap-require-datastar])  ; datastar CSRF
-        doc-access (security/wrap-doc-access documents)]
+        doc-access (security/wrap-doc-access documents {:users users :access access})]
     [;; public auth routes (anti-forgery tokens)
      ["/login"    (af {:get  (auth/login-get (oauth/provider-list (:providers oauth)))
                        :post (auth/login-post users (oauth/provider-list (:providers oauth)))})]
@@ -81,6 +82,9 @@
      ;; landing + create (anti-forgery)
      ["/"             (af (page doc/index))]
      ["/form/:id/new" (af (merge (page doc/new-page) (post doc/create)))]
+     ;; work queues — a workflowed form's documents by state, for its team
+     ["/queue"        (af {:get (queue/index documents forms users access)})]
+     ["/queue/:form"  (af {:get (queue/for-form documents forms users access)})]
      ;; an app's own CSS, served live from the store (app-owned styling)
      ["/app/:id/style.css" {:get {:handler (app-style-handler forms)}}]
      ;; admin UI — role assignment (admin-only)

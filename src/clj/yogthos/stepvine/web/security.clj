@@ -12,25 +12,33 @@
   (:require
    [ring.middleware.anti-forgery :as af]
    [ring.util.response :as resp]
-   [yogthos.stepvine.documents :as documents]))
+   [yogthos.stepvine.access :as access]
+   [yogthos.stepvine.documents :as documents]
+   [yogthos.stepvine.users :as users]))
 
 (defn- forbidden [msg]
   (-> (resp/response msg) (resp/status 403) (resp/content-type "text/plain")))
 
 (defn wrap-doc-access
   "reitit middleware: 404 if the document doesn't exist, 403 if the session user
-   can't access it."
-  [documents]
-  (fn [handler]
-    (fn [req]
-      (let [doc-id  (get-in req [:path-params :id])
-            user-id (get-in req [:session :user-id])
-            doc     (documents/get-document documents doc-id)]
-        (cond
-          (nil? doc)                            (-> (resp/response "No such document")
-                                                    (resp/status 404))
-          (documents/can-access? doc user-id)   (handler req)
-          :else                                 (forbidden "You don't have access to this document."))))))
+   can't access it. Access = owner or shared; plus, when `:forms`/`:users`/`:access`
+   stores are supplied, a *team member* of the document's form (a role holder of a
+   role-restricted form) — so workflow handlers can open queued documents."
+  ([documents] (wrap-doc-access documents nil))
+  ([documents {:keys [users access]}]
+   (fn [handler]
+     (fn [req]
+       (let [doc-id  (get-in req [:path-params :id])
+             user-id (get-in req [:session :user-id])
+             doc     (documents/get-document documents doc-id)]
+         (cond
+           (nil? doc)                          (-> (resp/response "No such document")
+                                                   (resp/status 404))
+           (documents/can-access? doc user-id) (handler req)
+           (and access users
+                (access/team-member? access (users/get-user users user-id) (:form-id doc)))
+           (handler req)
+           :else (forbidden "You don't have access to this document.")))))))
 
 (defn wrap-require-datastar
   "reitit middleware: require the Datastar-Request header on state-changing
