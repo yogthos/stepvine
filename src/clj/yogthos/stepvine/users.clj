@@ -57,6 +57,17 @@
   [store id roles]
   (swap! store (fn [m] (cond-> m (contains? m id) (assoc-in [id :roles] (set roles))))))
 
+(defn set-password!
+  "Re-hash and store a new password for a user."
+  [store id password]
+  (swap! store (fn [m] (cond-> m (contains? m id)
+                         (assoc-in [id :password-hash] (hashers/derive password))))))
+
+(defn delete!
+  "Remove a user."
+  [store id]
+  (swap! store dissoc id))
+
 (defn check-password
   "True if `password` matches the user's stored hash."
   [user password]

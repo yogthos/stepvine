@@ -82,10 +82,13 @@
      ["/app/:id/style.css" {:get {:handler (app-style-handler forms)}}]
      ;; admin UI — role assignment (admin-only)
      ["/admin" {:middleware [(partial admin/wrap-admin users)]}
-      ["/users"           (af {:get  (admin/users-page users)})]
-      ["/users/:id/roles" (af {:post (admin/set-user-roles users)})]
-      ["/forms"           (af {:get  (admin/forms-page forms access users)})]
-      ["/forms/:id/roles" (af {:post (admin/set-form-roles access)})]]
+      ["/users"              (af {:get  (admin/users-page users)})]
+      ["/users/new"          (af {:post (admin/create-user users)})]
+      ["/users/:id/roles"    (af {:post (admin/set-user-roles users)})]
+      ["/users/:id/password" (af {:post (admin/set-user-password users)})]
+      ["/users/:id/delete"   (af {:post (admin/delete-user users)})]
+      ["/forms"              (af {:get  (admin/forms-page forms access users)})]
+      ["/forms/:id/roles"    (af {:post (admin/set-form-roles access)})]]
      ;; document routes — access-controlled
      ["/doc/:id" {:middleware [doc-access]}
       [""        (page doc/render-doc)]

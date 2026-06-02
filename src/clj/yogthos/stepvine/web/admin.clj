@@ -41,25 +41,67 @@
 
 (defn users-page [users-store]
   (fn [req]
-    (page (auth/current-user req users-store) "Users"
-          [:div
-           [:p.muted "Assign roles (space-separated). " [:code "admin"]
-            " grants the admin UI and access to every form."]
-           (into [:table [:tr [:th "User"] [:th "Roles"] [:th]]]
-                 (for [u (sort-by :username (users/list-users users-store))]
-                   [:tr
-                    [:td (:display-name u) " " [:small.muted (:username u)]]
-                    [:td
-                     [:form {:method "post" :action (str "/admin/users/" (:id u) "/roles")}
-                      (security/csrf-field)
-                      [:input {:name "roles" :value (roles-str (users/roles u)) :size 24}]
-                      " " [:button "Save"]]]
-                    [:td.muted (when (users/admin? u) "admin")]]))])))
+    (let [me (auth/current-user req users-store)]
+      (page me "Users"
+            [:div
+             [:p.muted "Assign roles (space-separated). " [:code "admin"]
+              " grants the admin UI and access to every form."]
+             (into [:table [:tr [:th "User"] [:th "Roles"] [:th "Reset password"] [:th]]]
+                   (for [u (sort-by :username (users/list-users users-store))]
+                     [:tr
+                      [:td (:display-name u) " " [:small.muted (:username u)]
+                       (when (:oauth u) [:small.muted " · SSO"])]
+                      [:td
+                       [:form {:method "post" :action (str "/admin/users/" (:id u) "/roles")}
+                        (security/csrf-field)
+                        [:input {:name "roles" :value (roles-str (users/roles u)) :size 18}]
+                        " " [:button "Save"]]]
+                      [:td
+                       (when-not (:oauth u)
+                         [:form {:method "post" :action (str "/admin/users/" (:id u) "/password")}
+                          (security/csrf-field)
+                          [:input {:name "password" :type "password" :placeholder "new password" :size 14}]
+                          " " [:button "Set"]])]
+                      [:td
+                       (when (not= (:id u) (:id me))         ; can't delete yourself
+                         [:form {:method "post" :action (str "/admin/users/" (:id u) "/delete")}
+                          (security/csrf-field)
+                          [:button "Delete"]])]]))
+             [:h2 "Add user"]
+             [:form {:method "post" :action "/admin/users/new"}
+              (security/csrf-field)
+              [:input {:name "username" :placeholder "username" :required true}] " "
+              [:input {:name "display-name" :placeholder "display name"}] " "
+              [:input {:name "password" :type "password" :placeholder "password" :required true}] " "
+              [:input {:name "roles" :placeholder "roles" :size 14}] " "
+              [:button "Create user"]]]))))
 
 (defn set-user-roles [users-store]
   (fn [req]
     (users/set-roles! users-store (get-in req [:path-params :id])
                       (parse-roles (get-in req [:params :roles])))
+    (resp/redirect "/admin/users" :see-other)))
+
+(defn create-user [users-store]
+  (fn [req]
+    (let [{:keys [username password display-name roles]} (:params req)]
+      (when (and (seq username) (seq password)
+                 (not (users/find-by-username users-store username)))
+        (users/create! users-store {:username username :password password
+                                    :display-name display-name :roles (parse-roles roles)}))
+      (resp/redirect "/admin/users" :see-other))))
+
+(defn set-user-password [users-store]
+  (fn [req]
+    (when (seq (get-in req [:params :password]))
+      (users/set-password! users-store (get-in req [:path-params :id]) (get-in req [:params :password])))
+    (resp/redirect "/admin/users" :see-other)))
+
+(defn delete-user [users-store]
+  (fn [req]
+    ;; never delete the acting admin
+    (when (not= (get-in req [:path-params :id]) (:id (auth/current-user req users-store)))
+      (users/delete! users-store (get-in req [:path-params :id])))
     (resp/redirect "/admin/users" :see-other)))
 
 ;; --- Forms -> roles -------------------------------------------------------
