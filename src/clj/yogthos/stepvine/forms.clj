@@ -31,8 +31,13 @@
 (defn- edn-file? [^java.io.File f]
   (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
 
-(defn- read-form [^java.io.File f]
-  (edn/read-string (slurp f)))
+(defn- read-form
+  "Read a form's EDN, plus its sibling `<id>.css` (the app's own styling, §app-css)
+   loaded into `:css` when present — so an app is its EDN + its CSS."
+  [^java.io.File f]
+  (let [form (edn/read-string (slurp f))
+        css  (io/file (.getParentFile f) (str (name (:id form)) ".css"))]
+    (cond-> form (.isFile css) (assoc :css (slurp css)))))
 
 (defn load-dir
   "Load every *.edn form file in `dir` into a {form-id -> form} map, keyed by the
@@ -81,6 +86,21 @@
   (when-let [a (:versions store)]
     (:digest (get @a [(keyword id) v]))))
 
+;; --- App CSS (app-owned styling, served live) -----------------------------
+
+(defn css
+  "The app's own CSS string (loaded from its sibling `<id>.css`), or nil."
+  [store id]
+  (:css (get @(:forms store) (keyword id))))
+
+(defn app-css-href
+  "A cache-busting href for an app's *live* CSS (re-skins without redeploy), or
+   nil when the app declares none. CSS is presentation — served from the current
+   working form, not version-pinned with the document."
+  [store id]
+  (when-let [c (css store id)]
+    (str "/app/" (name id) "/style.css?v=" (subs (versions/digest {:css c}) 0 12))))
+
 (defn get-form-version
   "Resolve the exact archived form for a pinned `[id version]`, with partials
    spliced (§15.9). Falls back to the current authoring form when the archive has
@@ -91,20 +111,23 @@
     (get-form store id)))
 
 (defn save-form!
-  "Persist a form to disk, update the in-memory working copy, and publish the
-   version into the immutable archive."
+  "Persist a form: its EDN (data/workflow/views) to `<id>.edn`, its app CSS to the
+   sibling `<id>.css`, update the in-memory working copy, and publish the version.
+   CSS is excluded from the versioned archive — it is live presentation, not pinned
+   document content — so a re-skin never spawns a spurious form version."
   [store form]
   (let [id (:id form)]
-    (spit (io/file (:dir store) (str (name id) ".edn")) (pr-str form))
+    (spit (io/file (:dir store) (str (name id) ".edn")) (pr-str (dissoc form :css)))
+    (when (:css form) (spit (io/file (:dir store) (str (name id) ".css")) (:css form)))
     (swap! (:forms store) assoc id form)
-    (when-let [a (:versions store)] (versions/publish! a form))
+    (when-let [a (:versions store)] (versions/publish! a (dissoc form :css)))
     id))
 
 (defmethod ig/init-key :store/forms
   [_ {:keys [dir versions-file partials]}]
   (let [loaded  (load-dir dir)
         archive (versions/init-archive versions-file)]
-    (versions/publish-all! archive (vals loaded))
+    (versions/publish-all! archive (map #(dissoc % :css) (vals loaded)))
     (log/info "loaded forms from" dir ":" (vec (keys loaded))
               "— archived versions for" (count loaded) "forms")
     {:dir dir :forms (atom loaded) :versions archive :partials partials}))

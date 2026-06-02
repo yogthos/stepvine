@@ -10,6 +10,8 @@
          external CSS. A form view may layer its own theme on top via
          :opts {:theme "…"} (a /name, an absolute /path, or a full URL). -->
     <link rel="stylesheet" href="/css/stepvine.css">
+    {% if app_css %}<!-- the app's own styling, served live from the store -->
+    <link rel="stylesheet" href="{{app_css}}">{% endif %}
     {% if theme %}<link rel="stylesheet" href="{{theme}}">{% endif %}
   </head>
   <body>

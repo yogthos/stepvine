@@ -16,6 +16,7 @@
    [integrant.core :as ig]
    [mycelium.middleware :as mw]
    [yogthos.stepvine.documents :as documents]
+   [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.web.admin :as admin]
    [yogthos.stepvine.web.auth :as auth]
    [yogthos.stepvine.web.oauth :as oauth]
@@ -38,6 +39,14 @@
                    "Content-Disposition" (str "inline; filename=report-" idx ".pdf")}
          :body    (io/file path)}
         {:status 404 :body "No such report."}))))
+
+(defn- app-style-handler
+  "Serve an app's own CSS live from the store (re-skin without redeploy)."
+  [forms-store]
+  (fn [req]
+    (if-let [css (forms/css forms-store (get-in req [:path-params :id]))]
+      {:status 200 :headers {"Content-Type" "text/css" "Cache-Control" "no-cache"} :body css}
+      {:status 404 :headers {"Content-Type" "text/css"} :body "/* no app css */"})))
 
 (defn page-routes [{:keys [forms documents session hub options-store patient-client users audit reports-dir oauth access]}]
   (let [resources  {:forms           forms
@@ -69,6 +78,8 @@
      ;; landing + create (anti-forgery)
      ["/"             (af (page doc/index))]
      ["/form/:id/new" (af (merge (page doc/new-page) (post doc/create)))]
+     ;; an app's own CSS, served live from the store (app-owned styling)
+     ["/app/:id/style.css" {:get {:handler (app-style-handler forms)}}]
      ;; admin UI — role assignment (admin-only)
      ["/admin" {:middleware [(partial admin/wrap-admin users)]}
       ["/users"           (af {:get  (admin/users-page users)})]

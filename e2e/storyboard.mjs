@@ -235,6 +235,12 @@ try {
   await openDoc(page, () => page.click('button:has-text("New Support Ticket")'), '#title');
   const stateText = () => page.locator('[data-text="$state"]').innerText();
   ok('opened a ticket');
+  // the app carries its own styling, served live and layered over the platform CSS
+  (await page.locator('link[href^="/app/ticket/style.css"]').count()) > 0
+    ? ok('the ticket app links its own CSS') : bad('app CSS not linked in the editor');
+  const btnBg = await page.locator('.wf-btn').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  btnBg === 'rgb(13, 148, 136)'
+    ? ok('app CSS applied (re-skinned the action button)') : bad(`app CSS not applied: ${btnBg}`);
   (await stateText()) === 'open' ? ok('initial state :open') : bad(`state not open: ${await stateText()}`);
   await page.fill('#title', 'Printer down'); await page.waitForTimeout(450);
   (await page.locator('.wf-btn:has-text("Submit for review")').isVisible())

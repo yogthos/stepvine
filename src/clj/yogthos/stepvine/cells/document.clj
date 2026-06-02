@@ -240,11 +240,12 @@
             user (users/get-user users user-id)
             crumbs [{:label "Documents" :href "/"} {:label (or (:title form-raw) (name (:form-id doc)))}]]
         {:html (selmer/render-file "html/form.html"
-                                   {:title  (:title form-raw)
-                                    :view   view
-                                    :theme  (render/theme-href sess vid)
-                                    :navbar (layout/navbar-html user crumbs)
-                                    :footer (layout/footer-html)})})
+                                   {:title   (:title form-raw)
+                                    :view    view
+                                    :theme   (render/theme-href sess vid)
+                                    :app_css (forms/app-css-href (:forms resources) (:form-id doc))  ; live app styling
+                                    :navbar  (layout/navbar-html user crumbs)
+                                    :footer  (layout/footer-html)})})
       {:html (selmer/render-file "html/form.html"
                                  {:title "Not found" :view "<p>No such document.</p>"})})))
 

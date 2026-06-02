@@ -29,6 +29,17 @@ current system and the remaining roadmap.
    (XTDB/Datalevin) tomorrow behind the same API.
 6. **LLM friendly** The system must provide APIs for the LLM (or any external client)
    to hook into and edit the document the same way the user would through the UI.
+7. **Apps are content, not code.** Each *app* is a self-contained unit — its EDN
+   (model, views, workflow/lifecycle, the data sources it uses, validation) **plus
+   its own CSS** — living in the store and hot-swappable **live, no redeploy**. The
+   platform owns every cross-cutting, context-free concern (widgets, document
+   editing over SSE, locking/presence, notifications, data-source resolution,
+   audit, RBAC, PDF, the workflow engine); an app only declares its data,
+   behaviour, and look. *App-owned styling:* a form's sibling `<id>.css` is loaded
+   into its `:css` and served live at `/app/:id/style.css`, layered over the
+   platform widget CSS (the structural contract). CSS is presentation — served
+   from the current working form and **not** version-pinned — so re-skinning
+   applies immediately to every document of that app.
  
 ---
 

@@ -1,0 +1,12 @@
+/* ── Support Ticket — the app's own styling (app-css) ──────────────────────
+   Scoped to .sv-doc-body so an app re-skins only its own content; the platform
+   chrome (navbar/footer) and widget structure stay the shared contract. Loaded
+   from this sibling of ticket.edn and served live at /app/ticket/style.css —
+   edit + republish to re-skin without any redeploy. */
+.sv-doc-body            { background: #f0fdfa; border-radius: .5rem; }
+.sv-doc-body h1         { color: #0f766e; border-bottom: 2px solid #99f6e4; padding-bottom: .35rem; }
+.sv-doc-body .field label { color: #0f766e; font-weight: 600; }
+.sv-doc-body .field input { border-color: #5eead4; }
+.sv-doc-body p strong   { color: #0f766e; }
+.wf-btn                 { background: #0d9488; }
+.wf-btn:hover           { background: #0f766e; }
