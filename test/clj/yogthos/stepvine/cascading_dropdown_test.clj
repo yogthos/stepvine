@@ -6,6 +6,8 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest testing is]]
+   [yogthos.stepvine.cascades :as cascades]
+   [yogthos.stepvine.editor.impl :as impl]
    [yogthos.stepvine.render :as render]))
 
 (def ^:private aliases {"c" "stepvine.components"})
@@ -70,3 +72,47 @@
     (is (empty? (render/cascade-closure chain-markup aliases :department))))
   (testing "an unrelated field has no dependents"
     (is (empty? (render/cascade-closure chain-markup aliases :reason)))))
+
+;; --- the VALUE cascade rides Domino's event DAG (clearing events) ----------
+
+(def ^:private chain-form
+  {:id :booking :version 1
+   :data {:model [[:region     {:id :region     :type :string}]
+                  [:clinic     {:id :clinic     :type :string}]
+                  [:department {:id :department :type :string}]]}
+   :views {:default {:opts {:widget-namespaces {"c" "stepvine.components"}}
+                     :markup chain-markup}}})
+
+(deftest compile-cascades-emits-clearing-events
+  (let [events (get-in (cascades/compile-cascades chain-form) [:data :events])
+        by-out (into {} (map (juxt (comp first :outputs) :inputs) events))]
+    (testing "one clearing event per dependency, parent -> child"
+      (is (= [:region] (get by-out :clinic)))
+      (is (= [:clinic] (get by-out :department))))))
+
+(deftest domino-clears-the-whole-chain
+  ;; Because edits go through domino transact, a clearing event fires only on
+  ;; CHANGE (so it never pins the child), and the chain clears transitively in one
+  ;; transaction — the engine's DAG does the cascade.
+  (let [form (cascades/compile-cascades chain-form)
+        s    (-> (impl/create-session form {})
+                 (impl/apply-changes [[:region "north"]])
+                 (impl/apply-changes [[:clinic "ng"]])
+                 (impl/apply-changes [[:department "cardio"]]))]
+    (testing "setting fields is NOT pinned by the clearing events"
+      (is (= "ng"     (impl/value s :clinic)))
+      (is (= "cardio" (impl/value s :department))))
+    (testing "changing the top clears every downstream field (one transaction)"
+      (let [s2 (impl/apply-changes s [[:region "south"]])]
+        (is (= "south" (impl/value s2 :region)))
+        (is (= ""      (impl/value s2 :clinic))     "child cleared by its event")
+        (is (= ""      (impl/value s2 :department)) "grandchild cleared transitively via the DAG"))))
+  (testing "changing a mid-chain field clears only what's below it"
+    (let [s (-> (impl/create-session (cascades/compile-cascades chain-form) {})
+                (impl/apply-changes [[:region "north"]])
+                (impl/apply-changes [[:clinic "ng"]])
+                (impl/apply-changes [[:department "cardio"]])
+                (impl/apply-changes [[:clinic "other"]]))]
+      (is (= "north" (impl/value s :region))     "region (above) untouched")
+      (is (= "other" (impl/value s :clinic)))
+      (is (= ""      (impl/value s :department)) "department (below) cleared"))))

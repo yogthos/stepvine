@@ -49,26 +49,21 @@
        :raw-value (get signals (render/signal-name (keyword field-id)))})))
 
 (defn- rerender-dependents!
-  "Cascading dropdowns: when `changed-fid` changes, ripple to EVERY dropdown that
-   transitively `:depends-on` it (region → clinic → department → …). The
-   editor's Domino ctx recomputes derived values from state each transact, so a
-   stale dependent selection (a transition effect, not a derived value) is cleared
-   here, at the apply layer: clear the whole descendant closure in one transaction,
-   then re-render each affected <select> (new option list + cleared selection) and
-   patch it to all peers."
+  "Cascading dropdowns: re-render every dropdown reachable from `changed-fid` over
+   the `:depends-on` graph (region → clinic → department → …) and patch each to
+   peers. The VALUE cascade already happened inside Domino — synthesized clearing
+   events (§cascades) cleared the whole chain in this transaction, and those
+   cleared signals are broadcast like any change — so this only refreshes the
+   affected <select>s (new option list + cleared selection)."
   [{:keys [session-manager hub options-store]} doc-id changed-fid]
   (let [sess    (session/current session-manager doc-id)
         markup  (render/view-markup sess :default)
         aliases (get-in sess [:form :views :default :opts :widget-namespaces])
         deps    (render/cascade-closure markup aliases changed-fid)]
     (when (seq deps)
-      ;; clear the whole descendant chain at once (full-depth cascade)
-      (session/apply-change! session-manager doc-id
-                             (mapv (fn [{:keys [id]}] [(keyword id) ""]) deps))
-      (let [sess2 (session/current session-manager doc-id)
-            ctx   (-> (render/session->context sess2 :default doc-id)
-                      (assoc :options (options/resolve-field-options
-                                       options-store (render/all-field-opts sess2))))]
+      (let [ctx (-> (render/session->context sess :default doc-id)
+                    (assoc :options (options/resolve-field-options
+                                     options-store (render/all-field-opts sess))))]
         (doseq [{:keys [node]} deps]
           (hub/broadcast-elements! hub doc-id (render/render-view ctx node)))))))
 
