@@ -191,6 +191,39 @@
                     (dissoc vs :filter)
                     (assoc vs :filter {:col (keyword col) :value (str value)})))))
 
+;; --- Table column customization (view-state overlay: order/hidden/labels) ---
+
+(defn set-table-column-order!
+  "Persist a column display order (a vector of column path keywords)."
+  [manager doc-id coll-id paths]
+  (let [order (mapv keyword paths)]
+    (update-view! manager doc-id coll-id #(assoc-in % [:cols :order] order))))
+
+(defn hide-table-column!
+  "Hide a column from the table display (view-only; the field/data is untouched)."
+  [manager doc-id coll-id path]
+  (update-view! manager doc-id coll-id
+                #(update-in % [:cols :hidden] (fnil conj #{}) (keyword path))))
+
+(defn restore-table-column!
+  "Un-hide the most-recently-hidden column (the inverse of hide); no-op if none."
+  [manager doc-id coll-id]
+  (update-view! manager doc-id coll-id
+                (fn [vs]
+                  (let [hidden (get-in vs [:cols :hidden])]
+                    (if (seq hidden)
+                      (assoc-in vs [:cols :hidden] (disj hidden (last (vec hidden))))
+                      vs)))))
+
+(defn set-table-column-label!
+  "Override (or clear, on blank) a column's display label."
+  [manager doc-id coll-id path label]
+  (update-view! manager doc-id coll-id
+                (fn [vs]
+                  (if (str/blank? (str label))
+                    (update-in vs [:cols :labels] dissoc (keyword path))
+                    (assoc-in vs [:cols :labels (keyword path)] (str label))))))
+
 (defn set-table-page!
   "Move the table page: dir is \"next\"/\"prev\" or an absolute integer string."
   [manager doc-id coll-id dir]

@@ -404,14 +404,22 @@
     (is (str/includes? html "data-col-removable"))
     (is (str/includes? html "table-col-drag-from"))))
 
-(deftest table-emits-add-column-button-when-customizable
-  (let [html (hiccup->html
-              (render-widget-hiccup
-               [:stepvine.components/table
-                {:id :people :label "Team" :customizable? true}]
-               table-ctx))]
-    (is (str/includes? html "Add Column"))
-    (is (str/includes? html "columns-add"))))
+(deftest table-restore-column-button-appears-only-when-a-column-is-hidden
+  (testing "no hidden columns: no restore button"
+    (let [html (hiccup->html
+                (render-widget-hiccup
+                 [:stepvine.components/table
+                  {:id :people :label "Team" :customizable? true}]
+                 table-ctx))]
+      (is (not (str/includes? html "columns-add")))))
+  (testing "a hidden column surfaces the restore button"
+    (let [html (hiccup->html
+                (render-widget-hiccup
+                 [:stepvine.components/table
+                  {:id :people :label "Team" :customizable? true}]
+                 (assoc-in table-ctx [:view-state :people :cols :hidden] #{:age})))]
+      (is (str/includes? html "Restore column"))
+      (is (str/includes? html "columns-add")))))
 
 (deftest table-emits-editable-label-when-customizable
   (let [html (hiccup->html

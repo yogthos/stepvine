@@ -310,38 +310,50 @@
   {:requires [:forms :documents :session-manager :hub :options-store]
    :input    {:doc-id :any :coll-id :any :query-params :any}
    :output   {:status :int :body :string}
-   :doc      "Add a new column to the collection (metadata change + re-render)."}
-  (fn [resources {:keys [doc-id coll-id]}]
+   :doc      "Restore the most-recently-hidden column (view-state + re-render)."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id]}]
     (when (docs/ensure! resources doc-id)
-      (rerender-collection! resources doc-id (keyword coll-id)))
+      (let [coll (keyword coll-id)]
+        (session/restore-table-column! session-manager doc-id coll)
+        (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
 (myc/defcell :form/coll-columns-move
   {:requires [:forms :documents :session-manager :hub :options-store]
    :input    {:doc-id :any :coll-id :any :query-params :any}
    :output   {:status :int :body :string}
-   :doc      "Move a column (metadata change + re-render)."}
-  (fn [resources {:keys [doc-id coll-id]}]
+   :doc      "Reorder columns to the posted path order (view-state + re-render)."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id query-params]}]
     (when (docs/ensure! resources doc-id)
-      (rerender-collection! resources doc-id (keyword coll-id)))
+      (let [coll  (keyword coll-id)
+            order (some-> (get query-params "order") not-empty (str/split #","))]
+        (when (seq order)
+          (session/set-table-column-order! session-manager doc-id coll order))
+        (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
 (myc/defcell :form/coll-columns-remove
   {:requires [:forms :documents :session-manager :hub :options-store]
    :input    {:doc-id :any :coll-id :any :query-params :any}
    :output   {:status :int :body :string}
-   :doc      "Remove a column (metadata change + re-render)."}
-  (fn [resources {:keys [doc-id coll-id]}]
+   :doc      "Hide a column from the table display (view-state + re-render)."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id query-params]}]
     (when (docs/ensure! resources doc-id)
-      (rerender-collection! resources doc-id (keyword coll-id)))
+      (let [coll (keyword coll-id)]
+        (when-let [path (get query-params "path")]
+          (session/hide-table-column! session-manager doc-id coll path))
+        (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
 (myc/defcell :form/coll-columns-label
   {:requires [:forms :documents :session-manager :hub :options-store]
    :input    {:doc-id :any :coll-id :any :query-params :any}
    :output   {:status :int :body :string}
-   :doc      "Update a column's custom label (metadata change + re-render)."}
-  (fn [resources {:keys [doc-id coll-id]}]
+   :doc      "Override a column's display label (view-state + re-render)."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id query-params]}]
     (when (docs/ensure! resources doc-id)
-      (rerender-collection! resources doc-id (keyword coll-id)))
+      (let [coll (keyword coll-id)]
+        (when-let [col (get query-params "col")]
+          (session/set-table-column-label! session-manager doc-id coll col (get query-params "label")))
+        (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))

@@ -1,0 +1,37 @@
+;; Customizable table demo (stepvine-jj9 part 2). Columns can be reordered
+;; (drag a header), removed (drag a header out of the table), relabeled (edit the
+;; header text), and restored. All customization is server-side view-state — it
+;; never touches the document data.
+{:id    :ledger
+ :title "Ledger"
+
+ :data
+ {:model
+  [[:rows
+    {:id :rows :collection? true :index-id :rid
+     :schema
+     {:model [[:rid    {:id :rid}]
+              [:date   {:id :date   :type :string}]
+              [:memo   {:id :memo   :type :string}]
+              [:amount {:id :amount :type :number}]]}}]]}
+
+ :views
+ {:default
+  {:title "Ledger"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Ledger"]
+    [:p "Drag a column header to reorder, drag it out of the table to hide it, or "
+     "edit a header to relabel it. Hidden columns can be restored."]
+    [:c/table
+     {:id :rows
+      :customizable? true
+      :columns [{:path :date   :label "Date"   :reorderable? true :removable? true
+                 :editable-label? true :widget :stepvine.components/input-field}
+                {:path :memo   :label "Memo"   :reorderable? true :removable? true
+                 :editable-label? true :widget :stepvine.components/input-field}
+                {:path :amount :label "Amount" :reorderable? true :removable? true
+                 :editable-label? true :widget :stepvine.components/input-field}]
+      :can-add-rows?    true
+      :can-delete-rows? true}]]}}}

@@ -12,6 +12,7 @@
    [yogthos.stepvine.session :as session]
    [starfederation.datastar.clojure.adapter.test :as ds-test]
    yogthos.stepvine.components   ; register widget render methods
+   [yogthos.stepvine.components.widgets.tables.table :as table]
    [yogthos.stepvine.editor.impl :as impl]))
 
 (defn- mgr+ []
@@ -299,3 +300,54 @@
       (testing "a blank value clears the filter"
         (session/set-table-filter! mgr "tasks" :tasks :priority "")
         (is (= 3 (row-count (render-tasks mgr))))))))
+
+;; --- Column customization (overlay: reorder / hide / restore / relabel) ----
+
+(deftest column-overlay-reorders-hides-and-relabels
+  (let [declared [{:path :date :label "Date"} {:path :memo :label "Memo"}
+                  {:path :amount :label "Amount"}]]
+    (testing "no overlay: columns unchanged"
+      (is (= declared (table/apply-column-overlay declared nil))))
+    (testing ":order reorders the columns"
+      (is (= [:amount :date :memo]
+             (map :path (table/apply-column-overlay declared {:order [:amount :date :memo]})))))
+    (testing "a declared column missing from :order keeps its place at the end"
+      (is (= [:amount :date :memo]
+             (map :path (table/apply-column-overlay declared {:order [:amount :date]})))))
+    (testing ":hidden drops a column"
+      (is (= [:date :amount]
+             (map :path (table/apply-column-overlay declared {:hidden #{:memo}})))))
+    (testing ":labels overrides a column header"
+      (is (= "When" (:label (first (table/apply-column-overlay declared {:labels {:date "When"}}))))))))
+
+(defn- render-ledger [mgr]
+  (let [sess (session/current mgr "ledger")
+        ctx  (assoc (render/session->context sess :default "ledger") :options {})]
+    (render/render-view ctx (render/view-markup sess :default))))
+
+(deftest table-column-customization-via-session
+  (let [[_ _ mgr] (mgr+)
+        form (forms/load-form "ledger")]
+    (session/ensure-document! mgr "ledger" form {})
+    (let [idx (session/add-item! mgr "ledger" :rows)
+          bind (fn [col] (str "data-bind=\"rows_" idx "_" (name col) "\""))]
+      (testing "all columns render their cell inputs by default"
+        (let [h (render-ledger mgr)]
+          (is (str/includes? h (bind :date)))
+          (is (str/includes? h (bind :memo)))
+          (is (str/includes? h (bind :amount)))))
+      (testing "hiding a column removes its cells"
+        (session/hide-table-column! mgr "ledger" :rows :memo)
+        (let [h (render-ledger mgr)]
+          (is (not (str/includes? h (bind :memo))))
+          (is (str/includes? h (bind :date)))))
+      (testing "reordering puts amount before date"
+        (session/set-table-column-order! mgr "ledger" :rows ["amount" "date" "memo"])
+        (let [h (render-ledger mgr)]
+          (is (< (str/index-of h (bind :amount)) (str/index-of h (bind :date))))))
+      (testing "restore brings back the most-recently-hidden column"
+        (session/restore-table-column! mgr "ledger" :rows)
+        (is (str/includes? (render-ledger mgr) (bind :memo))))
+      (testing "a label override shows as the header input value"
+        (session/set-table-column-label! mgr "ledger" :rows :date "When")
+        (is (str/includes? (render-ledger mgr) "value=\"When\""))))))

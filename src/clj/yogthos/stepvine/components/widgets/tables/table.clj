@@ -27,6 +27,21 @@
 
 (defn- ->path-vector [x] (if (coll? x) (vec x) [x]))
 
+(defn apply-column-overlay
+  "Apply a view-state column overlay (`{:order :hidden :labels}`) to the declared
+   `columns`: reorder by `:order` (declared columns missing from it keep their
+   place at the end), drop `:hidden` paths, and override `:label`s. With no
+   overlay the declared columns pass through unchanged."
+  [declared {:keys [order hidden labels]}]
+  (let [by-path  (into {} (map (juxt :path identity)) declared)
+        ordered  (if (seq order)
+                   (concat (keep by-path order)
+                           (remove #(some #{(:path %)} order) declared))
+                   declared)
+        hidden?  (set hidden)]
+    (mapv (fn [c] (cond-> c (contains? labels (:path c)) (assoc :label (get labels (:path c)))))
+          (remove #(hidden? (:path %)) ordered))))
+
 (defn- coll-base [ctx coll-id]
   (str "/doc/" (:doc-id ctx) "/coll/" (name coll-id)))
 
@@ -120,7 +135,8 @@
       :placeholder (str (or default-label (name path)))
       "data-bind"  sig
       "data-on:input__debounce.500ms"
-      (str "@post('" (coll-base ctx coll-id) "/columns-label?col=" (name path) "')")}]))
+      (str "@post('" (coll-base ctx coll-id) "/columns-label?col=" (name path)
+           "&label='+encodeURIComponent($" sig "))")}]))
 
 ;; ═══════════════════════════════════════════════════════════════════════════
 ;; filter UI
@@ -233,9 +249,10 @@
          var th=thFor(e.target);
          if(!th)return;
          var idx=th.getAttribute('data-col-idx');
+         var path=th.getAttribute('data-col-path');
          var reorderable=th.getAttribute('data-col-reorderable')==='true';
          var removable=th.getAttribute('data-col-removable')==='true';
-         var payload={idx:idx,reorderable:reorderable,removable:removable};
+         var payload={idx:idx,path:path,reorderable:reorderable,removable:removable};
          e.dataTransfer.setData(COL_TYPE,JSON.stringify(payload));
          if(reorderable)e.dataTransfer.setData(COL_REORDER,'1');
          if(removable)e.dataTransfer.setData(COL_REMOVE,'1');
@@ -269,9 +286,14 @@
          if(!th||e.dataTransfer.types.indexOf(COL_REORDER)<0)return;
          th.classList.remove('table-col-drag-to');
          var src=JSON.parse(e.dataTransfer.getData(COL_TYPE));
-         var dst=th.getAttribute('data-col-idx');
-         if(src.idx!==dst){
-           fetch(base+'/columns-move?from='+src.idx+'&to='+dst,{method:'POST',headers:{'datastar-request':'true'}})
+         var dstPath=th.getAttribute('data-col-path');
+         if(src.path!==dstPath){
+           var paths=[].slice.call(tbl.querySelectorAll('th[data-col-path]'))
+                       .map(function(t){return t.getAttribute('data-col-path');})
+                       .filter(function(p){return p!==src.path;});
+           var di=paths.indexOf(dstPath); if(di<0)di=paths.length;
+           paths.splice(di,0,src.path);
+           fetch(base+'/columns-move?order='+encodeURIComponent(paths.join(',')),{method:'POST',headers:{'datastar-request':'true'}})
              .then(function(r){return r.text();})
              .then(function(html){
                var tmp=document.createElement('div');
@@ -291,7 +313,7 @@
          if(e.dataTransfer.types.indexOf(COL_REMOVE)>=0){
            e.preventDefault();
            var src=JSON.parse(e.dataTransfer.getData(COL_TYPE));
-           fetch(base+'/columns-remove?idx='+src.idx,{method:'POST',headers:{'datastar-request':'true'}})
+           fetch(base+'/columns-remove?path='+encodeURIComponent(src.path),{method:'POST',headers:{'datastar-request':'true'}})
              .then(function(r){return r.text();})
              .then(function(html){
                var tmp=document.createElement('div');
@@ -410,14 +432,12 @@
            (if (:sortable? col)
              (sort-header-cell ctx coll-id col current-sort-col current-sort-dir)
              (let [th-attrs (cond-> {}
-                              (:reorderable? col)
+                              (or (:reorderable? col) (:removable? col))
                               (assoc :draggable "true"
                                      "data-col-idx" (str (.indexOf columns col))
-                                     "data-col-reorderable" "true")
-                              (:removable? col)
-                              (assoc :draggable "true"
-                                     "data-col-idx" (str (.indexOf columns col))
-                                     "data-col-removable" "true"))]
+                                     "data-col-path" (name (:path col)))
+                              (:reorderable? col) (assoc "data-col-reorderable" "true")
+                              (:removable? col)   (assoc "data-col-removable" "true"))]
                [:th th-attrs
                 (if (and customizable? (:editable-label? col))
                   (editable-label ctx coll-id col)
@@ -439,10 +459,13 @@
                         [:button.btn.btn-outline-danger.btn-sm.widget-table-clear
                          {"data-on:click" (str "@post('" base "/clear')")}
                          (or clear-button-label "Clear")])
-                      (when (and customizable? (not read-only))
+                      ;; restore the most-recently-hidden column (inverse of the
+                      ;; drag-outside-to-remove); only shown when a column is hidden
+                      (when (and customizable? (not read-only)
+                                 (seq (get-in ctx [:view-state coll-id :cols :hidden])))
                         [:button.btn.btn-outline-secondary.btn-sm.widget-table-add-column
                          {"data-on:click" (str "@post('" base "/columns-add')")}
-                         "Add Column"])]))
+                         "↺ Restore column"])]))
              (when paged? (page-controls ctx coll-id (:page opts 0) (:pages opts 1)))]]]])]])))
 
 ;; ═══════════════════════════════════════════════════════════════════════════
@@ -556,6 +579,8 @@
                               {:path fid
                                :label (or (:label fopts) (name fid))})
                             field-opts))
+        ;; view-state column overlay (§jj9): reorder / hide / relabel columns
+        columns   (apply-column-overlay columns (get-in ctx [:view-state coll-id :cols]))
         ;; server-side view-state: sort + paging applied to the (already row-
         ;; ordered) collection; the displayed order/indicators come from here.
         view      (apply-view ctx coll-id order items {:page-size page-size :paged? paged?})
