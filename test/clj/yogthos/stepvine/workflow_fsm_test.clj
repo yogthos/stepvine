@@ -33,7 +33,8 @@
         mgr     (ig/init-key :session/manager {:documents docs :hub h})
         aud     (audit/store)
         doc     (documents/create! docs :ticket {:created-by "u1" :form-version 1})
-        res     {:forms forms :documents docs :session-manager mgr :hub h :audit aud}]
+        res     {:forms forms :documents docs :session-manager mgr :hub h :audit aud
+                 :users (atom {"u1" {:id "u1" :roles #{:reviewer}}})}]
     {:res res :id (:id doc) :mgr mgr :docs docs :audit aud}))
 
 (defn- run [res id action uid]

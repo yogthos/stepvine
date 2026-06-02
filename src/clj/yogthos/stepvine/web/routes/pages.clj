@@ -16,6 +16,7 @@
    [integrant.core :as ig]
    [mycelium.middleware :as mw]
    [yogthos.stepvine.documents :as documents]
+   [yogthos.stepvine.web.admin :as admin]
    [yogthos.stepvine.web.auth :as auth]
    [yogthos.stepvine.web.oauth :as oauth]
    [yogthos.stepvine.web.security :as security]
@@ -38,7 +39,7 @@
          :body    (io/file path)}
         {:status 404 :body "No such report."}))))
 
-(defn page-routes [{:keys [forms documents session hub options-store patient-client users audit reports-dir oauth]}]
+(defn page-routes [{:keys [forms documents session hub options-store patient-client users audit reports-dir oauth access]}]
   (let [resources  {:forms           forms
                     :documents       documents
                     :session-manager session
@@ -47,6 +48,7 @@
                     :patient-client  patient-client
                     :users           users
                     :audit           audit
+                    :access          access
                     :reports-dir     reports-dir}
         page (fn [wf] {:get  {:handler (mw/workflow-handler wf {:resources resources})}})
         post (fn [wf] {:post {:handler (mw/workflow-handler
@@ -67,6 +69,12 @@
      ;; landing + create (anti-forgery)
      ["/"             (af (page doc/index))]
      ["/form/:id/new" (af (merge (page doc/new-page) (post doc/create)))]
+     ;; admin UI — role assignment (admin-only)
+     ["/admin" {:middleware [(partial admin/wrap-admin users)]}
+      ["/users"           (af {:get  (admin/users-page users)})]
+      ["/users/:id/roles" (af {:post (admin/set-user-roles users)})]
+      ["/forms"           (af {:get  (admin/forms-page forms access)})]
+      ["/forms/:id/roles" (af {:post (admin/set-form-roles access)})]]
      ;; document routes — access-controlled
      ["/doc/:id" {:middleware [doc-access]}
       [""        (page doc/render-doc)]

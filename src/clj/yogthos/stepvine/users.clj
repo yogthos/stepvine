@@ -26,16 +26,36 @@
 (defn create!
   "Create a user with a bcrypt-hashed password. Throws if the username is taken.
    Returns the (hash-bearing) record."
-  [store {:keys [username password display-name]}]
+  [store {:keys [username password display-name roles]}]
   (when (find-by-username store username)
     (throw (ex-info "Username already taken" {:username username})))
   (let [user {:id            (str (UUID/randomUUID))
               :username      username
               :display-name  (or display-name username)
               :password-hash (hashers/derive password)
+              :roles         (set roles)
               :created-at    (System/currentTimeMillis)}]
     (swap! store assoc (:id user) user)
     user))
+
+;; --- Roles (admin UI, role-based form access) -----------------------------
+
+(defn roles
+  "The user's role set (keywords)."
+  [user]
+  (set (:roles user)))
+
+(defn has-role? [user role] (contains? (roles user) role))
+
+(defn admin?
+  "True if the user holds the special :admin role."
+  [user]
+  (has-role? user :admin))
+
+(defn set-roles!
+  "Replace a user's roles with `roles` (a coll of keywords)."
+  [store id roles]
+  (swap! store (fn [m] (cond-> m (contains? m id) (assoc-in [id :roles] (set roles))))))
 
 (defn check-password
   "True if `password` matches the user's stored hash."
@@ -65,7 +85,8 @@
 
 (defn- seed-admin! [store]
   (when (empty? @store)
-    (create! store {:username "admin" :password "admin" :display-name "Admin"})
+    (create! store {:username "admin" :password "admin" :display-name "Admin"
+                    :roles #{:admin}})
     (log/info "seeded dev admin user (admin/admin) — change in production")))
 
 (defmethod ig/init-key :store/users

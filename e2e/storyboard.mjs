@@ -275,6 +275,45 @@ try {
     ? ok('mock SSO logged in and reached the app') : bad('SSO did not reach the app');
   await octx.close();
 
+  // ---- 13. Admin UI — role-based form access ---------------------------
+  step('13. Admin UI — role-based form access');
+  // admin restricts the ticket form to the :reviewer role
+  await page.goto(BASE + '/admin/forms');
+  ok('admin can open the admin UI');
+  const fRow = page.locator('tr', { hasText: 'Support Ticket' });
+  await fRow.locator('input[name=roles]').fill('reviewer');
+  await fRow.locator('button:has-text("Save")').click();
+  await page.waitForTimeout(400);
+  // a fresh non-admin user registers (no roles)
+  const rctx = await browser.newContext();
+  const rpage = await rctx.newPage();
+  watch(rpage, 'rbac');
+  await rpage.goto(BASE + '/register');
+  await rpage.fill('input[name=username]', 'rbac-user');
+  await rpage.fill('input[name=display-name]', 'RBAC User');
+  await rpage.fill('input[name=password]', 'pw');
+  await Promise.all([rpage.waitForURL(BASE + '/'), rpage.click('button:has-text("Create account")')]);
+  (await rpage.locator('h2:has-text("Support Ticket")').count()) === 0
+    ? ok('a restricted form is hidden from a user without the role')
+    : bad('restricted form leaked to a user without the role');
+  // admin grants the user the :reviewer role
+  await page.goto(BASE + '/admin/users');
+  const uRow = page.locator('tr', { hasText: 'rbac-user' });
+  await uRow.locator('input[name=roles]').fill('reviewer');
+  await uRow.locator('button:has-text("Save")').click();
+  await page.waitForTimeout(400);
+  // the user now sees the form
+  await rpage.goto(BASE + '/');
+  (await rpage.locator('h2:has-text("Support Ticket")').count()) > 0
+    ? ok('granting the role reveals the form to the user')
+    : bad('form still hidden after the role was granted');
+  // a non-admin cannot reach the admin UI
+  await rpage.goto(BASE + '/admin/users');
+  (rpage.url().replace(/\/$/, '') === BASE)
+    ? ok('non-admin is redirected away from the admin UI')
+    : bad(`non-admin reached admin UI: ${rpage.url()}`);
+  await rctx.close();
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

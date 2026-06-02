@@ -1,0 +1,57 @@
+(ns yogthos.stepvine.access
+  "Role-based form access (`:store/access`).
+
+   Users carry `:roles` (managed in the admin UI); forms are associated with roles
+   in this store — `{form-id #{roles}}`. A user may use a form when they are an
+   **admin**, the form has **no roles** assigned (open to all authenticated
+   users), or their roles **intersect** the form's. Decoupled from the immutable
+   form versions, so an admin can re-scope access without cutting a new version.
+
+   Backed by a duratom on disk (admin-managed content lives in storage, never in
+   system.edn), or a plain atom for tests."
+  (:require
+   [clojure.java.io :as io]
+   [clojure.set :as set]
+   [clojure.tools.logging :as log]
+   [duratom.core :as duratom]
+   [integrant.core :as ig]
+   [yogthos.stepvine.users :as users]))
+
+(defn store [] (atom {}))
+
+(defn form-roles
+  "The set of roles a form is restricted to (empty = open to all)."
+  [store form-id]
+  (get @store (keyword form-id) #{}))
+
+(defn set-form-roles!
+  "Restrict `form-id` to `roles` (empty/nil = open to all)."
+  [store form-id roles]
+  (swap! store assoc (keyword form-id) (set roles)))
+
+(defn can-access?
+  "True if `user` may use `form-id`."
+  [store user form-id]
+  (let [fr (form-roles store form-id)]
+    (boolean (or (users/admin? user)
+                 (empty? fr)
+                 (seq (set/intersection (users/roles user) fr))))))
+
+(defn accessible-forms
+  "The subset of `form-ids` `user` may use, order preserved."
+  [store user form-ids]
+  (filter #(can-access? store user %) form-ids))
+
+(defn known-roles
+  "All roles in use (assigned to any form) plus the built-in :admin — the admin
+   UI's role picker."
+  [store]
+  (into #{:admin} (mapcat identity (vals @store))))
+
+(defmethod ig/init-key :store/access
+  [_ {:keys [file]}]
+  (if file
+    (do (io/make-parents file)
+        (log/info "form-access roles persisted to" file)
+        (duratom/duratom :local-file :file-path file :init {}))
+    (store)))

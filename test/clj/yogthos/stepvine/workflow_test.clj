@@ -42,10 +42,11 @@
     (is (not (wf/guard-ok? flow :submit {:rxns {:valid? false}}))))
   (testing "an action with no :guard is always ok"
     (is (wf/guard-ok? flow :approve {})))
-  (testing "role requirement"
-    (is (wf/role-ok? flow :approve {:role :reviewer}))
-    (is (not (wf/role-ok? flow :approve {:role :nurse})))
-    (is (wf/role-ok? flow :submit {:role :anyone}))))   ; no :require-role
+  (testing "role requirement (actor holds a role set; admin satisfies any)"
+    (is (wf/role-ok? flow :approve {:roles #{:reviewer}}))
+    (is (wf/role-ok? flow :approve {:roles #{:admin}}))
+    (is (not (wf/role-ok? flow :approve {:roles #{:nurse}})))
+    (is (wf/role-ok? flow :submit {:roles #{}}))))      ; no :require-role
 
 (deftest run-step-emits-directives
   (let [ctx {:values {} :rxns {} :doc {:name "Ada"}}]

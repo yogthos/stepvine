@@ -11,6 +11,7 @@
    [jsonista.core :as json]
    [mycelium.core :as myc]
    [selmer.parser :as selmer]
+   [yogthos.stepvine.access :as access]
    [yogthos.stepvine.audit :as audit]
    [yogthos.stepvine.builder :as builder]
    [yogthos.stepvine.docs :as docs]
@@ -34,7 +35,39 @@
 
 ;; --- GET / (landing) ------------------------------------------------------
 
-(defn- landing-html [docs form-list user users]
+(defn- create-control [{:keys [id title index?]}]
+  (if index?
+    ;; index forms start from a key lookup (§15.13)
+    [:a.btn {:href (str "/form/" (name id) "/new")} (str "+ New " (or title (name id)) "…")]
+    [:form {:method "post" :action (str "/form/" (name id) "/new")}
+     (security/csrf-field)
+     [:button (str "+ New " (or title (name id)))]]))
+
+(defn- doc-row [users user {:keys [id form-id created-by shared status meta]}]
+  (let [owner? (= (:id user) created-by)
+        state  (get-in meta [:workflow :state])]
+    [:div.doc
+     [:a {:href (str "/doc/" id)} (str (name form-id))] " " [:small id]
+     [:small.badge (str " · " (name (or status :in-progress)))]
+     (when state [:small.badge (str " · " (name state))])
+     (if owner? [:small " · owner"] [:small " · shared with you"])
+     (when owner?
+       [:span
+        [:form {:method "post" :action (str "/doc/" id "/share")}
+         (security/csrf-field)
+         [:input {:name "username" :placeholder "share with username"}]
+         [:button "Share"]]
+        (when (seq shared)
+          [:small " — shared with "
+           (str/join ", " (keep #(:username (users/get-user users %)) shared))])
+        [:form {:method "post" :action (str "/doc/" id "/delete")}
+         (security/csrf-field)
+         [:button "Delete"]]])]))
+
+(defn- landing-html
+  "The signed-in user's home: the forms they can access (by role), each with a
+   create control and their documents of that form."
+  [{:keys [forms docs-by-form user users admin? status]}]
   (str "<!DOCTYPE html>"
        (h/html
         [:html {:lang "en"}
@@ -46,6 +79,7 @@
                        ".doc{padding:.5rem 0;border-bottom:1px solid #eee}"
                        "form{display:inline} small{color:#6b7280}"
                        ".bar{display:flex;justify-content:space-between;align-items:center}"
+                       ".form-sec{margin:1.25rem 0;padding-top:.5rem;border-top:2px solid #eef0f3}"
                        "input{padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.375rem}"
                        "button,a.btn{padding:.25rem .6rem;border:1px solid #d1d5db;border-radius:.375rem;"
                        "background:#fff;cursor:pointer;text-decoration:none;color:#111;margin-left:.3rem}"
@@ -54,47 +88,27 @@
          [:body
           [:div.bar
            [:h1 "Stepvine documents"]
-           [:form {:method "post" :action "/logout"}
-            (security/csrf-field)
-            [:small "Signed in as " [:b (:display-name user)]]
-            [:button "Sign out"]]]
-          [:h2 "Create new"]
-          [:p (for [{:keys [id title index?]} form-list]
-                (if index?
-                  ;; index forms start from a key lookup (§15.13)
-                  [:a.btn {:href (str "/form/" (name id) "/new")} (str "+ New " (or title (name id)) "…")]
-                  [:form {:method "post" :action (str "/form/" (name id) "/new")}
-                   (security/csrf-field)
-                   [:button (str "+ New " (or title (name id)))]]))]
-          [:h2 "Your documents"]
-          ;; status filter (§15.13)
+           [:span
+            (when admin? [:a.btn {:href "/admin/users"} "Admin"])
+            [:form {:method "post" :action "/logout"}
+             (security/csrf-field)
+             [:small "Signed in as " [:b (:display-name user)]]
+             [:button "Sign out"]]]]
           [:p.filter "Show: "
            (for [[k label] [[nil "all"] [:in-progress "in progress"] [:submitted "submitted"]
                             [:completed "completed"]]]
              [:a.btn {:href (str "/" (when k (str "?status=" (name k))))} label])]
-          (if (seq docs)
+          (if (seq forms)
             (into [:div]
-                  (for [{:keys [id form-id created-by shared status meta]} docs]
-                    (let [owner? (= (:id user) created-by)
-                          state  (get-in meta [:workflow :state])]
-                      [:div.doc
-                       [:a {:href (str "/doc/" id)} (str (name form-id))] " " [:small id]
-                       [:small.badge (str " · " (name (or status :in-progress)))]
-                       (when state [:small.badge (str " · " (name state))])
-                       (if owner? [:small " · owner"] [:small " · shared with you"])
-                       (when owner?
-                         [:span
-                          [:form {:method "post" :action (str "/doc/" id "/share")}
-                           (security/csrf-field)
-                           [:input {:name "username" :placeholder "share with username"}]
-                           [:button "Share"]]
-                          (when (seq shared)
-                            [:small " — shared with "
-                             (str/join ", " (keep #(:username (users/get-user users %)) shared))])
-                          [:form {:method "post" :action (str "/doc/" id "/delete")}
-                           (security/csrf-field)
-                           [:button "Delete"]]])])))
-            [:p "No documents yet."])]])))
+                  (for [{:keys [id] :as f} forms]
+                    (let [docs (cond->> (get docs-by-form id)
+                                 status (filter #(= status (:status %))))]
+                      [:div.form-sec
+                       [:div.bar [:h2 (or (:title f) (name id))] (create-control f)]
+                       (if (seq docs)
+                         (into [:div] (map #(doc-row users user %) docs))
+                         [:p.badge "No documents yet."])])))
+            [:p "You don't have access to any forms yet. Ask an admin for a role."])]])))
 
 (defn- index-page-html
   "The lookup page for an index form (§15.13): enter the key (e.g. an MRN), submit
@@ -122,21 +136,22 @@
             [:p [:a {:href "/"} "← Cancel"]]]]))))
 
 (myc/defcell :index/render
-  {:requires [:documents :forms :users]
+  {:requires [:documents :forms :users :access]
    :input    {:http-request :map}
    :output   {:html :string}
-   :doc      "Render the documents landing for the signed-in user (their docs only),
-              optionally filtered by ?status."}
-  (fn [{:keys [documents forms users]} {req :http-request}]
-    (let [user-id   (get-in req [:session :user-id])
-          user      (users/get-user users user-id)
-          status    (some-> (get-in req [:query-params "status"]) keyword)
-          form-list (map (fn [id] (let [f (forms/get-form forms id)]
-                                    {:id id :title (:title f) :index? (boolean (:index f))}))
-                         (forms/list-forms forms))
-          docs      (cond->> (documents/accessible-by documents user-id)
-                      status (filter #(= status (:status %))))]
-      {:html (landing-html docs form-list user users)})))
+   :doc      "Render the landing: the forms the signed-in user can access (by role),
+              each with its documents (optionally filtered by ?status)."}
+  (fn [{:keys [documents forms users access]} {req :http-request}]
+    (let [user-id    (get-in req [:session :user-id])
+          user       (users/get-user users user-id)
+          status     (some-> (get-in req [:query-params "status"]) keyword)
+          form-ids   (access/accessible-forms access user (forms/list-forms forms))
+          form-list  (map (fn [id] (let [f (forms/get-form forms id)]
+                                     {:id id :title (:title f) :index? (boolean (:index f))}))
+                          form-ids)
+          docs-by    (group-by :form-id (documents/accessible-by documents user-id))]
+      {:html (landing-html {:forms form-list :docs-by-form docs-by :user user
+                            :users users :admin? (users/admin? user) :status status})})))
 
 (myc/defcell :doc/new-page
   {:requires [:forms]
@@ -164,38 +179,45 @@
                         :form-version version
                         :form-digest  (forms/version-digest forms form-id version)})))
 
+(defn- do-create
+  [{:keys [documents forms] :as resources} form-id user-id index-key]
+  (let [form     (forms/get-form forms form-id)
+        idx-spec (:index form)]
+    (cond
+      ;; index form with a key: validate, create, seed, prepopulate
+      (and idx-spec (seq (str index-key)))
+      (if-not (:found? (index/lookup (imports/source-ctx resources) idx-spec index-key))
+        {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"}
+         :body (index-page-html form-id form index-key "No match for that key — please check it.")}
+        (let [doc (create-pinned! documents forms form-id user-id)
+              id  (:id doc)
+              into (:into idx-spec)]
+          (docs/ensure! resources id)
+          (session/apply-change! (:session-manager resources) id [[into index-key]])  ; seed trigger field
+          (docs/run-imports! resources form id into)               ; imports map the entity
+          {:status 303 :headers {"Location" (str "/doc/" id)} :body ""}))
+
+      ;; index form, no key yet: (re)show the lookup page
+      idx-spec
+      {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"}
+       :body (index-page-html form-id form nil nil)}
+
+      ;; plain form: create empty and go
+      :else
+      {:status 303 :headers {"Location" (str "/doc/" (:id (create-pinned! documents forms form-id user-id)))}
+       :body ""})))
+
 (myc/defcell :doc/create
-  {:requires [:documents :forms :session-manager :patient-client :options-store]
+  {:requires [:documents :forms :session-manager :patient-client :options-store :access :users]
    :input    {:form-id :any :user-id :any :index-key :any}
    :output   {:status :int :headers :any :body :string}
-   :doc      "Create a document (pinned). For an index form, resolve the key, then
-              seed the :into field so the form's imports prepopulate it (§15.13)."}
-  (fn [{:keys [documents forms] :as resources} {:keys [form-id user-id index-key]}]
-    (let [form     (forms/get-form forms form-id)
-          idx-spec (:index form)]
-      (cond
-        ;; index form with a key: validate, create, seed, prepopulate
-        (and idx-spec (seq (str index-key)))
-        (if-not (:found? (index/lookup (imports/source-ctx resources) idx-spec index-key))
-          {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"}
-           :body (index-page-html form-id form index-key "No match for that key — please check it.")}
-          (let [doc (create-pinned! documents forms form-id user-id)
-                id  (:id doc)
-                into (:into idx-spec)]
-            (docs/ensure! resources id)
-            (session/apply-change! (:session-manager resources) id [[into index-key]])  ; seed trigger field
-            (docs/run-imports! resources form id into)               ; imports map the entity
-            {:status 303 :headers {"Location" (str "/doc/" id)} :body ""}))
-
-        ;; index form, no key yet: (re)show the lookup page
-        idx-spec
-        {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"}
-         :body (index-page-html form-id form nil nil)}
-
-        ;; plain form: create empty and go
-        :else
-        {:status 303 :headers {"Location" (str "/doc/" (:id (create-pinned! documents forms form-id user-id)))}
-         :body ""}))))
+   :doc      "Create a document (pinned), if the user may access the form. For an
+              index form, resolve the key, then seed the :into field so imports
+              prepopulate it (§15.13)."}
+  (fn [{:keys [access users] :as resources} {:keys [form-id user-id index-key]}]
+    (if-not (access/can-access? access (users/get-user users user-id) form-id)
+      {:status 303 :headers {"Location" "/"} :body ""}      ; no access — back to landing
+      (do-create resources form-id user-id index-key))))
 
 ;; --- GET /doc/:id (render an instance) ------------------------------------
 

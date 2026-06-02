@@ -15,6 +15,7 @@
    [yogthos.stepvine.hub :as hub]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
+   [yogthos.stepvine.users :as users]
    [yogthos.stepvine.workflow :as workflow]))
 
 (myc/defcell :wf/parse
@@ -27,8 +28,8 @@
 (myc/defcell :wf/load
   {:doc      "Load the document, its form workflow, current state, value/reaction
               context, and which other editors are present."
-   :requires [:forms :documents :session-manager :hub]}
-  (fn [{:keys [session-manager hub documents] :as resources} {:keys [doc-id uid] :as data}]
+   :requires [:forms :documents :session-manager :hub :users]}
+  (fn [{:keys [session-manager hub documents users] :as resources} {:keys [doc-id uid] :as data}]
     (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
       (let [wf    (:workflow form-raw)
             doc   (documents/get-document documents doc-id)
@@ -39,7 +40,8 @@
                :form     form-raw
                :workflow wf
                :state    state
-               :ctx      {:rxns (:rxns rctx) :doc (:values rctx) :role nil}
+               :ctx      {:rxns  (:rxns rctx) :doc (:values rctx)
+                          :roles (users/roles (users/get-user users uid))}   ; actor's roles
                :others   (disj (hub/users hub doc-id) uid)))
       (assoc data :found? false))))
 

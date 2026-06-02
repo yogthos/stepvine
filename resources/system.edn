@@ -51,6 +51,7 @@
   :patient-client #ig/ref :clients/patient
   :users          #ig/ref :store/users
   :audit          #ig/ref :store/audit
+  :access         #ig/ref :store/access
   :reports-dir    #or [#env REPORTS_DIR "data/reports"]
   ;; OAuth2/OIDC providers (§15.13). Dev/test ship a self-contained :mock provider
   ;; that short-circuits the external round trip; prod configures real providers
@@ -100,6 +101,12 @@
  {:file #profile {:dev  "data/audit.edn"
                   :test nil
                   :prod #or [#env AUDIT_FILE "data/audit.edn"]}}
+
+ ;; Role-based form access (admin UI): {form-id #{roles}}
+ :store/access
+ {:file #profile {:dev  "data/access.edn"
+                  :test nil
+                  :prod #or [#env ACCESS_FILE "data/access.edn"]}}
 
  ;; User accounts; duratom-persisted in dev/prod, in-memory for tests.
  ;; A dev admin (admin/admin) is seeded when the store is empty.

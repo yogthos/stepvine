@@ -67,10 +67,11 @@
     true))
 
 (defn role-ok?
-  "True when the actor's `:role` satisfies the action's `:require-role` (or none)."
-  [workflow action {:keys [role]}]
+  "True when the actor holds the action's `:require-role` (or it requires none).
+   `ctx :roles` is the actor's role set; an admin satisfies any requirement."
+  [workflow action {:keys [roles]}]
   (if-let [req (get-in workflow [:actions action :require-role])]
-    (= req role)
+    (boolean (or (contains? (set roles) :admin) (contains? (set roles) req)))
     true))
 
 ;; --- step dispatcher (pluggable, §15.11) -----------------------------------

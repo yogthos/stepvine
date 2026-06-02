@@ -19,6 +19,7 @@
    [yogthos.stepvine.options]
    [yogthos.stepvine.clients]
    [yogthos.stepvine.users]
+   [yogthos.stepvine.access]
 
     ;; Routes
    [yogthos.stepvine.web.routes.api]
