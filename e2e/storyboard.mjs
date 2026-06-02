@@ -858,6 +858,38 @@ try {
   (await lineInputs().count()) >= 2
     ? ok('the committed line items persisted (round-trip through SSE)') : bad('rows did not persist');
 
+  // ---- 28. Terminology / value-set-bound coded fields ----
+  step('28. Value-set-bound coded fields');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Patient Demographics")'), '#gender');
+  ok('opened the demographics form');
+  // the inline ValueSet expansion renders coded options: display label, code value
+  const genderOpts = await page.evaluate(() =>
+    [...document.querySelectorAll('#gender option')].map((o) => [o.value, o.textContent.trim()]));
+  (genderOpts.some(([v, t]) => v === 'male' && t === 'Male') &&
+   genderOpts.some(([v, t]) => v === 'female' && t === 'Female'))
+    ? ok('gender options are coded: value = FHIR code, label = display') : bad(`gender options wrong: ${JSON.stringify(genderOpts)}`);
+  // the named value set (from the terminology store) also expands to coded options
+  const maritalOpts = await page.evaluate(() =>
+    [...document.querySelectorAll('#marital option')].map((o) => [o.value, o.textContent.trim()]));
+  maritalOpts.some(([v, t]) => v === 'M' && t === 'Married')
+    ? ok('the named value set (marital-status) resolved from the terminology store') : bad(`marital options wrong: ${JSON.stringify(maritalOpts)}`);
+  // selecting stores the CODE, while the widget shows the display
+  await page.selectOption('#gender', 'male');
+  await page.selectOption('#marital', 'M');
+  await settleFields(page);
+  await page.waitForFunction(
+    () => /Stored gender code:\s*male/.test(document.body.innerText) &&
+          /Stored marital code:\s*M\b/.test(document.body.innerText),
+    null, { timeout: 4000 })
+    .then(() => ok('the stored value is the FHIR code (gender=male, marital=M)'))
+    .catch(() => bad('stored codes not reflected'));
+  // codes persist through SSE
+  await openDoc(page, () => page.reload(), '#gender');
+  ((await page.locator('#gender').inputValue()) === 'male' &&
+   (await page.locator('#marital').inputValue()) === 'M')
+    ? ok('the selected codes persisted (round-trip through SSE)') : bad('codes did not persist');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

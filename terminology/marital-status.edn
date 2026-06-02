@@ -1,0 +1,13 @@
+;; A FHIR ValueSet in compact authoring form (id + system + concepts). Loaded by
+;; terminology/load-dir, expanded to coded options {:value code :label display
+;; :system system}, and folded into the options store under :marital-status — so a
+;; form field can bind :options {:kind :value-set :value-set :marital-status}.
+{:id      :marital-status
+ :system  "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus"
+ :concepts
+ [{:code "S" :display "Never Married"}
+  {:code "M" :display "Married"}
+  {:code "D" :display "Divorced"}
+  {:code "W" :display "Widowed"}
+  {:code "L" :display "Legally Separated"}
+  {:code "UNK" :display "Unknown"}]}

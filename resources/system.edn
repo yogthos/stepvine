@@ -85,9 +85,11 @@
                            :test nil
                            :prod #or [#env FORM_VERSIONS_FILE "data/form-versions.edn"]}}
 
- ;; DB-sourced dropdown options live on disk, one EDN file per source
+ ;; DB-sourced dropdown options live on disk, one EDN file per source. Coded
+ ;; value sets (FHIR ValueSets, §9ox) load from :term-dir and fold into the store.
  :store/options
- {:dir #or [#env OPTIONS_DIR "options"]}
+ {:dir      #or [#env OPTIONS_DIR "options"]
+  :term-dir #or [#env TERMINOLOGY_DIR "terminology"]}
 
  ;; External service stub: a small patient directory
  :clients/patient

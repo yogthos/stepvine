@@ -13,7 +13,8 @@
    [clojure.string :as str]
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
-   [yogthos.stepvine.sources :as sources]))
+   [yogthos.stepvine.sources :as sources]
+   [yogthos.stepvine.terminology :as terminology]))
 
 (defn- edn-file? [^java.io.File f]
   (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
@@ -60,7 +61,13 @@
         field-opts))
 
 (defmethod ig/init-key :store/options
-  [_ {:keys [dir]}]
-  (let [loaded (load-dir dir)]
-    (log/info "loaded option sources from" dir ":" (vec (keys loaded)))
-    loaded))
+  [_ {:keys [dir term-dir]}]
+  (let [loaded (load-dir dir)
+        ;; coded value sets (§9ox) are folded into the same store, expanded from
+        ;; FHIR ValueSets — so a :value-set source named by id resolves like any
+        ;; option set, with terminology semantics applied at load.
+        coded  (when term-dir (terminology/load-dir term-dir))
+        store  (merge loaded coded)]
+    (log/info "loaded option sources from" dir ":" (vec (keys loaded))
+              (when (seq coded) (str "+ value sets: " (vec (keys coded)))))
+    store))

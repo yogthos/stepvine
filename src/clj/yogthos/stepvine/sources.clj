@@ -17,7 +17,8 @@
    allowlist. The HTTP transport is injected (`ctx :request-fn`) so the resolver
    stays dependency-free and unit-testable."
   (:require
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [yogthos.stepvine.terminology :as terminology])
   (:import
    [java.net URI]))
 
@@ -59,6 +60,20 @@
 (defmethod resolve-source :options
   [{:keys [options-store]} {:keys [source]}]
   (let [data (get options-store source [])]
+    (fn ([] data) ([query] (filter-options data query)))))
+
+(defmethod resolve-source :value-set
+  ;; Coded field bound to a FHIR ValueSet (§9ox). An option kind: returns coded
+  ;; options {:value <code> :label <display> :system <system>}. The expansion is
+  ;; either declared inline (`:expansion <FHIR ValueSet>`) and expanded here, or
+  ;; named (`:value-set <id>`) and read from the terminology store (folded into
+  ;; the options store at load). Same calling shape as :static/:options, so coded
+  ;; fields work in dropdowns and server-side typeahead unchanged.
+  [{:keys [options-store terminology]} {:keys [value-set expansion]}]
+  (let [data (cond
+               expansion (terminology/expand expansion)
+               value-set (get (or terminology options-store) value-set [])
+               :else     [])]
     (fn ([] data) ([query] (filter-options data query)))))
 
 (defmethod resolve-source :client

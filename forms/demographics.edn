@@ -1,0 +1,37 @@
+;; Terminology / value-set binding for coded fields (parity stepvine-9ox). Coded
+;; fields bind to a FHIR ValueSet instead of an ad-hoc list. Two ways:
+;;   - inline  {:kind :value-set :expansion <FHIR ValueSet>} (expanded at resolve)
+;;   - named   {:kind :value-set :value-set :marital-status} (from the terminology
+;;             store, folded into the options store at load)
+;; The stored value is the FHIR code; the widget shows the display.
+{:id    :demographics
+ :title "Patient Demographics"
+
+ :data
+ {:model
+  [[:name   {:id :name   :type :string}]
+   ;; inline ValueSet expansion (administrative-gender)
+   [:gender {:id :gender :type :enum
+             :options {:kind :value-set
+                       :expansion {:system "http://hl7.org/fhir/administrative-gender"
+                                   :concepts [{:code "male"    :display "Male"}
+                                              {:code "female"  :display "Female"}
+                                              {:code "other"   :display "Other"}
+                                              {:code "unknown" :display "Unknown"}]}}}]
+   ;; named value set, resolved from the terminology store
+   [:marital {:id :marital :type :enum
+              :options {:kind :value-set :value-set :marital-status}}]]}
+
+ :views
+ {:default
+  {:title "Patient Demographics"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Patient Demographics"]
+    [:c/input-field {:id :name :label "Name"}]
+    ;; coded fields render as dropdowns: option value = code, label = display
+    [:c/dropdown {:id :gender  :label "Gender" :placeholder "Select…"}]
+    [:c/dropdown {:id :marital :label "Marital status" :placeholder "Select…"}]
+    [:p "Stored gender code: " [:stepvine.components/value {:id :gender}]]
+    [:p "Stored marital code: " [:stepvine.components/value {:id :marital}]]]}}}
