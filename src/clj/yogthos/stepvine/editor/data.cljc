@@ -250,6 +250,17 @@
 
 (defn get-tx-report [ctx] (::d/transaction-report ctx nil))
 
+(defn changed-ids
+  "The set of model ids whose value changed in the last `transact` (from domino's
+   change report). A path that doesn't map to a model id (e.g. a dynamic
+   collection-item path) falls back to the path itself as a vector id. Empty after
+   a structural rebuild or a no-op change."
+  [ctx]
+  (let [{:keys [path->id]} (model-of ctx)]
+    (into #{}
+          (keep (fn [[path _]] (or (get path->id path) (when (vector? path) path))))
+          (:changes (get-tx-report ctx)))))
+
 (defn get-value [ctx id]
   (let [rxns (::reactions ctx)]
     (if (contains? rxns id)

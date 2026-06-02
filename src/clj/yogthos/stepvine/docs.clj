@@ -16,15 +16,19 @@
    [yogthos.stepvine.editor.impl :as impl]))
 
 (defn run-imports!
-  "Run any imports a change to `fid` triggers: resolve each import's source (§15.6),
-   fetch lazily, and transact the diff-based mapped changes. Shared by the
+  "Run any imports a change to `fids` triggers: resolve each import's source
+   (§15.6), fetch lazily, and transact the diff-based mapped changes. `fids` is one
+   field id or a collection of them — the set of fields that changed in a
+   transaction — so an import reacts to a cascaded change too. Shared by the
    field-edit cell and index-based creation."
-  [{:keys [session-manager] :as resources} form-raw doc-id fid]
-  (let [ctx     (imports/source-ctx resources)
-        resolve (fn [sid] (when-let [spec (get-in form-raw [:sources sid])]
-                            (sources/resolve-source ctx spec)))
-        read    (fn [path] (session/value session-manager doc-id (first path)))
-        changes (imports/run (:imports form-raw) (imports/event-trigger fid) resolve read)]
+  [{:keys [session-manager] :as resources} form-raw doc-id fids]
+  (let [ctx      (imports/source-ctx resources)
+        resolve  (fn [sid] (when-let [spec (get-in form-raw [:sources sid])]
+                             (sources/resolve-source ctx spec)))
+        read     (fn [path] (session/value session-manager doc-id (first path)))
+        triggers (into #{} (map imports/event-trigger)
+                       (if (coll? fids) fids [fids]))
+        changes  (imports/run (:imports form-raw) triggers resolve read)]
     (when (seq changes)
       (session/apply-change! session-manager doc-id changes))))
 

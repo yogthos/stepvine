@@ -46,7 +46,15 @@
     (testing "diff-based: fields already at the fetched value emit no change"
       (is (= #{[:lname "Lovelace"] [:dob "1815-12-10"]}
              (set (imports/run (:imports form) (imports/event-trigger :patient-id)
-                               resolve (read-from {:patient-id "p1" :fname "Ada"}))))))))
+                               resolve (read-from {:patient-id "p1" :fname "Ada"}))))))
+    (testing "a SET of triggers (the transaction change-set) fires any matching import"
+      ;; an import reacts when ANY field in the change-set is one of its triggers,
+      ;; so it fires for a cascaded change too
+      (is (empty? (imports/run (:imports form) #{:event/kg :event/m}
+                               resolve (read-from {:patient-id "p1"}))))
+      (is (= #{[:fname "Ada"] [:lname "Lovelace"] [:dob "1815-12-10"]}
+             (set (imports/run (:imports form) #{:event/kg :event/patient-id}
+                               resolve (read-from {:patient-id "p1"}))))))))
 
 (deftest setting-trigger-field-hydrates-from-service
   (let [form    (forms/load-form "intake")

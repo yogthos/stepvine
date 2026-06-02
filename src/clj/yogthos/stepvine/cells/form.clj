@@ -49,17 +49,18 @@
        :raw-value (get signals (render/signal-name (keyword field-id)))})))
 
 (defn- rerender-dependents!
-  "Cascading dropdowns: re-render every dropdown reachable from `changed-fid` over
-   the `:depends-on` graph (region → clinic → department → …) and patch each to
-   peers. The VALUE cascade already happened inside Domino — synthesized clearing
-   events (§cascades) cleared the whole chain in this transaction, and those
-   cleared signals are broadcast like any change — so this only refreshes the
-   affected <select>s (new option list + cleared selection)."
-  [{:keys [session-manager hub options-store]} doc-id changed-fid]
+  "Cascading dropdowns: re-render the dropdowns whose parent value moved in this
+   transaction (`changed` = the engine's change-set) and patch each to peers. The
+   VALUE cascade already happened inside Domino — synthesized clearing events
+   (§cascades) cleared the whole chain in this transaction, those cleared signals
+   broadcast like any change, and the change-set names every field that moved — so
+   this re-renders exactly the affected <select>s (new option list + cleared
+   selection), nothing more."
+  [{:keys [session-manager hub options-store]} doc-id changed]
   (let [sess    (session/current session-manager doc-id)
         markup  (render/view-markup sess :default)
         aliases (get-in sess [:form :views :default :opts :widget-namespaces])
-        deps    (render/cascade-closure markup aliases changed-fid)]
+        deps    (render/dropdowns-depending-on markup aliases changed)]
     (when (seq deps)
       (let [ctx (-> (render/session->context sess :default doc-id)
                     (assoc :options (options/resolve-field-options
@@ -71,9 +72,10 @@
   {:requires [:forms :documents :session-manager :patient-client :audit :hub :options-store]
    :input    {:doc-id :any :field-id :any :uid :any :raw-value :any}
    :output   {:status :int :body :string}
-   :doc      "Coerce + transact the change (lock-aware + finalized-doc-aware), audit
-              the before/after diff, run any triggered import, then re-render any
-              dependent (cascading) dropdowns."}
+   :doc      "Coerce + transact the change (lock-aware + finalized-doc-aware), then —
+              driven by the transaction's change-set — audit the diff, re-render
+              dependent (cascading) dropdowns, and run any triggered imports (so an
+              import fires for a cascaded change too)."}
   (fn [{:keys [session-manager patient-client documents audit] :as resources}
        {:keys [doc-id field-id uid raw-value]}]
     (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
@@ -84,12 +86,15 @@
               value  (coerce (get-in sess [:field-opts fid]) raw-value)
               before (session/value session-manager doc-id fid)]
           (session/apply-field-as! session-manager doc-id uid fid value)
-          (let [after (session/value session-manager doc-id fid)]
+          (let [after   (session/value session-manager doc-id fid)
+                ;; the engine's change-set: every field this transaction moved
+                ;; (the edited field + anything its events cascaded)
+                changed (session/changed-ids session-manager doc-id)]
             (when (not= before after)                              ; skip no-ops / lock-rejected
               (audit/record! audit {:doc-id doc-id :by uid :action :field/save
                                     :path [fid] :before before :after after})
-              (rerender-dependents! resources doc-id fid)))        ; cascading dropdowns
-          (docs/run-imports! resources form-raw doc-id fid)
+              (rerender-dependents! resources doc-id changed)      ; re-render what changed
+              (docs/run-imports! resources form-raw doc-id changed))) ; imports for any changed field
           {:status 204 :body ""}))
       {:status 404 :body (str "No such document: " doc-id)})))
 

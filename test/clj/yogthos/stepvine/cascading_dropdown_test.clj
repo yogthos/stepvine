@@ -116,3 +116,28 @@
       (is (= "north" (impl/value s :region))     "region (above) untouched")
       (is (= "other" (impl/value s :clinic)))
       (is (= ""      (impl/value s :department)) "department (below) cleared"))))
+
+;; --- change-set-driven re-render (the engine's transaction report) ---------
+
+(deftest change-set-reflects-the-cascade
+  (let [form (cascades/compile-cascades chain-form)
+        s    (-> (impl/create-session form {})
+                 (impl/apply-changes [[:region "north"]])
+                 (impl/apply-changes [[:clinic "ng"]])
+                 (impl/apply-changes [[:department "cardio"]]))]
+    (testing "a single edit reports only that field"
+      (is (= #{:department} (impl/changed-ids s))))
+    (testing "a cascading edit reports every field the engine moved"
+      (is (= #{:region :clinic :department}
+             (impl/changed-ids (impl/apply-changes s [[:region "south"]])))))))
+
+(deftest rerender-is-driven-by-what-actually-changed
+  (testing "every cascaded field present -> re-render its dependents"
+    (is (= [:clinic :department]
+           (sort-by name (map :id (render/dropdowns-depending-on
+                                   chain-markup aliases #{:region :clinic :department}))))))
+  (testing "only the parent moved (child value unchanged) -> re-render just the child"
+    (is (= [:clinic]
+           (map :id (render/dropdowns-depending-on chain-markup aliases #{:region})))))
+  (testing "nothing relevant changed -> nothing re-renders"
+    (is (empty? (render/dropdowns-depending-on chain-markup aliases #{:reason})))))

@@ -373,3 +373,14 @@
                (into seen (map (comp keyword :id) fresh))
                (into out fresh)))
       out)))
+
+(defn dropdowns-depending-on
+  "Dropdown nodes whose `:depends-on` is in `changed` (a set of field ids) — the
+   dropdowns whose options must be re-rendered because their parent's value moved
+   in this transaction. Driven by the engine's change-set, so only what actually
+   changed re-renders (and a child whose own value didn't move isn't re-rendered
+   unless its parent's did)."
+  [markup aliases changed]
+  (let [changed (set changed)]
+    (distinct
+     (mapcat #(dependent-dropdown-nodes markup aliases %) changed))))

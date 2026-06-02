@@ -47,6 +47,12 @@
 (defn db [session]
   (data/get-db (::data/ctx session)))
 
+(defn changed-ids
+  "The set of field ids that changed in the session's last transact (domino's
+   change report) — drives change-set-based re-rendering and imports."
+  [session]
+  (data/changed-ids (::data/ctx session)))
+
 (defn apply-changes [session changes]
   (data/transact-ctx session changes))
 

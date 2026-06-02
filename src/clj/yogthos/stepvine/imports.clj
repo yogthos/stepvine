@@ -21,9 +21,11 @@
    Pure: `run` returns `[[field value] ...]`; the caller transacts them.")
 
 (defn triggered
-  "Imports whose `:on` set includes `trigger`."
-  [imports trigger]
-  (filter #(contains? (set (:on %)) trigger) imports))
+  "Imports whose `:on` set includes any of `triggers` (a single trigger or a
+   collection), in declared order (so chaining is preserved)."
+  [imports triggers]
+  (let [ts (if (coll? triggers) (set triggers) #{triggers})]
+    (filter #(some ts (:on %)) imports)))
 
 (defn event-trigger
   "The trigger keyword for a changed field, e.g. :weight -> :event/weight."
@@ -33,7 +35,8 @@
 (defn- as-path [p] (if (vector? p) p [p]))
 
 (defn run
-  "Run the imports triggered by `trigger`.
+  "Run the imports triggered by `trigger` (a single trigger keyword or a set —
+   e.g. the triggers for every field that changed in a transaction).
      - resolve : (fn [source-id] -> source-fn)   ; a source resolver (§15.6)
      - read    : (fn [doc-path]  -> value)       ; current document value at a path
    Returns `[[field-id value] ...]` of *changed* fields, chaining so a later

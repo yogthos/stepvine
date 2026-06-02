@@ -61,6 +61,11 @@
   [manager id field-id]
   (impl/value (current manager id) field-id))
 
+(defn changed-ids
+  "Field ids that changed in the document's last transact (domino's change report)."
+  [manager id]
+  (impl/changed-ids (current manager id)))
+
 (defn snapshot-of
   [manager id]
   (snapshot (current manager id)))
