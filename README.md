@@ -94,21 +94,6 @@ Set via environment variables (sensible defaults in `resources/system.edn`):
 
 > The OAuth `:mock` provider is dev/test only and is never exposed in `:prod`.
 
-## Project layout
-
-```
-src/clj/yogthos/stepvine/   platform code
-  components/                 widgets (render to HTML + Datastar bindings)
-  workflows/ cells/           Mycelium request pipelines + the document FSM
-  editor/                     vendored Domino session/reaction layer
-  web/                        routes, SSE, auth, admin, the live editor
-forms/                      example apps (EDN, with optional sibling .css)
-options/  partials/          dropdown sources + reusable markup fragments
-resources/                  system.edn, HTML templates, default theme CSS
-test/clj/                   unit tests
-e2e/                        Playwright storyboard
-```
-
 ## Status
 
 Pre-release / actively developed. See `PLAN.md` for the roadmap and `CLAUDE.md`
