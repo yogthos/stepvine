@@ -156,6 +156,43 @@
                              (assoc :status (if (seq views) :submitted :in-progress))
                              (update :rev (fnil inc 0))))))))))
 
+;; --- Workflow state machine (§15.10) --------------------------------------
+
+(defn workflow-state
+  "The document's current workflow state, or `default` (its form's :initial) when
+   unset."
+  [doc default]
+  (get-in doc [:meta :workflow :state] default))
+
+(defn set-workflow-state!
+  "Move the document into workflow state `state`, appending to its transition
+   history and bumping :rev. `locked?` marks the state read-only (mirrored into
+   `:status` so the existing edit guard applies)."
+  [store id state locked? by]
+  (swap! store
+         (fn [m]
+           (cond-> m
+             (contains? m id)
+             (update id
+                     (fn [doc]
+                       (-> doc
+                           (assoc-in [:meta :workflow :state] state)
+                           (update-in [:meta :workflow :history] (fnil conj [])
+                                      {:state state :by by :at (System/currentTimeMillis)})
+                           (assoc :status (if locked? :submitted :in-progress))
+                           (update :rev (fnil inc 0)))))))))
+
+(defn update-meta!
+  "Persist a value at `[:meta & path]` (workflow step directive), bumping :rev."
+  [store id path value]
+  (swap! store
+         (fn [m]
+           (cond-> m
+             (contains? m id)
+             (update id (fn [doc] (-> doc
+                                      (assoc-in (into [:meta] path) value)
+                                      (update :rev (fnil inc 0)))))))))
+
 (defn delete!
   [store id]
   (swap! store dissoc id))
