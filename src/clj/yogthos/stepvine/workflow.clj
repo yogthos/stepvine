@@ -132,6 +132,10 @@
   [:email {:to      (resolve-template ctx (:to step))
            :subject (resolve-template ctx (:subject step))
            :body    (resolve-template ctx (:body step))}])
+(defmethod run-step :http      [ctx step]
+  ;; call an external service: the body map's values are resolved from the document
+  [:http (-> (select-keys step [:url :host-allow :method :headers])
+             (assoc :body (into {} (map (fn [[k v]] [k (resolve-value ctx v)])) (:body step))))])
 
 (defn action-steps [workflow action] (get-in workflow [:actions action :steps]))
 

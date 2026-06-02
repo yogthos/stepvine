@@ -17,10 +17,12 @@
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.editor.impl :as impl]
    [yogthos.stepvine.hub :as hub]
+   [yogthos.stepvine.http :as http]
    [yogthos.stepvine.mailer :as mailer]
    [yogthos.stepvine.pdf :as pdf]
    [yogthos.stepvine.render :as render]
-   [yogthos.stepvine.session :as session]))
+   [yogthos.stepvine.session :as session]
+   [yogthos.stepvine.sources :as sources]))
 
 (defn- append-report!
   "Append a report entry (snapshot or pdf) to the document, returning its index."
@@ -63,6 +65,14 @@
     (pdf/write! spec file)
     (append-report! documents doc-id {:at (System/currentTimeMillis) :by (:by intent)
                                       :pdf (.getPath file) :idx idx})))
+
+;; --- external service call (SSRF-guarded) ---------------------------------
+
+(defmethod perform! :http [{:keys [http-client]} _doc-id _form intent]
+  (let [{:keys [url host-allow]} intent]
+    (if (sources/host-allowed? host-allow url)
+      (http/send! http-client (select-keys intent [:url :method :body :headers]))
+      (log/warn "blocked :http effect — host not on the allowlist" {:url url :host-allow host-allow}))))
 
 ;; --- imports (layered on the engine's effect signal) ----------------------
 

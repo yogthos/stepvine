@@ -6,8 +6,10 @@
    [clojure.test :refer [deftest testing is]]
    [yogthos.stepvine.effects :as effects]
    [yogthos.stepvine.editor.impl :as impl]
+   [yogthos.stepvine.http :as http]
    [yogthos.stepvine.imports :as imports]
-   [yogthos.stepvine.mailer :as mailer]))
+   [yogthos.stepvine.mailer :as mailer]
+   [yogthos.stepvine.workflow :as workflow]))
 
 ;; --- the engine emits intents, change-triggered + conditional --------------
 
@@ -72,3 +74,25 @@
       (is (= "a@b.c" (:to (first (mailer/outbox mbox)))))))
   (testing "an unknown kind is ignored (no throw)"
     (is (nil? (effects/perform-all! {} "doc1" {} [{:kind :mystery}])))))
+
+;; --- the :http workflow step (external service call) -----------------------
+
+(deftest http-step-resolves-and-guards
+  (testing "run-step :http resolves the body map from the document"
+    (is (= [:http {:url "https://h.example.com/x" :host-allow ["h.example.com"]
+                   :body {:event "closed" :title "Printer down"}}]
+           (workflow/run-step {:doc {:title "Printer down"}}
+                              {:do :http :url "https://h.example.com/x"
+                               :host-allow ["h.example.com"]
+                               :body {:event "closed" :title {:from [:title]}}}))))
+  (testing "perform! :http calls the client for an allowlisted host"
+    (let [c (http/recording)]
+      (effects/perform! {:http-client c} "d1" {}
+                        {:kind :http :url "https://h.example.com/x" :host-allow ["h.example.com"] :body {:a 1}})
+      (is (= 1 (count (http/recorded c))))
+      (is (= "https://h.example.com/x" (:url (first (http/recorded c)))))))
+  (testing "perform! :http BLOCKS a host not on the allowlist (SSRF guard)"
+    (let [c (http/recording)]
+      (effects/perform! {:http-client c} "d1" {}
+                        {:kind :http :url "https://evil.example/x" :host-allow ["h.example.com"] :body {:a 1}})
+      (is (empty? (http/recorded c))))))

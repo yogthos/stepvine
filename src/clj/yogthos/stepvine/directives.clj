@@ -41,5 +41,6 @@
       :email     (effects/perform! resources doc-id form (assoc (second d) :kind :email))
       :snapshot  (effects/perform! resources doc-id form {:kind :snapshot :by uid})
       :pdf       (effects/perform! resources doc-id form (assoc (second d) :kind :pdf :by uid))
+      :http      (effects/perform! resources doc-id form (assoc (second d) :kind :http))
       nil))
   directives)

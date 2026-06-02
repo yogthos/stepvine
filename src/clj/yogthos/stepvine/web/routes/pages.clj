@@ -52,7 +52,7 @@
       {:status 200 :headers {"Content-Type" "text/css" "Cache-Control" "no-cache"} :body css}
       {:status 404 :headers {"Content-Type" "text/css"} :body "/* no app css */"})))
 
-(defn page-routes [{:keys [forms documents session hub options-store patient-client users audit reports-dir oauth access mailer]}]
+(defn page-routes [{:keys [forms documents session hub options-store patient-client users audit reports-dir oauth access mailer http-client]}]
   (let [resources  {:forms           forms
                     :documents       documents
                     :session-manager session
@@ -63,6 +63,7 @@
                     :audit           audit
                     :access          access
                     :mailer          mailer
+                    :http-client     http-client
                     :reports-dir     reports-dir}
         page (fn [wf] {:get  {:handler (mw/workflow-handler wf {:resources resources})}})
         post (fn [wf] {:post {:handler (mw/workflow-handler
@@ -102,7 +103,7 @@
       ["/forms/:id/roles"    (af {:post (admin/set-form-roles access)})]
       ["/forms/:id/edit"     (af {:get  (editor/edit-page forms access users)})]
       ["/forms/:id/save"     (ds {:post (editor/save forms)})]
-      ["/outbox"             (af {:get  (admin/outbox-page mailer users)})]]
+      ["/outbox"             (af {:get  (admin/outbox-page mailer http-client users)})]]
      ;; document routes — access-controlled
      ["/doc/:id" {:middleware [doc-access]}
       [""        (page doc/render-doc)]

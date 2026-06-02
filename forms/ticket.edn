@@ -32,6 +32,15 @@
                               ;; a step that runs only when the ticket is high priority
                               {:do :notify :message "Escalated to on-call." :when :high-priority?}]}
             :approve {:steps [{:do :pdf}            ; generate a PDF report on close (report 0)
+                              ;; call an external service on close — the body is
+                              ;; templated from the document; the host must be on
+                              ;; the SSRF allowlist
+                              {:do :http
+                               :url "https://hooks.example.com/tickets/closed"
+                               :host-allow ["hooks.example.com"]
+                               :body {:event "ticket-closed"
+                                      :title {:from [:title]}
+                                      :priority {:from [:priority]}}}
                               {:do :notify :message "Approved and closed."}]}
             :reject  {:steps [{:do :notify :message "Sent back for changes."}]}}}
 

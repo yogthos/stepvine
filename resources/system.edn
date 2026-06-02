@@ -53,6 +53,7 @@
   :audit          #ig/ref :store/audit
   :access         #ig/ref :store/access
   :mailer         #ig/ref :mailer/mailer
+  :http-client    #ig/ref :http/client
   :reports-dir    #or [#env REPORTS_DIR "data/reports"]
   ;; OAuth2/OIDC providers (§15.13). Dev/test ship a self-contained :mock provider
   ;; that short-circuits the external round trip; prod configures real providers
@@ -132,6 +133,11 @@
          :user #or [#env SMTP_USER nil]
          :pass #or [#env SMTP_PASS nil]
          :tls  true}}
+
+ ;; Outbound HTTP for workflow :http steps. Dev/test record requests to an
+ ;; in-memory log (no calls); prod makes real requests (java.net.http).
+ :http/client
+ {:kind #profile {:dev :recording :test :recording :prod :real}}
 
  ;; Periodic keep-alive: detects dropped SSE clients (the ring adapter only
  ;; notices a broken connection on a failed write) so their thread + locks are

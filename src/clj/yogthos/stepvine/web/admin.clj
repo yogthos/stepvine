@@ -8,6 +8,7 @@
    [yogthos.stepvine.access :as access]
    [yogthos.stepvine.auth :as auth]
    [yogthos.stepvine.forms :as forms]
+   [yogthos.stepvine.http :as http]
    [yogthos.stepvine.mailer :as mailer]
    [yogthos.stepvine.users :as users]
    [yogthos.stepvine.web.layout :as layout]
@@ -32,21 +33,31 @@
       (resp/content-type "text/html")))
 
 (defn outbox-page
-  "Dev/admin view of emails sent by workflow :email steps. The recording mailer
-   keeps them in memory (no delivery); an SMTP mailer returns nil (delivered)."
-  [mailer-impl users-store]
+  "Dev/admin view of side effects emitted by workflow steps: emails (:email) and
+   outbound HTTP calls (:http). In dev these are recorded in memory (not actually
+   delivered/called); in prod they go out for real (no record)."
+  [mailer-impl http-client users-store]
   (fn [req]
     (page (auth/current-user users-store req) "Outbox"
-          (let [box (reverse (or (mailer/outbox mailer-impl) []))]
+          (let [mails (reverse (or (mailer/outbox mailer-impl) []))
+                calls (reverse (or (http/recorded http-client) []))]
             [:div
-             [:p.muted "Emails sent by workflow " [:code ":email"] " steps. In dev these are "
-              "recorded here (not delivered); prod delivers via SMTP (no record)."]
-             (if (seq box)
+             [:h2 "Email"]
+             [:p.muted "Sent by workflow " [:code ":email"] " steps."]
+             (if (seq mails)
                (into [:table [:tr [:th "To"] [:th "Subject"] [:th "Body"]]]
-                     (for [m box]
+                     (for [m mails]
                        [:tr [:td (:to m)] [:td (:subject m)]
                         [:td [:pre {:style "white-space:pre-wrap;margin:0"} (:body m)]]]))
-               [:p.muted "No emails sent yet."])]))))
+               [:p.muted "No emails sent yet."])
+             [:h2 "Outbound HTTP"]
+             [:p.muted "Calls made by workflow " [:code ":http"] " steps (SSRF-allowlisted)."]
+             (if (seq calls)
+               (into [:table [:tr [:th "Method"] [:th "URL"] [:th "Body"]]]
+                     (for [c calls]
+                       [:tr [:td (str/upper-case (name (or (:method c) :post)))] [:td (:url c)]
+                        [:td [:pre {:style "white-space:pre-wrap;margin:0"} (pr-str (:body c))]]]))
+               [:p.muted "No HTTP calls yet."])]))))
 
 (defn- roles-str [roles] (str/join " " (sort (map name roles))))
 
