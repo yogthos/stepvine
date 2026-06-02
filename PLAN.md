@@ -496,8 +496,13 @@ a validated `:workflow` (states + transitions + per-action `:steps`);
 compensation (mycelium `:error-groups`/`:resilience` are the hooks) — needed once
 real external steps (email/PDF/HTTP) land.
 
-**Phase 11 — Pages, index lookups & production hardening.** Real query-DB
-backends and OAuth2/OIDC remain (§15.13). **✅ Index lookups + pages done:**
+**Phase 11 — Pages, index lookups & production hardening.** OAuth2/OIDC remains
+(§15.13). **✅ Query-DB backend done:** `:store/documents` is pluggable behind a
+`DocStore` protocol (atoms/duratoms satisfy it directly, so all callers are
+backend-agnostic); a `SqlStore` keeps the document EDN in a SQLite `doc` column
+with indexed `owner`/`form_id`/`status`/`created_at` columns and an indexed
+`find-by` query. One contract test runs against both backends; dev/prod run on
+SQLite. **✅ Index lookups + pages done:**
 `yogthos.stepvine.index` resolves an external key to an entity via the unified
 source resolver; a form's `:index {:kind :key :into :prompt}` drives a
 lookup-creation page (`GET /form/:id/new`) that validates the key and seeds the
