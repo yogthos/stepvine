@@ -178,6 +178,7 @@
               id  (:id doc)
               into (:into idx-spec)]
           (docs/ensure! resources id)
+          (docs/hydrate! resources form id user)                  ; created-by / today / defaults
           (session/apply-change! (:session-manager resources) id [[into index-key]])  ; seed trigger field
           (docs/run-imports! resources form id into)               ; imports map the entity
           {:status 303 :headers {"Location" (str "/doc/" id)} :body ""}))
@@ -187,10 +188,12 @@
       {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"}
        :body (index-page-html user form-id form nil nil)}
 
-      ;; plain form: create empty and go
+      ;; plain form: create, hydrate creation-time fields, and go
       :else
-      {:status 303 :headers {"Location" (str "/doc/" (:id (create-pinned! documents forms form-id user-id)))}
-       :body ""})))
+      (let [id (:id (create-pinned! documents forms form-id user-id))]
+        (docs/ensure! resources id)
+        (docs/hydrate! resources form id user)                    ; created-by / today / defaults
+        {:status 303 :headers {"Location" (str "/doc/" id)} :body ""}))))
 
 (myc/defcell :doc/create
   {:requires [:documents :forms :session-manager :patient-client :options-store :access :users]

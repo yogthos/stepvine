@@ -1,0 +1,30 @@
+;; Creation-time hydration. The :hydrate map stamps fields when the document is
+;; created — from the creating user (:session), the clock (:today), or a literal
+;; (:value) — with no code in the form. Here the author + date + initial status are
+;; filled in automatically; only the body is edited.
+{:id    :note
+ :title "Quick Note"
+
+ :hydrate {:author  {:session [:display-name]}   ; the creating user's display name
+           :created {:today true}                ; today's date (yyyy-MM-dd)
+           :status  {:value "draft"}}            ; a literal default
+
+ :data
+ {:model
+  [[:author  {:id :author  :type :string}]
+   [:created {:id :created :type :string}]
+   [:status  {:id :status  :type :string}]
+   [:body    {:id :body    :type :string}]]}
+
+ :views
+ {:default
+  {:title "Quick Note"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Quick Note"]
+    [:p "Author, date and status are stamped on creation — you just write the note."]
+    [:c/input-field {:id :author  :label "Author"  :read-only true}]
+    [:c/input-field {:id :created :label "Created" :read-only true}]
+    [:c/input-field {:id :status  :label "Status"  :read-only true}]
+    [:c/input-field {:id :body    :label "Note"}]]}}}

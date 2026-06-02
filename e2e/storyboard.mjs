@@ -597,6 +597,19 @@ try {
     .then(() => ok('re-searching "united" returned UK + US'))
     .catch(() => bad('server-side re-search failed'));
 
+  // ---- 20. Creation-time field hydration -----------------------------
+  step('20. Creation-time hydration');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Quick Note")'), '#author');
+  ok('created a quick note');
+  // author is stamped from the signed-in user, status from a literal default
+  (await page.locator('#author').inputValue()) === 'Admin'
+    ? ok('author hydrated from the session identity (Admin)') : bad(`author not hydrated: ${await page.locator('#author').inputValue()}`);
+  (await page.locator('#status').inputValue()) === 'draft'
+    ? ok('status hydrated from a literal default (draft)') : bad('status default not applied');
+  /^\d{4}-\d{2}-\d{2}$/.test(await page.locator('#created').inputValue())
+    ? ok('created hydrated from today’s date') : bad(`created date not hydrated: ${await page.locator('#created').inputValue()}`);
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

@@ -32,6 +32,33 @@
     (when (seq changes)
       (session/apply-change! session-manager doc-id changes))))
 
+(defn- hydrate-value
+  "Resolve a creation-time hydration spec against the creating `user` and the
+   clock: `{:session [path…]}` reads the user record, `{:today fmt?}` the date,
+   `{:now true}` a timestamp, `{:value v}` a literal."
+  [user spec]
+  (cond
+    (contains? spec :session) (get-in user (vec (:session spec)))
+    (contains? spec :today)   (.format (java.text.SimpleDateFormat.
+                                        (if (string? (:today spec)) (:today spec) "yyyy-MM-dd"))
+                                        (java.util.Date.))
+    (contains? spec :now)     (System/currentTimeMillis)
+    (contains? spec :value)   (:value spec)
+    :else                     nil))
+
+(defn hydrate!
+  "Populate fields declared in the form's `:hydrate` map from the creation context
+   — the creating `user` (`:session` path), today/now, or a literal. Runs once, at
+   document creation, so e.g. `created-by`/`created-on` are stamped without the
+   form author writing any code."
+  [{:keys [session-manager] :as _resources} form doc-id user]
+  (let [changes (keep (fn [[fid spec]]
+                        (when-some [v (hydrate-value user spec)]
+                          [(keyword fid) v]))
+                      (:hydrate form))]
+    (when (seq changes)
+      (session/apply-change! session-manager doc-id (vec changes)))))
+
 (defn ensure!
   "Ensure the live session for `doc-id` exists, loading its persisted db against
    the document's *pinned* form version. Returns {:document .. :form-raw ..}, or
