@@ -72,10 +72,12 @@
     [:c/input-field {:label "Discount (%)"     :id :discount-pct}]
     [:c/input-field {:label "Tax rate (%)"     :id :tax-rate}]
     [:hr]
-    [:c/input-field {:label "Subtotal"  :id :subtotal :read-only true}]
-    [:c/input-field {:label "Discount"  :id :discount :read-only true}]
-    [:c/input-field {:label "Tax"       :id :tax      :read-only true}]
-    [:c/input-field {:label "Total"     :id :total    :read-only true}]
+    ;; calculated money fields, shown read-only and currency-formatted live via
+    ;; :fmt (printf-style) — no raw float noise
+    [:c/labeled-value {:label "Subtotal" :id :subtotal :fmt "$%.2f" :default "$0.00"}]
+    [:c/labeled-value {:label "Discount" :id :discount :fmt "$%.2f" :default "$0.00"}]
+    [:c/labeled-value {:label "Tax"      :id :tax      :fmt "$%.2f" :default "$0.00"}]
+    [:c/labeled-value {:label "Total"    :id :total    :fmt "$%.2f" :default "$0.00"}]
     [:c/show {:when :free-shipping?}
      [:p.alert.alert-success "Free shipping — subtotal is over $100."]]
     [:p.presence "Editors online: " [:span {:data-text "$presence"}]]]}}}

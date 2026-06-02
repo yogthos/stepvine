@@ -28,10 +28,10 @@
 ;; --- Labeled value --------------------------------------------------------
 
 (defmethod render-widget :stepvine.components/labeled-value
-  [ctx _component {:keys [id label default]} _body]
+  [ctx _component {:keys [id label default fmt]} _body]
   (let [sig     (render/item-$ ctx id)
         current (get-in ctx [:values id])]
-    [:div.widget.labeled-value.field
+    [:div.widget.labeled-value.field (when (and id (not (:item ctx))) {:id (str "lv-" (name id))})
      [:label label]
-     [:span {"data-text" sig}
-      (str (if (nil? current) (or default "") current))]]))
+     [:span {"data-text" (render/fmt-text-expr fmt sig)}     ; :fmt formats live + on render
+      (str (if (nil? current) (or default "") (render/fmt-value fmt current)))]]))

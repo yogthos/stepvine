@@ -469,16 +469,20 @@ try {
   await page.fill('#price', '20');
   await page.fill('#discount-pct', '10');
   await page.fill('#tax-rate', '8');
+  // the calculated fields are :c/labeled-value spans formatted via :fmt "$%.2f"
+  const lv = (id) => page.locator(`#lv-${id} span`).innerText();
+  const waitLv = (id, want) => page.waitForFunction(
+    ([i, w]) => { const el = document.querySelector(`#lv-${i} span`); return el && el.textContent === w; },
+    [id, want], { timeout: 6000 });
   // the chain settles: subtotal 60 → discount 6 → tax 4.32 → total 58.32
-  await waitVal(page, '#total', v => parseFloat(v) === 58.32);
-  ok('the full chain computed: total = 58.32');
-  (parseFloat(await page.locator('#subtotal').inputValue()) === 60 &&
-   parseFloat(await page.locator('#tax').inputValue()) === 4.32)
-    ? ok('intermediate calc fields: subtotal=60, tax=4.32') : bad('intermediate cascade values wrong');
-  // change ONE upstream input → the whole chain recomputes live over SSE
+  await waitLv('total', '$58.32');
+  ok('the full chain computed: total = $58.32 (:fmt currency formatting)');
+  ((await lv('subtotal')) === '$60.00' && (await lv('tax')) === '$4.32')
+    ? ok('intermediate calc fields formatted: subtotal=$60.00, tax=$4.32') : bad('intermediate cascade/format values wrong');
+  // change ONE upstream input → the whole chain recomputes (and reformats) live
   await page.fill('#qty', '6');
-  await waitVal(page, '#total', v => parseFloat(v) === 116.64);
-  ok('editing qty cascaded subtotal→discount→tax→total live (total = 116.64)');
+  await waitLv('total', '$116.64');
+  ok('editing qty cascaded subtotal→discount→tax→total live (total = $116.64)');
 
   // ---- 17. Work queues — documents by workflow state, across owners ----
   step('17. Work queues');
