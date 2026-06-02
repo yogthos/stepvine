@@ -7,8 +7,11 @@
 
  :data
  {:model
-  [[:title  {:id :title  :type :string :validation [:required]}]
-   [:detail {:id :detail :type :string}]]}
+  [[:title    {:id :title    :type :string :validation [:required]}]
+   [:detail   {:id :detail   :type :string}]
+   [:priority {:id :priority :type :string}]]
+  :reactions
+  [{:id :high-priority? :args [:priority] :fn (fn [p] (= p "high"))}]}
 
  :workflow
  {:initial :open
@@ -17,14 +20,17 @@
             :closed {:terminal? true :locked? true}}
   :actions {:submit  {:guard :valid?
                       :steps [{:do :notify :message "Submitted for review."}
-                              ;; notify the triage queue by email — subject/body are
-                              ;; templated from the document (a vector concatenates
-                              ;; literals with {:from path} / {:reaction id} values)
+                              ;; email the triage queue — the recipient is computed
+                              ;; from the document (:cond), and subject/body are
+                              ;; templated (a vector concatenates literals + values)
                               {:do :email
-                               :to      "triage@example.com"
+                               :to      {:cond [:high-priority? "urgent@example.com"
+                                                :else "triage@example.com"]}
                                :subject ["New ticket for review: " {:from [:title]}]
                                :body    ["A support ticket was submitted for review.\n\nTitle: "
-                                         {:from [:title]} "\nDetail: " {:from [:detail]}]}]}
+                                         {:from [:title]} "\nDetail: " {:from [:detail]}]}
+                              ;; a step that runs only when the ticket is high priority
+                              {:do :notify :message "Escalated to on-call." :when :high-priority?}]}
             :approve {:steps [{:do :pdf}            ; generate a PDF report on close (report 0)
                               {:do :notify :message "Approved and closed."}]}
             :reject  {:steps [{:do :notify :message "Sent back for changes."}]}}}
@@ -39,6 +45,8 @@
     [:p "Status: " [:strong {:data-text "$state"}]]
     [:c/input-field {:id :title :label "Title"}]
     [:c/input-field {:id :detail :label "Detail"}]
+    [:c/dropdown-select {:id :priority :label "Priority"
+                         :options [["Normal" "normal"] ["High" "high"]]}]
     [:c/h-box {:gap :sm :align :center}
      [:c/workflow {:action :submit  :label "Submit for review" :show-when :open}]
      [:c/workflow {:action :approve :label "Approve"           :show-when :review}]

@@ -676,6 +676,24 @@ try {
   await page.waitForFunction(() => !/Emails must match/.test(document.body.textContent), null, { timeout: 5000 })
     .then(() => ok('matching the email clears the error')).catch(() => bad('field-must-equal did not clear'));
 
+  // ---- 23. Conditional / templated workflow steps --------------------
+  step('23. Conditional workflow steps');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Support Ticket")'), '#title');
+  await page.fill('#title', 'Server down');
+  await page.selectOption('#priority', 'high');           // -> high-priority? reaction true
+  await page.waitForTimeout(500);
+  await page.click('.wf-btn:has-text("Submit for review")');
+  await page.waitForTimeout(700);
+  // the :when-gated escalation step ran (only on high priority)
+  await page.waitForFunction(() => /Escalated to on-call/.test(document.querySelector('.sv-notice')?.textContent || ''),
+                             null, { timeout: 4000 })
+    .then(() => ok('a :when-gated step ran for a high-priority ticket')).catch(() => bad('when-gated step did not run'));
+  // the :cond email recipient resolved to urgent@ (not the triage default)
+  await page.goto(BASE + '/admin/outbox');
+  (await page.locator('td:has-text("urgent@example.com")').count()) > 0
+    ? ok('the :cond email recipient resolved to urgent@ for high priority') : bad('conditional recipient wrong');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

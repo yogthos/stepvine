@@ -76,14 +76,34 @@
 
 ;; --- step dispatcher (pluggable, §15.11) -----------------------------------
 
+(declare resolve-truthy)
+
 (defn resolve-value
-  "Resolve a step value against the document context: `{:from [path]}` reads the
-   document, `{:reaction id}` reads a reaction, anything else is a literal."
+  "Resolve a step value against the document context:
+     `{:from [path]}`   reads the document
+     `{:reaction id}`   reads a reaction
+     `{:cond [test val … :else val]}`  picks the value of the first truthy test
+        (a `test` is a value-spec — `{:reaction id}` / `{:from path}` — or a bare
+        keyword treated as a reaction id)
+     anything else is a literal."
   [ctx v]
   (cond
     (and (map? v) (contains? v :from))     (get-in (:doc ctx) (:from v))
     (and (map? v) (contains? v :reaction)) (get-in ctx [:rxns (:reaction v)])
-    :else                                  v))
+    (and (map? v) (contains? v :cond))
+    (loop [[t val & more] (:cond v)]
+      (cond
+        (= t :else)            (resolve-value ctx val)
+        (nil? t)               nil
+        (resolve-truthy ctx t) (resolve-value ctx val)
+        :else                  (recur more)))
+    :else v))
+
+(defn resolve-truthy
+  "Resolve `v` to a boolean condition: a bare keyword is a reaction id, otherwise
+   resolved as a value-spec."
+  [ctx v]
+  (boolean (resolve-value ctx (if (keyword? v) {:reaction v} v))))
 
 (defn resolve-template
   "Resolve a templated step value: a vector concatenates its resolved parts into
@@ -115,12 +135,20 @@
 
 (defn action-steps [workflow action] (get-in workflow [:actions action :steps]))
 
+(defn- step-runs?
+  "A step runs unless it declares a `:when` that resolves falsy (a reaction id, or
+   a `{:reaction}`/`{:from}` value-spec) — conditional step execution."
+  [ctx step]
+  (or (not (contains? step :when)) (resolve-truthy ctx (:when step))))
+
 (defn action-directives
   "The directive list for running `action` from `state`: the implicit state
-   transition first, then each step's directive(s)."
+   transition first, then each runnable step's directive(s) (a step gated by a
+   falsy `:when` is skipped)."
   [workflow state action ctx]
   (into [[:set-state (target-state workflow state action)]]
-        (mapcat (fn [step]
-                  (let [d (run-step ctx step)]
-                    (if (and (sequential? d) (sequential? (first d))) d [d])))
-                (action-steps workflow action))))
+        (comp (filter #(step-runs? ctx %))
+              (mapcat (fn [step]
+                        (let [d (run-step ctx step)]
+                          (if (and (sequential? d) (sequential? (first d))) d [d])))))
+        (action-steps workflow action)))

@@ -65,3 +65,25 @@
       (is (= [:set-state :review] (first ds)))
       (is (some #(= % [:notify "Submitted for review"]) ds))
       (is (some #(= % [:snapshot]) ds)))))
+
+(deftest conditional-step-values
+  (let [ctx {:rxns {:urgent? true} :doc {:to "a@b.c"}}]
+    (testing ":cond picks the first truthy test's value (bare keyword = reaction)"
+      (is (= "urgent@x" (wf/resolve-value ctx {:cond [:urgent? "urgent@x" :else "ops@x"]})))
+      (is (= "ops@x"    (wf/resolve-value (assoc-in ctx [:rxns :urgent?] false)
+                                          {:cond [:urgent? "urgent@x" :else "ops@x"]})))
+      (is (nil?         (wf/resolve-value (assoc-in ctx [:rxns :urgent?] false)
+                                          {:cond [:urgent? "urgent@x"]}))))     ; no match, no :else
+    (testing "tests + values can themselves be value-specs"
+      (is (= "a@b.c" (wf/resolve-value ctx {:cond [{:reaction :urgent?} {:from [:to]} :else "x"]}))))))
+
+(deftest step-when-gates-execution
+  (let [wf '{:initial :open :states {:open {:on {:submit :done}} :done {}}
+             :actions {:submit {:steps [{:do :notify :message "always"}
+                                        {:do :notify :message "only-urgent" :when :urgent?}]}}}]
+    (testing "a step gated by a falsy :when is skipped"
+      (is (= [[:set-state :done] [:notify "always"]]
+             (wf/action-directives wf :open :submit {:rxns {:urgent? false}}))))
+    (testing "a step whose :when is truthy runs"
+      (is (= [[:set-state :done] [:notify "always"] [:notify "only-urgent"]]
+             (wf/action-directives wf :open :submit {:rxns {:urgent? true}}))))))
