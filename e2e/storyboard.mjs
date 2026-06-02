@@ -534,13 +534,27 @@ try {
     return o.includes('North General') && !o.includes('South Bay');
   }, null, { timeout: 5000 }).then(() => ok('selecting North narrowed the clinics to the North list'))
     .catch(() => bad('clinic options did not cascade for North'));
-  // switching region re-narrows the dependent options
+  // pick a clinic -> the third-level Department narrows to that clinic
+  await page.selectOption('#clinic', 'north-general');
+  await page.waitForFunction(() => {
+    const o = [...document.querySelectorAll('#department option')].map((e) => e.textContent);
+    return o.includes('Cardiology') && o.includes('Orthopedics');
+  }, null, { timeout: 5000 }).then(() => ok('picking a clinic narrowed the department (level 3)'))
+    .catch(() => bad('department did not cascade from clinic'));
+  await page.selectOption('#department', 'ng-cardio');
+  // NOW change the TOP of the chain — the whole chain must reset (clinic + department)
   await page.selectOption('#region', 'south');
   await page.waitForFunction(() => {
-    const o = [...document.querySelectorAll('#clinic option')].map((e) => e.textContent);
-    return o.includes('South Bay') && !o.includes('North General');
-  }, null, { timeout: 5000 }).then(() => ok('switching to South re-narrowed the clinics to the South list'))
-    .catch(() => bad('clinic options did not re-cascade for South'));
+    const c = [...document.querySelectorAll('#clinic option')].map((e) => e.textContent);
+    const d = [...document.querySelectorAll('#department option')].map((e) => e.textContent);
+    // clinic re-narrowed to South, department reset to just its placeholder (chain cleared)
+    return c.includes('South Bay') && !c.includes('North General') && d.length === 1;
+  }, null, { timeout: 5000 })
+    .then(() => ok('changing region cascaded to the FULL chain: clinic→South, department reset'))
+    .catch(() => bad('full-depth cascade failed (department not reset on region change)'));
+  // and the cleared selections are gone
+  ((await page.locator('#clinic').inputValue()) === '' && (await page.locator('#department').inputValue()) === '')
+    ? ok('stale clinic + department selections were cleared') : bad('stale selections not cleared');
 
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');

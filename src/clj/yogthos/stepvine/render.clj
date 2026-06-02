@@ -358,3 +358,18 @@
        n)
      markup)
     @found))
+
+(defn cascade-closure
+  "The dropdowns transitively dependent on `parent-id` over the `:depends-on`
+   graph — `[{:id :node} …]` in breadth-first order (direct children first, then
+   grandchildren, …). The basis for a full-depth cascade: a parent change ripples
+   to every descendant dropdown. Cycle-safe."
+  [markup aliases parent-id]
+  (loop [queue [parent-id], seen #{parent-id}, out []]
+    (if-let [fid (first queue)]
+      (let [deps  (dependent-dropdown-nodes markup aliases fid)
+            fresh (remove (comp seen keyword :id) deps)]
+        (recur (into (subvec (vec queue) 1) (map (comp keyword :id) fresh))
+               (into seen (map (comp keyword :id) fresh))
+               (into out fresh)))
+      out)))

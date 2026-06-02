@@ -49,18 +49,22 @@
        :raw-value (get signals (render/signal-name (keyword field-id)))})))
 
 (defn- rerender-dependents!
-  "Cascading dropdowns: when `changed-fid` changes, re-render every top-level
-   dropdown that `:depends-on` it — clearing a now-invalid child selection — and
-   patch each select (by its wrapper id) to all peers. One level deep."
+  "Cascading dropdowns: when `changed-fid` changes, ripple to EVERY dropdown that
+   transitively `:depends-on` it (region → clinic → department → …). The
+   editor's Domino ctx recomputes derived values from state each transact, so a
+   stale dependent selection (a transition effect, not a derived value) is cleared
+   here, at the apply layer: clear the whole descendant closure in one transaction,
+   then re-render each affected <select> (new option list + cleared selection) and
+   patch it to all peers."
   [{:keys [session-manager hub options-store]} doc-id changed-fid]
-  (let [sess (session/current session-manager doc-id)
-        deps (render/dependent-dropdown-nodes
-              (render/view-markup sess :default)
-              (get-in sess [:form :views :default :opts :widget-namespaces])
-              changed-fid)]
+  (let [sess    (session/current session-manager doc-id)
+        markup  (render/view-markup sess :default)
+        aliases (get-in sess [:form :views :default :opts :widget-namespaces])
+        deps    (render/cascade-closure markup aliases changed-fid)]
     (when (seq deps)
-      (doseq [{:keys [id]} deps :when id]                 ; clear stale child selections
-        (session/apply-change! session-manager doc-id [[(keyword id) ""]]))
+      ;; clear the whole descendant chain at once (full-depth cascade)
+      (session/apply-change! session-manager doc-id
+                             (mapv (fn [{:keys [id]}] [(keyword id) ""]) deps))
       (let [sess2 (session/current session-manager doc-id)
             ctx   (-> (render/session->context sess2 :default doc-id)
                       (assoc :options (options/resolve-field-options

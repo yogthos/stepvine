@@ -8,9 +8,10 @@
 
  :data
  {:model
-  [[:region {:id :region :type :string}]
-   [:clinic {:id :clinic :type :string}]
-   [:reason {:id :reason :type :string}]]}
+  [[:region     {:id :region     :type :string}]
+   [:clinic     {:id :clinic     :type :string}]
+   [:department {:id :department :type :string}]
+   [:reason     {:id :reason     :type :string}]]}
 
  :views
  {:default
@@ -22,12 +23,23 @@
     [:p "Pick a region — the clinics list narrows to that region."]
     [:c/dropdown-select {:id :region :label "Region"
                          :options [["North" "north"] ["South" "south"]]}]
-    ;; the dependent dropdown: options filtered by the chosen region
+    ;; dependent on region — options filtered by the chosen region
     [:c/dropdown-select {:id :clinic :label "Clinic" :depends-on :region
                          :placeholder "— choose a region first —"
                          :options [{:value "north-general" :label "North General"  :when "north"}
                                    {:value "north-harbor"  :label "North Harbor"   :when "north"}
                                    {:value "south-central" :label "South Central"  :when "south"}
                                    {:value "south-bay"     :label "South Bay"      :when "south"}]}]
+    ;; dependent on clinic — a third level: changing region clears BOTH the
+    ;; clinic and the department (the cascade follows the full chain)
+    [:c/dropdown-select {:id :department :label "Department" :depends-on :clinic
+                         :placeholder "— choose a clinic first —"
+                         :options [{:value "ng-cardio"  :label "Cardiology"  :when "north-general"}
+                                   {:value "ng-ortho"   :label "Orthopedics" :when "north-general"}
+                                   {:value "nh-ent"     :label "ENT"         :when "north-harbor"}
+                                   {:value "sc-derm"    :label "Dermatology" :when "south-central"}
+                                   {:value "sb-peds"    :label "Pediatrics"  :when "south-bay"}
+                                   {:value "sb-neuro"   :label "Neurology"   :when "south-bay"}]}]
     [:c/input-field {:id :reason :label "Reason for visit"}]
-    [:p "Booking: " [:c/value {:id :region}] " / " [:c/value {:id :clinic}]]]}}}
+    [:p "Booking: " [:c/value {:id :region}] " / " [:c/value {:id :clinic}]
+     " / " [:c/value {:id :department}]]]}}}

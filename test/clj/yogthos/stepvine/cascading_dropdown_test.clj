@@ -48,3 +48,25 @@
   (testing "a dependent dropdown carries a field-<id> wrapper id for morphing"
     (is (str/includes? (render/render-view (ctx {:region "north"}) clinic-node)
                        "id=\"field-clinic\""))))
+
+;; --- the cascade follows the dependency graph to FULL depth ---------------
+
+(def ^:private chain-markup
+  ;; region -> clinic -> department  (a three-level :depends-on chain)
+  [:c/form {}
+   [:c/dropdown-select {:id :region :options [["North" "north"]]}]
+   [:c/dropdown-select {:id :clinic :depends-on :region
+                        :options [{:value "ng" :when "north"}]}]
+   [:c/dropdown-select {:id :department :depends-on :clinic
+                        :options [{:value "cardio" :when "ng"}]}]])
+
+(deftest cascade-closure-reaches-every-descendant
+  (testing "a region change ripples to clinic AND department (transitively)"
+    (let [ids (map :id (render/cascade-closure chain-markup aliases :region))]
+      (is (= [:clinic :department] ids))))            ; breadth-first, full depth
+  (testing "a mid-chain change ripples only to what's below it"
+    (is (= [:department] (map :id (render/cascade-closure chain-markup aliases :clinic)))))
+  (testing "a leaf change ripples to nothing"
+    (is (empty? (render/cascade-closure chain-markup aliases :department))))
+  (testing "an unrelated field has no dependents"
+    (is (empty? (render/cascade-closure chain-markup aliases :reason)))))
