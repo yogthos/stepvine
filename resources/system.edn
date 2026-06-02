@@ -64,18 +64,21 @@
                                                             :email "demo@example.com" :name "Demo User"}}}}
                    :prod {:providers {}}}}
 
- ;; --- Form-document engine -------------------------------------------------
- ;; Form definitions live on disk as one EDN file per form; the store scans this
- ;; directory at startup (v1 'database' for forms).
+ ;; --- Form/app engine ------------------------------------------------------
  ;; Reusable definition partials, spliced into forms at serve time (§15.9)
  :store/partials
  {:dir #or [#env PARTIALS_DIR "partials"]}
 
+ ;; The app store (EDN + CSS). Dev/prod run on the embedded SQLite backend
+ ;; (`forms` working table + `form_versions` archive), seeded once from the disk
+ ;; `forms/` directory; thereafter apps live in the DB and are editable live. Tests
+ ;; use the in-memory map backend (duratom version archive). Set :backend :atom +
+ ;; :versions-file to run dev on disk EDN + a duratom archive instead.
  :store/forms
  {:partials      #ig/ref :store/partials
-  :dir           #or [#env FORMS_DIR "forms"]
-  ;; immutable version archive (§15.1); duratom in dev/prod so pins survive
-  ;; restarts, in-memory for tests
+  :dir           #or [#env FORMS_DIR "forms"]            ; seed source
+  :backend       #profile {:dev :sql :test :atom :prod :sql}
+  :db-file       #or [#env APPS_DB "data/apps.db"]
   :versions-file #profile {:dev  "data/form-versions.edn"
                            :test nil
                            :prod #or [#env FORM_VERSIONS_FILE "data/form-versions.edn"]}}

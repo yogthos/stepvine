@@ -9,6 +9,7 @@
    [yogthos.stepvine.audit :as audit]
    [yogthos.stepvine.docs :as docs]
    [yogthos.stepvine.documents :as documents]
+   [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.session :as session]
    [yogthos.stepvine.versions :as versions]
    [yogthos.stepvine.workflows.workflow :as wf-fsm]))
@@ -27,7 +28,7 @@
 (defn- setup []
   (let [archive (versions/archive)
         _       (versions/publish! archive ticket-form)
-        forms   {:dir nil :forms (atom {:ticket ticket-form}) :versions archive :partials nil}
+        forms   (forms/atom-store {:dir nil :forms {:ticket ticket-form} :versions archive})
         docs    (atom {})
         h       (atom {})
         mgr     (ig/init-key :session/manager {:documents docs :hub h})

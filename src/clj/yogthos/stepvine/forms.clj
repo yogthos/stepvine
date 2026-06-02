@@ -1,24 +1,49 @@
 (ns yogthos.stepvine.forms
-  "Form-definition store (`:store/forms`).
+  "Form/app store (`:store/forms`), pluggable behind the `FormStore` protocol.
 
-   Form definitions are the *templates* — raw EDN, one file per form, stored on
-   disk in a forms directory (the v1 'database' for form definitions). The store
-   scans that directory at startup and keys each form by its `:id`; saving a form
-   writes it back to disk. A real database can replace this behind the same
-   get-form / save-form! / list-forms API.
+   An *app* is its EDN (model/views/workflow/sources/validation) **plus its own
+   CSS**. The store keeps the current *working* form per id (with CSS), and an
+   **immutable version archive** keyed by `[id version]` with a content digest.
 
-   A form's `:data` section is a Domino schema; `:views` describe presentation.
-   Event/reaction fns are left as quoted lists and evaluated safely via sci when
-   a session is created (yogthos.stepvine.editor.impl)."
+   Two backends:
+   - **map/disk** (default) — EDN files in a directory + a duratom/atom archive;
+   - **SQLite** (`:backend :sql`) — `forms` (working: id, edn, css) + `form_versions`
+     (archive: form_id, version, digest, draft, edn). Schema is plain SQL over
+     next.jdbc, so a Postgres backend slots in the same way later.
+
+   Design notes drawn from (not copied from) a reference Postgres system:
+   - the body is **EDN text**, not JSON — forms carry code (quoted fns) that JSON
+     can't represent;
+   - versioning uses an **explicit `:version` + content digest** (deterministic,
+     identity-bearing) rather than a `created_at` ordering (which is ambiguous
+     under clock skew);
+   - the **working form is separate from the immutable archive**, and superseded
+     versions are **sealed** (re-publishing throws) — the reference conflated the
+     two and could silently mutate a published version;
+   - CSS is a live column on the working form, **never** in the versioned archive."
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
+   [next.jdbc :as jdbc]
    [yogthos.stepvine.partials :as partials]
    [yogthos.stepvine.validation :as validation]
    [yogthos.stepvine.versions :as versions]))
+
+;; --- Protocol -------------------------------------------------------------
+
+(defprotocol FormStore
+  (-form            [s id]   "The working form (raw EDN + :css) for id, or nil.")
+  (-form-ids        [s]      "All form ids (keywords).")
+  (-store-form!     [s form] "Upsert the working form (EDN + CSS).")
+  (-archived        [s id v] "The archived form for [id v] (no CSS), or nil.")
+  (-latest-published [s id]  "Highest published (non-draft) version number, or nil.")
+  (-archived-digest [s id v] "Content digest of [id v], or nil.")
+  (-publish!        [s form] "Archive form at its :version (sealing-checked). Returns {:id :version :digest}."))
+
+;; --- Authoring (pure-ish helpers) -----------------------------------------
 
 (defn- prepare
   "Resolve a served form: splice partials (§15.9) then compile its declarative
@@ -32,16 +57,15 @@
   (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
 
 (defn- read-form
-  "Read a form's EDN, plus its sibling `<id>.css` (the app's own styling, §app-css)
-   loaded into `:css` when present — so an app is its EDN + its CSS."
+  "Read a form's EDN, plus its sibling `<id>.css` (the app's own styling) loaded
+   into `:css` when present — so an app is its EDN + its CSS."
   [^java.io.File f]
   (let [form (edn/read-string (slurp f))
         css  (io/file (.getParentFile f) (str (name (:id form)) ".css"))]
     (cond-> form (.isFile css) (assoc :css (slurp css)))))
 
 (defn load-dir
-  "Load every *.edn form file in `dir` into a {form-id -> form} map, keyed by the
-   form's own :id."
+  "Load every *.edn form file in `dir` into a {form-id -> form} map."
   [dir]
   (let [d (io/file dir)]
     (when-not (.isDirectory d)
@@ -55,79 +79,158 @@
   ([id] (load-form "forms" id))
   ([dir id] (read-form (io/file dir (str (name id) ".edn")))))
 
-;; --- Store API ------------------------------------------------------------
+;; --- map/disk backend -----------------------------------------------------
+
+(defrecord MapFormStore [dir forms versions partials]
+  FormStore
+  (-form [_ id] (get @forms (keyword id)))
+  (-form-ids [_] (keys @forms))
+  (-store-form! [_ form]
+    (let [id (:id form)]
+      (when dir
+        (io/make-parents (io/file dir "_"))
+        (spit (io/file dir (str (name id) ".edn")) (pr-str (dissoc form :css)))
+        (when (:css form) (spit (io/file dir (str (name id) ".css")) (:css form))))
+      (swap! forms assoc id form)
+      id))
+  (-archived [_ id v] (when versions (versions/get-version versions (keyword id) v)))
+  (-latest-published [_ id] (when versions (versions/latest-version versions (keyword id))))
+  (-archived-digest [_ id v] (when versions (:digest (get @versions [(keyword id) v]))))
+  (-publish! [_ form] (when versions (versions/publish! versions (dissoc form :css)))))
+
+(defn atom-store
+  "An in-memory/disk form store (the default backend). `forms` may be a map or an
+   atom; `versions` an archive atom (or nil); `partials` a partials map (or nil)."
+  [{:keys [dir forms versions partials]}]
+  (->MapFormStore dir
+                  (if (instance? clojure.lang.IAtom forms) forms (atom (or forms {})))
+                  versions
+                  partials))
+
+;; --- SQLite backend -------------------------------------------------------
+
+(def ^:private sql-schema
+  ["create table if not exists forms
+      (id text primary key, edn text not null, css text, updated_at integer)"
+   "create table if not exists form_versions
+      (form_id text not null, version integer not null, digest text not null,
+       draft integer not null default 0, edn text not null, published_at integer,
+       primary key (form_id, version))"
+   "create index if not exists idx_form_versions_form on form_versions(form_id)"])
+
+(defrecord SqlFormStore [ds partials]
+  FormStore
+  (-form [_ id]
+    (when-let [row (jdbc/execute-one! ds ["select edn, css from forms where id=?" (name id)])]
+      (cond-> (edn/read-string (:forms/edn row))
+        (:forms/css row) (assoc :css (:forms/css row)))))
+  (-form-ids [_]
+    (mapv (comp keyword :forms/id) (jdbc/execute! ds ["select id from forms"])))
+  (-store-form! [_ form]
+    (jdbc/execute! ds ["insert into forms(id,edn,css,updated_at) values(?,?,?,?)
+                        on conflict(id) do update set edn=excluded.edn, css=excluded.css,
+                        updated_at=excluded.updated_at"
+                       (name (:id form)) (pr-str (dissoc form :css)) (:css form)
+                       (System/currentTimeMillis)])
+    (:id form))
+  (-archived [_ id v]
+    (some-> (jdbc/execute-one! ds ["select edn from form_versions where form_id=? and version=?" (name id) v])
+            :form_versions/edn edn/read-string))
+  (-latest-published [_ id]
+    (:m (jdbc/execute-one! ds ["select max(version) m from form_versions where form_id=? and draft=0" (name id)])))
+  (-archived-digest [_ id v]
+    (:form_versions/digest
+     (jdbc/execute-one! ds ["select digest from form_versions where form_id=? and version=?" (name id) v])))
+  (-publish! [_ form]
+    (let [id (name (:id form)) v (:version form 1) d (versions/digest (dissoc form :css))
+          ex (jdbc/execute-one! ds ["select digest from form_versions where form_id=? and version=?" id v])
+          higher (:c (jdbc/execute-one! ds ["select count(*) c from form_versions where form_id=? and version>?" id v]))]
+      (cond
+        (and ex (= d (:form_versions/digest ex))) nil          ; identical — no-op
+        (and ex (pos? higher))                                  ; sealed (superseded)
+        (throw (ex-info "Refusing to mutate a sealed form version; bump :version"
+                        {:id id :version v}))
+        :else
+        (jdbc/execute! ds ["insert into form_versions(form_id,version,digest,draft,edn,published_at)
+                            values(?,?,?,?,?,?)
+                            on conflict(form_id,version) do update set digest=excluded.digest,
+                            draft=excluded.draft, edn=excluded.edn, published_at=excluded.published_at"
+                           id v d (if (:draft? form) 1 0) (pr-str (dissoc form :css))
+                           (System/currentTimeMillis)]))
+      {:id (:id form) :version v :digest d})))
+
+;; --- Public API (backend-agnostic) ----------------------------------------
 
 (defn get-form
-  "Look up the current *authoring* (working) form by id (keyword or string), with
-   any `{:include ..}` partials spliced (§15.9). Used for previews/builder +
-   new-document listing; loaded documents resolve their pinned version via
-   `get-form-version`."
+  "The current working form by id, with partials spliced + validation compiled.
+   Used for previews/builder + new-document listing; loaded documents resolve
+   their pinned version via `get-form-version`."
   [store id]
-  (prepare store (get @(:forms store) (keyword id))))
+  (prepare store (-form store (keyword id))))
 
-(defn list-forms
-  "Ids of all loaded forms."
-  [store]
-  (keys @(:forms store)))
-
-;; --- Versioning (§15.1) ---------------------------------------------------
+(defn list-forms [store] (-form-ids store))
 
 (defn latest-published
-  "The highest published (non-draft) version number for a form, from the archive,
-   falling back to the authoring form's declared `:version` when no archive entry
-   exists (e.g. legacy/test stores)."
+  "The highest published version number for a form, falling back to the working
+   form's declared `:version`."
   [store id]
-  (or (when-let [a (:versions store)] (versions/latest-version a (keyword id)))
-      (:version (get-form store id) 1)))
+  (or (-latest-published store (keyword id))
+      (:version (-form store (keyword id)) 1)))
 
-(defn version-digest
-  "The content digest of a published `[id version]`, or nil."
+(defn version-digest [store id v] (-archived-digest store (keyword id) v))
+
+(defn get-form-version
+  "The exact archived form for a pinned `[id version]` (partials spliced), falling
+   back to the working form when the archive has no such entry."
   [store id v]
-  (when-let [a (:versions store)]
-    (:digest (get @a [(keyword id) v]))))
+  (prepare store (or (-archived store (keyword id) v) (-form store (keyword id)))))
+
+(defn save-form!
+  "Persist the working form (EDN + CSS) and publish its version. CSS is live
+   presentation — excluded from the archive — so a re-skin never spawns a version."
+  [store form]
+  (-store-form! store form)
+  (-publish! store form)
+  (:id form))
 
 ;; --- App CSS (app-owned styling, served live) -----------------------------
 
 (defn css
-  "The app's own CSS string (loaded from its sibling `<id>.css`), or nil."
+  "The app's own CSS string, or nil."
   [store id]
-  (:css (get @(:forms store) (keyword id))))
+  (:css (-form store (keyword id))))
 
 (defn app-css-href
   "A cache-busting href for an app's *live* CSS (re-skins without redeploy), or
-   nil when the app declares none. CSS is presentation — served from the current
-   working form, not version-pinned with the document."
+   nil when the app declares none."
   [store id]
   (when-let [c (css store id)]
     (str "/app/" (name id) "/style.css?v=" (subs (versions/digest {:css c}) 0 12))))
 
-(defn get-form-version
-  "Resolve the exact archived form for a pinned `[id version]`, with partials
-   spliced (§15.9). Falls back to the current authoring form when the archive has
-   no such entry (legacy documents or archive-less test stores)."
-  [store id v]
-  (if-let [archived (when-let [a (:versions store)] (versions/get-version a (keyword id) v))]
-    (prepare store archived)
-    (get-form store id)))
+;; --- Component ------------------------------------------------------------
 
-(defn save-form!
-  "Persist a form: its EDN (data/workflow/views) to `<id>.edn`, its app CSS to the
-   sibling `<id>.css`, update the in-memory working copy, and publish the version.
-   CSS is excluded from the versioned archive — it is live presentation, not pinned
-   document content — so a re-skin never spawns a spurious form version."
-  [store form]
-  (let [id (:id form)]
-    (spit (io/file (:dir store) (str (name id) ".edn")) (pr-str (dissoc form :css)))
-    (when (:css form) (spit (io/file (:dir store) (str (name id) ".css")) (:css form)))
-    (swap! (:forms store) assoc id form)
-    (when-let [a (:versions store)] (versions/publish! a (dissoc form :css)))
-    id))
+(defn- seed-from-dir!
+  "Load every app from the on-disk forms directory into `store` (working + version)
+   — the disk files seed a fresh DB-backed store; thereafter it is live in the DB."
+  [store dir]
+  (doseq [form (vals (load-dir dir))]
+    (-store-form! store form)
+    (-publish! store form)))
 
 (defmethod ig/init-key :store/forms
-  [_ {:keys [dir versions-file partials]}]
-  (let [loaded  (load-dir dir)
-        archive (versions/init-archive versions-file)]
-    (versions/publish-all! archive (map #(dissoc % :css) (vals loaded)))
-    (log/info "loaded forms from" dir ":" (vec (keys loaded))
-              "— archived versions for" (count loaded) "forms")
-    {:dir dir :forms (atom loaded) :versions archive :partials partials}))
+  [_ {:keys [dir versions-file partials backend db-file]}]
+  (case (or backend :atom)
+    :sql (let [_  (io/make-parents (or db-file "data/apps.db"))
+               ds (jdbc/get-datasource (str "jdbc:sqlite:" (or db-file "data/apps.db")))
+               store (->SqlFormStore ds partials)]
+           (doseq [stmt sql-schema] (jdbc/execute! ds [stmt]))
+           (when (and dir (empty? (-form-ids store)))
+             (seed-from-dir! store dir)
+             (log/info "seeded SQLite app store from" dir))
+           (log/info "apps backed by SQLite at" (or db-file "data/apps.db"))
+           store)
+    (let [store (->MapFormStore dir (atom (load-dir dir))
+                                (versions/init-archive versions-file) partials)]
+      (doseq [form (vals @(:forms store))] (-publish! store form))
+      (log/info "loaded forms from" dir ":" (vec (-form-ids store)))
+      store)))

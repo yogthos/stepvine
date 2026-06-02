@@ -44,7 +44,7 @@
 (deftest save-form-persists-and-reloads
   (let [dir   (str (System/getProperty "java.io.tmpdir") "/sv-forms-" (System/nanoTime))
         _     (.mkdirs (io/file dir))
-        store {:dir dir :forms (atom {})}
+        store (forms/atom-store {:dir dir})
         form  {:id :gen :title "Gen" :version 1
                :data {:model [[:x {:id :x :type :string}]]} :views {}}]
     (forms/save-form! store form)

@@ -7,6 +7,7 @@
    [integrant.core :as ig]
    [yogthos.stepvine.docs :as docs]
    [yogthos.stepvine.documents :as documents]
+   [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.migrations :as migrations]
    [yogthos.stepvine.session :as session]
    [yogthos.stepvine.versions :as versions]))
@@ -36,7 +37,7 @@
   [& fs]
   (let [a (versions/archive)]
     (versions/publish-all! a fs)
-    {:dir nil :forms (atom (into {} (map (juxt :id identity) fs))) :versions a}))
+    (forms/atom-store {:dir nil :forms (into {} (map (juxt :id identity) fs)) :versions a})))
 
 (deftest migrate-applies-transforms-in-order
   (testing "a v1 db is brought up to the form's current version"

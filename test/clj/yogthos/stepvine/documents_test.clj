@@ -14,7 +14,7 @@
 (defn- setup []
   (let [docs-store (atom {})
         mgr        (ig/init-key :session/manager {:documents docs-store :hub nil})
-        forms-store {:dir "forms" :forms (atom {:bmi (forms/load-form "bmi")})}]
+        forms-store (forms/atom-store {:dir "forms" :forms {:bmi (forms/load-form "bmi")}})]
     {:documents docs-store :session-manager mgr :forms forms-store}))
 
 (deftest create-edit-persist-reload

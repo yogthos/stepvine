@@ -24,9 +24,15 @@ current system and the remaining roadmap.
 4. **One mechanism per concern.** Domino = per-document reactive state. Mycelium =
    per-request orchestration. Datastar = transport + DOM binding. They don't
    overlap.
-5. **Backend-swappable stores.** Every store (`:store/forms`, `:store/documents`,
-   …) exposes a small API. Disk-backed atoms/duratom today; a query DB
-   (XTDB/Datalevin) tomorrow behind the same API.
+5. **Backend-swappable stores.** Every store exposes a protocol. `:store/documents`
+   and `:store/forms` both run on an **embedded SQLite** backend behind a protocol
+   (`DocStore` / `FormStore`) — the app/form store keeps a `forms` working table
+   (EDN + live CSS) and a sealed `form_versions` archive (version + content digest);
+   the map/atom backend remains for tests. Written as plain SQL over next.jdbc so a
+   **Postgres** backend slots in the same way. Schema notes adapted (not copied)
+   from a reference Postgres system: EDN-text body (forms carry code), explicit
+   version + digest (not `created_at` ordering), working form separate from a
+   sealed archive, CSS never pinned.
 6. **LLM friendly** The system must provide APIs for the LLM (or any external client)
    to hook into and edit the document the same way the user would through the UI.
 7. **Apps are content, not code.** Each *app* is a self-contained unit — its EDN
