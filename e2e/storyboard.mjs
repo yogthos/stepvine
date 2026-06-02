@@ -477,8 +477,12 @@ try {
   // the chain settles: subtotal 60 → discount 6 → tax 4.32 → total 58.32
   await waitLv('total', '$58.32');
   ok('the full chain computed: total = $58.32 (:fmt currency formatting)');
-  ((await lv('subtotal')) === '$60.00' && (await lv('tax')) === '$4.32')
-    ? ok('intermediate calc fields formatted: subtotal=$60.00, tax=$4.32') : bad('intermediate cascade/format values wrong');
+  try {
+    await Promise.all([waitLv('subtotal', '$60.00'), waitLv('tax', '$4.32')]);
+    ok('intermediate calc fields formatted: subtotal=$60.00, tax=$4.32');
+  } catch (e) {
+    bad(`intermediate cascade/format values wrong: subtotal=${await lv('subtotal')} tax=${await lv('tax')}`);
+  }
   // change ONE upstream input → the whole chain recomputes (and reformats) live
   await page.fill('#qty', '6');
   await waitLv('total', '$116.64');

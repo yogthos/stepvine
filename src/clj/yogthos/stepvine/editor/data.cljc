@@ -201,8 +201,9 @@
     :else        (or (get-in (model-of ctx) [:id->path id]) [id])))
 
 (defn- apply-ops
-  "Apply `[[id value] …]` as plain data ops to the db (events are re-fired by the
-   subsequent re-init): nil clears/removes a path, anything else sets it."
+  "Apply `[[id value] …]` as plain data ops to the db: nil clears/removes a path,
+   anything else sets it. Used to compute the post-change db for the structural
+   check and to seed a rebuild."
   [db path-fn changes]
   (reduce (fn [db [id value]]
             (let [path (path-fn id)]
@@ -211,12 +212,37 @@
                 (assoc-in db path value))))
           db changes))
 
+(defn- coll-signature
+  "The nested item-index structure of `db` for `model`. Changes exactly when a
+   collection item is added or removed at any level — i.e. when the live (per-item)
+   schema would differ — so it tells `transact-ctx` whether it must rebuild or can
+   transact incrementally."
+  [model db]
+  (into {}
+        (for [{:keys [seg schema] :as c} (collection-fields model)]
+          [seg (into {} (for [idx (item-indices db c)]
+                          [idx (coll-signature (:model schema) (get-in db [seg idx]))]))])))
+
 (defn transact-ctx
-  "Apply `[[id value] …]` changes and rebuild the live ctx from the resulting db."
+  "Apply `[[id value] …]` changes to the live ctx.
+
+   Value edits go through domino's incremental `transact` — events fire on the
+   paths that actually CHANGED (not every present input), effects run, and the
+   engine returns a change report. Only a STRUCTURAL change (a collection item
+   added/removed, which alters the per-item schema) falls back to a full rebuild,
+   since domino has no subcontexts. Eager reactions are recomputed either way."
   [session changes]
-  (let [ctx (::ctx session)
-        db  (apply-ops (::d/db ctx) (partial id->path ctx) changes)]
-    (assoc session ::ctx (build-ctx (:form session) db))))
+  (let [ctx     (::ctx session)
+        path-fn (partial id->path ctx)
+        model   (get-in session [:form :data :model])
+        new-db  (apply-ops (::d/db ctx) path-fn changes)]
+    (assoc session ::ctx
+           (if (and (seq (collection-fields model))
+                    (not= (coll-signature model (::d/db ctx))
+                          (coll-signature model new-db)))
+             (build-ctx (:form session) new-db)                          ; item set changed
+             (-> (d/transact ctx (mapv (fn [[id v]] [(path-fn id) v]) changes))
+                 with-reactions)))))
 
 ;; ---- values ------------------------------------------------------------------
 
