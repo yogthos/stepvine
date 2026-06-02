@@ -68,7 +68,10 @@ body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #
                 border: 1px solid #d1d5db; border-radius: .375rem; background: #fff; }
 .sv-pagenav-next { background: #2563eb !important; color: #fff !important; border-color: #2563eb !important; }
 .sv-pagenav a:hover { filter: brightness(.97); }
+.sv-pagenav-next[aria-disabled="true"] { background: #cbd5e1 !important; border-color: #cbd5e1 !important;
+  color: #f8fafc !important; cursor: not-allowed; filter: none; }
 .sv-pagenav-pos { color: #9ca3af; font-size: .85rem; }
+.sv-page-hint { color: #b45309; font-size: .82rem; }
 .sv-pagenav-spacer { flex: 0 0 auto; }
 
 /* ── Fields ───────────────────────────────────────────────────────────── */

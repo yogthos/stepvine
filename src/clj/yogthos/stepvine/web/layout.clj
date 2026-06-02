@@ -6,6 +6,7 @@
   (:require
    [clojure.string :as str]
    [hiccup2.core :as h]
+   [yogthos.stepvine.render :as render]
    [yogthos.stepvine.users :as users]
    [yogthos.stepvine.web.security :as security]))
 
@@ -84,17 +85,35 @@
               pages))
       0))
 
+(defn- page-href [doc-id view] (str "/doc/" doc-id "?view=" (name view)))
+
+;; Datastar click expression: switch pages in place. `__prevent` stops the link's
+;; default navigation; we push the page's own URL (so the address bar updates and
+;; the page stays linkable / back-and-forward works) then @post the switch
+;; endpoint, whose SSE response morphs the view region in — no full reload.
+;; `guard-sig`, when given, is a signal (e.g. "$ready") that must be truthy to
+;; advance: forward progress is gated on the current page being valid.
+(defn- page-switch-js
+  ([doc-id view] (page-switch-js doc-id view nil))
+  ([doc-id view guard-sig]
+   (let [go (str "window.history.pushState(null,''," (pr-str (page-href doc-id view)) "),"
+                 "@post(" (pr-str (str "/doc/" doc-id "/page/" (name view))) ")")]
+     (if guard-sig (str guard-sig " && (" go ")") go))))
+
 (defn page-tabs
   "Breadcrumb-style page navigation for a multi-page form — one clickable tab per
    page (a form view), the current one highlighted. Each page is a different view
-   over the same shared document data. Returns nil for single-page forms."
+   over the same shared document data. Tabs switch in place (datastar morph) yet
+   keep a real per-page href so each page is linkable. Returns nil for single-page
+   forms."
   [pages current-vid doc-id]
   (when (> (count pages) 1)
     (let [idx (current-page-index pages current-vid)]
-      (into [:nav.sv-pages {:aria-label "Pages"}]
+      (into [:nav#sv-pages.sv-pages {:aria-label "Pages"}]
             (map-indexed
              (fn [i {:keys [view label]}]
-               [:a.sv-page {:href  (str "/doc/" doc-id "?view=" (name view))
+               [:a.sv-page {:href  (page-href doc-id view)
+                            "data-on:click__prevent" (page-switch-js doc-id view)
                             :class (when (= i idx) "active")
                             :aria-current (when (= i idx) "page")}
                 [:span.sv-page-num (str (inc i))]
@@ -102,21 +121,34 @@
              pages)))))
 
 (defn page-prevnext
-  "Prev / position / next controls for the bottom of a multi-page form. Returns
-   nil for single-page forms."
+  "Prev / position / next controls for the bottom of a multi-page form. Next is
+   gated on the current page's `:valid` reaction (when declared): the button is
+   aria-disabled and inert until that signal is truthy, with a hint shown
+   meanwhile. Returns nil for single-page forms."
   [pages current-vid doc-id]
   (when (> (count pages) 1)
-    (let [idx  (current-page-index pages current-vid)
-          href (fn [{:keys [view]}] (str "/doc/" doc-id "?view=" (name view)))
-          prev (get pages (dec idx))
-          nxt  (get pages (inc idx))]
-      [:div.sv-pagenav
+    (let [idx       (current-page-index pages current-vid)
+          cur       (nth pages idx)
+          prev      (get pages (dec idx))
+          nxt       (get pages (inc idx))
+          valid-sig (when-let [v (:valid cur)] (render/$ v))]
+      [:div#sv-pagenav.sv-pagenav
        (if prev
-         [:a.sv-pagenav-prev {:href (href prev)} "← " (:label prev)]
+         [:a.sv-pagenav-prev {:href (page-href doc-id (:view prev))
+                              "data-on:click__prevent" (page-switch-js doc-id (:view prev))}
+          "← " (:label prev)]
          [:span.sv-pagenav-spacer])
        [:span.sv-pagenav-pos (str "Page " (inc idx) " of " (count pages))]
+       (when (and nxt valid-sig)
+         [:span.sv-page-hint {"data-show" (str "!" valid-sig)} "Complete this page to continue"])
        (if nxt
-         [:a.sv-pagenav-next {:href (href nxt)} (:label nxt) " →"]
+         [:a.sv-pagenav-next
+          (cond-> {:href (page-href doc-id (:view nxt))
+                   "data-on:click__prevent" (page-switch-js doc-id (:view nxt) valid-sig)}
+            ;; a string expr (not a bare boolean) so datastar sets a stable
+            ;; "true"/"false" rather than toggling a boolean attribute on/off
+            valid-sig (assoc "data-attr:aria-disabled" (str "(!" valid-sig ").toString()")))
+          (:label nxt) " →"]
          [:span.sv-pagenav-spacer])])))
 
 (defn page-tabs-html [pages current-vid doc-id]

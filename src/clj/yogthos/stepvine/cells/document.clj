@@ -214,45 +214,61 @@
      :view-id (or (get-in req [:query-params "view"]) "default")
      :user-id (get-in req [:session :user-id])}))
 
+(defn render-doc-view
+  "Ensure a document's session and render ONE of its views to an HTML string,
+   with the full context (lock owner, read-only when finalized, workflow state,
+   resolved option sources). Resolves the requested view, falling back to the
+   first page of a multi-page form (or :default). Returns
+   `{:vid :html :form-raw :pages :doc}` or nil when the document doesn't exist.
+   Shared by the full-page render and the in-place page switch."
+  [{:keys [session-manager options-store documents] :as resources} doc-id view-id user-id]
+  (when-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
+    (let [sess (session/current session-manager doc-id)
+          vid  (let [v     (keyword view-id)
+                     views (get-in sess [:form :views])]
+                 (cond
+                   (get views v)           v
+                   ;; multi-page form: land on the first page when none requested
+                   (seq (:pages form-raw)) (keyword (:view (first (:pages form-raw))))
+                   :else                   :default))
+          doc  (documents/get-document documents doc-id)
+          ctx  (-> (render/session->context sess vid doc-id)
+                   (assoc :uid user-id)   ; the authenticated user drives lock comparison
+                   ;; finalized documents render read-only (§15.5)
+                   (assoc :locked? (documents/locked? doc))
+                   ;; current workflow state, for $state-driven action buttons (§15.10)
+                   (assoc :workflow-state
+                          (when-let [wf (:workflow form-raw)]
+                            (documents/workflow-state doc (:initial wf))))
+                   ;; resolve option sources for top-level AND collection-item fields
+                   (assoc :options (options/resolve-field-options options-store (render/all-field-opts sess))))]
+      {:vid      vid
+       :html     (render/render-view ctx (render/view-markup sess vid))
+       :form-raw form-raw
+       :pages    (:pages form-raw)               ; ordered [{:view :label} …] → page nav
+       :doc      doc
+       :theme    (render/theme-href sess vid)})))
+
 (myc/defcell :doc/render
   {:requires [:forms :documents :session-manager :options-store :users]
    :input    {:doc-id :any :view-id :any :user-id :any}
    :output   {:html :string}
    :doc      "Ensure the document's session and render the requested view, inside
               the shared navbar/footer chrome with breadcrumbs."}
-  (fn [{:keys [session-manager options-store documents users] :as resources} {:keys [doc-id view-id user-id]}]
-    (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
-      (let [sess (session/current session-manager doc-id)
-            vid  (let [v     (keyword view-id)
-                       views (get-in sess [:form :views])]
-                   (cond
-                     (get views v)          v
-                     ;; multi-page form: land on the first page when none requested
-                     (seq (:pages form-raw)) (keyword (:view (first (:pages form-raw))))
-                     :else                   :default))
-            doc  (documents/get-document documents doc-id)
-            ctx  (-> (render/session->context sess vid doc-id)
-                     (assoc :uid user-id)   ; the authenticated user drives lock comparison
-                     ;; finalized documents render read-only (§15.5)
-                     (assoc :locked? (documents/locked? doc))
-                     ;; current workflow state, for $state-driven action buttons (§15.10)
-                     (assoc :workflow-state
-                            (when-let [wf (:workflow form-raw)]
-                              (documents/workflow-state doc (:initial wf))))
-                     ;; resolve option sources for top-level AND collection-item fields
-                     (assoc :options (options/resolve-field-options options-store (render/all-field-opts sess))))
-            view  (render/render-view ctx (render/view-markup sess vid))
-            user  (users/get-user users user-id)
-            pages (:pages form-raw)                 ; ordered [{:view :label} …] → multi-page nav
+  (fn [{:keys [users] :as resources} {:keys [doc-id view-id user-id]}]
+    (if-let [{:keys [vid html form-raw pages doc theme]}
+             (render-doc-view resources doc-id view-id user-id)]
+      (let [user   (users/get-user users user-id)
             crumbs [{:label "Documents" :href "/"} {:label (or (:title form-raw) (name (:form-id doc)))}]]
         {:html (selmer/render-file "html/form.html"
                                    {:title     (:title form-raw)
-                                    :view      view
-                                    :theme     (render/theme-href sess vid)
+                                    :view      html
+                                    :theme     theme
                                     :app_css   (forms/app-css-href (:forms resources) (:form-id doc))  ; live app styling
                                     :navbar    (layout/navbar-html user crumbs)
                                     :page_tabs (layout/page-tabs-html pages vid doc-id)
                                     :page_nav  (layout/page-prevnext-html pages vid doc-id)
+                                    :multipage (boolean (seq pages))
                                     :footer    (layout/footer-html)})})
       {:html (selmer/render-file "html/form.html"
                                  {:title "Not found" :view "<p>No such document.</p>"})})))

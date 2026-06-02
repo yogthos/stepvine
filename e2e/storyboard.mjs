@@ -361,8 +361,8 @@ try {
   (await page.locator('h2:has-text("Demo App")').count()) > 0
     ? ok('the new app appears on the landing') : bad('new app not on the landing');
 
-  // ---- 15. Multi-page form — pages, breadcrumbs, prev/next, shared data -
-  step('15. Multi-page form navigation');
+  // ---- 15. Multi-page form — in-place page switch, URLs, validation gating
+  step('15. Multi-page form navigation (no-reload + gating)');
   await page.goto(BASE + '/');
   await openDoc(page, () => page.click('button:has-text("New Onboarding")'), '#full-name');
   ok('opened a multi-page onboarding form');
@@ -370,31 +370,68 @@ try {
     ? ok('three page tabs shown') : bad('page tabs missing');
   (await page.locator('.sv-page.active').innerText()).includes('Account')
     ? ok('Account is the active page') : bad('wrong active page');
-  // fill page 1, then settle (blur the field so its unlock POST completes before
-  // we navigate away — otherwise the page unload aborts the in-flight fetch)
+  // mark the window so we can later prove no full reload happened
+  await page.evaluate(() => { window.__noReload = true; });
+
+  // -- validation gating: Next is disabled until the page is valid -----------
+  (await page.locator('.sv-pagenav-next').getAttribute('aria-disabled')) === 'true'
+    ? ok('Next is gated (disabled) on an empty page') : bad('Next not gated initially');
+  (await page.locator('.sv-page-hint').isVisible())
+    ? ok('a "complete this page" hint is shown') : bad('no gating hint shown');
+  // force a click through the gate — the datastar guard still blocks it
+  await page.click('.sv-pagenav-next', { force: true });
+  await page.waitForTimeout(300);
+  (await page.locator('.sv-page.active').innerText()).includes('Account')
+    ? ok('gated Next did not advance (guard blocks the click)') : bad('gated Next advanced anyway');
+
+  // fill the page validly → Next ungates live (server pushes the $ready reaction)
   await page.fill('#full-name', 'Ada Lovelace');
   await page.fill('#email', 'ada@example.com');
   await settleFields(page);
-  // Next → Profile (full reload; SSE reconnects)
-  await openDoc(page, () => page.click('.sv-pagenav-next'), '#role');
+  await page.waitForFunction(() => {
+    const a = document.querySelector('.sv-pagenav-next');
+    return a && a.getAttribute('aria-disabled') === 'false';
+  }, null, { timeout: 4000 }).then(() => ok('Next ungated once the page is valid'))
+    .catch(() => bad('Next stayed gated after valid input'));
+
+  // -- in-place switch to Profile (no reload), URL updates -------------------
+  await page.click('.sv-pagenav-next');
+  await page.waitForSelector('#role');                 // morphed in, no navigation
+  (await page.evaluate(() => window.__noReload === true))
+    ? ok('page switched in place (no full reload)') : bad('a full reload happened');
   (await page.locator('.sv-page.active').innerText()).includes('Profile')
-    ? ok('Next advanced to Profile') : bad('Next did not advance the page');
+    ? ok('Next advanced to Profile in place') : bad('Next did not advance');
+  page.url().includes('view=profile')
+    ? ok('the URL reflects the current page (linkable)') : bad(`URL not updated: ${page.url()}`);
   await page.selectOption('#role', 'engineer').catch(() => {});
   await page.fill('#bio', 'Mathematician').catch(() => {});
   await settleFields(page);
-  // jump straight to Review via the breadcrumb tab
-  await openDoc(page, () => page.click('.sv-page:has-text("Review")'), '.sv-doc-body');
+
+  // -- jump to Review via a breadcrumb tab (in place) ------------------------
+  await page.click('.sv-page:has-text("Review")');
+  await page.waitForFunction(
+    () => (document.querySelector('.sv-page.active') || {}).textContent?.includes('Review'),
+    null, { timeout: 4000 });
   ok('jumped to Review via the breadcrumb tab');
-  const reviewText = await page.locator('.sv-doc-body').innerText();
+  const reviewText = await page.locator('#sv-doc-body').innerText();
   reviewText.includes('Ada Lovelace')
     ? ok('Review shows the name entered on page 1 (shared data model)')
     : bad('shared data did not carry across pages');
   reviewText.includes('ada@example.com')
     ? ok('Review shows the email entered on page 1') : bad('email not carried across pages');
-  // Prev goes back
-  await openDoc(page, () => page.click('.sv-pagenav-prev'), '#role');
+  (await page.evaluate(() => window.__noReload === true))
+    ? ok('still no reload after several switches') : bad('a reload happened during navigation');
+
+  // -- Prev goes back, in place ----------------------------------------------
+  await page.click('.sv-pagenav-prev');
+  await page.waitForSelector('#bio');
   (await page.locator('.sv-page.active').innerText()).includes('Profile')
-    ? ok('Prev returned to Profile') : bad('Prev did not go back');
+    ? ok('Prev returned to Profile in place') : bad('Prev did not go back');
+  // deep-link: loading a page URL directly lands on that page
+  await page.goto(page.url().replace(/\?.*$/, '') + '?view=review');
+  await page.waitForSelector('.sv-page.active');
+  (await page.locator('.sv-page.active').innerText()).includes('Review')
+    ? ok('deep-linking to ?view=review lands on the Review page') : bad('deep-link did not land on Review');
 
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');

@@ -16,8 +16,10 @@
   </head>
   <body>
     {{navbar|safe}}
+    {% if multipage %}<!-- back/forward restores the page from its URL -->
+    <div id="sv-history" data-on:popstate__window="window.location.reload()" hidden></div>{% endif %}
     {% if page_tabs %}{{page_tabs|safe}}{% endif %}
-    <div class="sv-doc-body">{{view|safe}}</div>
+    <div id="sv-doc-body" class="sv-doc-body">{{view|safe}}</div>
     {% if page_nav %}{{page_nav|safe}}{% endif %}
     {{footer|safe}}
   </body>

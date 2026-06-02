@@ -21,6 +21,7 @@
    [yogthos.stepvine.web.auth :as auth]
    [yogthos.stepvine.web.editor :as editor]
    [yogthos.stepvine.web.oauth :as oauth]
+   [yogthos.stepvine.web.pagenav :as pagenav]
    [yogthos.stepvine.web.security :as security]
    [yogthos.stepvine.web.sse :as sse]
    [yogthos.stepvine.workflows.document :as doc]
@@ -99,6 +100,8 @@
       [""        (page doc/render-doc)]
       ["/sse"    {:get {:handler (sse/make-handler {:hub hub :manager session
                                                     :forms forms :documents documents})}}]
+      ;; in-place page switch (multi-page forms): morph the view region, no reload
+      ["/page/:vid" (ds {:post {:handler (pagenav/switch-handler resources)}})]
       ["/share"  (af (post doc/share))]
       ["/delete" (af (post doc/delete))]
       ["/submit" (ds (post doc/submit))]

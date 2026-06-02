@@ -8,7 +8,9 @@
  :title "Onboarding"
 
  ;; Ordered pages → the breadcrumb tabs + prev/next nav. Each references a view.
- :pages [{:view :account :label "Account"}
+ ;; :valid names a reaction that must be truthy before Next will advance off the
+ ;; page (forward-progress validation gating).
+ :pages [{:view :account :label "Account" :valid :ready?}
          {:view :profile :label "Profile"}
          {:view :review  :label "Review"}]
 
