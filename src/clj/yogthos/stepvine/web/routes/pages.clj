@@ -12,8 +12,10 @@
    Datastar sets `Datastar-Request: true` automatically, so its endpoints need no
    token plumbing; plain HTML forms carry an anti-forgery token."
   (:require
+   [clojure.java.io :as io]
    [integrant.core :as ig]
    [mycelium.middleware :as mw]
+   [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.web.auth :as auth]
    [yogthos.stepvine.web.security :as security]
    [yogthos.stepvine.web.sse :as sse]
@@ -21,7 +23,21 @@
    [yogthos.stepvine.workflows.form :as form]
    [yogthos.stepvine.workflows.workflow :as wf]))
 
-(defn page-routes [{:keys [forms documents session hub options-store patient-client users audit]}]
+(defn- report-handler
+  "Serve a generated PDF report (under the doc-access middleware) for download."
+  [documents]
+  (fn [req]
+    (let [id   (get-in req [:path-params :id])
+          idx  (parse-long (get-in req [:path-params :idx]))
+          path (get-in (documents/get-document documents id) [:meta :reports idx :pdf])]
+      (if (and path (.exists (io/file path)))
+        {:status  200
+         :headers {"Content-Type"        "application/pdf"
+                   "Content-Disposition" (str "inline; filename=report-" idx ".pdf")}
+         :body    (io/file path)}
+        {:status 404 :body "No such report."}))))
+
+(defn page-routes [{:keys [forms documents session hub options-store patient-client users audit reports-dir]}]
   (let [resources  {:forms           forms
                     :documents       documents
                     :session-manager session
@@ -29,7 +45,8 @@
                     :options-store   options-store
                     :patient-client  patient-client
                     :users           users
-                    :audit           audit}
+                    :audit           audit
+                    :reports-dir     reports-dir}
         page (fn [wf] {:get  {:handler (mw/workflow-handler wf {:resources resources})}})
         post (fn [wf] {:post {:handler (mw/workflow-handler
                                         wf {:resources resources
@@ -54,6 +71,7 @@
       ["/submit" (ds (post doc/submit))]
       ["/revise" (ds (post doc/revise))]
       ["/wf/:action" (ds (post wf/run-action))]
+      ["/report/:idx" {:get {:handler (report-handler documents)}}]
       ["/field/:fid"         (ds (post form/update-field))]
       ["/field/:fid/lock"    (ds (post form/lock-field))]
       ["/field/:fid/unlock"  (ds (post form/unlock-field))]

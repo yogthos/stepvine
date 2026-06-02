@@ -17,7 +17,7 @@
             :closed {:terminal? true :locked? true}}
   :actions {:submit  {:guard :valid?
                       :steps [{:do :notify :message "Submitted for review."}]}
-            :approve {:steps [{:do :snapshot}
+            :approve {:steps [{:do :pdf}            ; generate a PDF report on close (report 0)
                               {:do :notify :message "Approved and closed."}]}
             :reject  {:steps [{:do :notify :message "Sent back for changes."}]}}}
 
@@ -34,4 +34,7 @@
     [:c/h-box {:gap :sm :align :center}
      [:c/workflow {:action :submit  :label "Submit for review" :show-when :open}]
      [:c/workflow {:action :approve :label "Approve"           :show-when :review}]
-     [:c/workflow {:action :reject  :label "Send back"         :show-when :review}]]]}}}
+     [:c/workflow {:action :reject  :label "Send back"         :show-when :review}]]
+    ;; the approve step generates a PDF report; offer it once closed
+    [:div {"data-show" "$state === 'closed'"}
+     [:c/hyperlink {:doc-path "report/0" :label "Download report PDF" :target "_blank"}]]]}}}

@@ -32,6 +32,9 @@
            hiccup/hiccup                   {:mvn/version "2.0.0"}
            metosin/jsonista                {:mvn/version "0.3.14"}
 
+           ;; PDF report generation (§15.13)
+           clj-pdf/clj-pdf                 {:mvn/version "2.7.4"}
+
            ;; Safe evaluation of form event/reaction fns
            org.babashka/sci                {:mvn/version "0.12.51"}
 

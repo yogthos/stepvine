@@ -36,6 +36,7 @@
             rctx  (render/session->context (session/current session-manager doc-id) :default doc-id)]
         (assoc data
                :found?   (boolean wf)
+               :form     form-raw
                :workflow wf
                :state    state
                :ctx      {:rxns (:rxns rctx) :doc (:values rctx) :role nil}
@@ -63,8 +64,8 @@
 (myc/defcell :wf/commit
   {:doc      "Apply the directives (transition + steps), audit the action, ack 204."
    :requires [:documents :session-manager :hub :audit]}
-  (fn [{:keys [audit] :as resources} {:keys [workflow doc-id uid action directives]}]
-    (directives/apply! resources workflow doc-id uid directives)
+  (fn [{:keys [audit] :as resources} {:keys [form doc-id uid action directives]}]
+    (directives/apply! resources form doc-id uid directives)
     (audit/record! audit {:doc-id doc-id :by uid :action :wf/action :detail {:action action}})
     {:status 204 :body ""}))
 

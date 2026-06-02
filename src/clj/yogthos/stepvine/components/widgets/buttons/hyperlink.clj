@@ -6,11 +6,13 @@
    [yogthos.stepvine.render :as render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/hyperlink
-  [ctx _component {:keys [href target label rxn id action disabled]} _body]
+  [ctx _component {:keys [href doc-path target label rxn id action disabled]} _body]
   (let [sig-id  (or rxn id)
         sig     (when sig-id (if rxn (render/$ sig-id) (render/item-$ ctx sig-id)))
         current (when sig-id
                   (if rxn (get (:rxns ctx) sig-id) (get-in ctx [:values sig-id])))
+        ;; :doc-path resolves to a path under this document (e.g. "report/0")
+        href    (or href (when doc-path (str "/doc/" (:doc-id ctx) "/" doc-path)))
         action-url (when action (str "/doc/" (:doc-id ctx) "/action/" (name action)))]
     [:a.widget.hyperlink
      (cond-> {:href (or href "#")}

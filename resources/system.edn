@@ -50,7 +50,8 @@
   :options-store  #ig/ref :store/options
   :patient-client #ig/ref :clients/patient
   :users          #ig/ref :store/users
-  :audit          #ig/ref :store/audit}
+  :audit          #ig/ref :store/audit
+  :reports-dir    #or [#env REPORTS_DIR "data/reports"]}
 
  ;; --- Form-document engine -------------------------------------------------
  ;; Form definitions live on disk as one EDN file per form; the store scans this

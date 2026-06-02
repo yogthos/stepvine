@@ -240,6 +240,12 @@ try {
   (await stateText()) === 'closed' ? ok('FSM transitioned :review → :closed') : bad(`state not closed: ${await stateText()}`);
   (await page.locator('.sv-status').isVisible())
     ? ok('terminal :closed state is read-only') : bad('closed document not read-only');
+  // the :pdf step generated a downloadable report
+  const reportHref = await page.locator('a:has-text("Download report PDF")').getAttribute('href');
+  const pdfResp = await page.request.get(BASE + reportHref);
+  const pdfHead = (await pdfResp.body()).subarray(0, 4).toString('latin1');
+  (pdfResp.status() === 200 && pdfHead === '%PDF')
+    ? ok('approve generated a downloadable PDF report') : bad(`PDF report bad: ${pdfResp.status()} ${pdfHead}`);
 
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');

@@ -498,7 +498,12 @@ real external steps (email/PDF/HTTP) land.
 
 **Phase 11 — Pages, index lookups & production hardening.** Multi-document
 workflow pages, index-based document creation/search, real query-DB backends,
-PDF generation, OAuth2/OIDC (§15.13).
+OAuth2/OIDC (§15.13). **✅ PDF generation done:** `yogthos.stepvine.pdf` (clj-pdf)
+renders a document to a PDF body — a default field/value table or a form-declared
+template with `{:field id}`/`{:reaction id}` substitution. A `:pdf` workflow step
+writes the report under `data/reports/<doc>/` and records it in `:meta :reports`;
+`GET /doc/:id/report/:idx` serves it (access-controlled). The ticket demo's
+approve step generates a downloadable PDF.
 
 ---
 

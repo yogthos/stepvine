@@ -94,6 +94,7 @@
 
 (defmethod run-step :notify   [ctx {:keys [message]}] [:notify (resolve-value ctx message)])
 (defmethod run-step :snapshot [_ _]                   [:snapshot])
+(defmethod run-step :pdf      [_ step]                [:pdf (select-keys step [:template])])
 (defmethod run-step :set-field [ctx {:keys [path value]}] [:set-field path (resolve-value ctx value)])
 (defmethod run-step :set-meta  [ctx {:keys [path value]}] [:set-meta path (resolve-value ctx value)])
 
