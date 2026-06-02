@@ -1,37 +1,116 @@
-# stepvine
+# Stepvine
 
-Start a [REPL](#repls) in your editor or terminal of choice.
+**Stepvine is a server-authoritative reactive form & app builder.** Forms are
+described as data (EDN), their logic runs entirely on the server, and the browser
+is a *dumb terminal*: inputs two-way–bind to server-owned signals over
+[Datastar](https://data-star.dev) SSE, and computed values, validation, and
+workflow state are pushed back as the server recomputes them. There is no
+client-side application code to write.
 
-Start the server with:
+Each app — its EDN document, its workflow, and its CSS — is an **independent app
+on top of the platform**, stored in a database and **hot-swappable live**: you can
+create, edit, re-style, and re-shape an app from the admin UI with no redeploy.
+The platform owns the cross-cutting concerns (auth, access control, persistence,
+live multi-user editing, audit, exports); the apps are just content.
 
-```clojure
-(go)
+It is built on three pieces: the [Domino](https://github.com/domino-clj/domino)
+reactive engine (the model + reaction DAG), [Mycelium](https://github.com/yogthos/mycelium)
+workflow cells (the request pipelines and the document state machine), and
+Datastar (the SSE transport).
+
+## Highlights
+
+- **Forms as data** — a model + reactions/derived fields, validated event/reaction
+  functions evaluated in a [SCI](https://github.com/babashka/sci) sandbox (never
+  `eval`), collections/tables, and pluggable option/import sources.
+- **Live, multi-user** — server-pushed updates, presence, and per-field locking so
+  concurrent editors don't clobber each other.
+- **Apps in the DB** — app EDN + CSS live in an embedded SQLite store
+  (Postgres-ready behind a `FormStore` protocol), with explicit version pinning and
+  a sealed archive.
+- **Live admin editor** — a split-pane CodeMirror editor (EDN + CSS) with a live
+  preview and a per-view picker; create, style, role-gate, and save apps from the UI.
+- **Multi-page forms** — a form's views double as ordered pages with breadcrumb
+  tabs and prev/next, in-place (no-reload) page switching over Datastar, per-page
+  URLs (linkable + deep-linkable), and forward-progress validation gating.
+- **Workflows** — declarative per-form state machines (submit/approve/revise, …)
+  compiled to Mycelium FSM cells, with finalized documents going read-only.
+- **AuthN/Z** — username/password + OAuth2/OIDC, role-based form access, and an
+  admin UI for user and role management.
+- **Exports** — server-rendered PDF reports.
+
+## Requirements
+
+- **JDK 17+** and the **[Clojure CLI](https://clojure.org/guides/install_clojure)**
+  (`clj` / `deps.edn`).
+- Optional: **[Babashka](https://babashka.org)** (`bb`) and `make` for task
+  shortcuts; **Node.js** for the end-to-end storyboard.
+
+## Build & run
+
+```bash
+make run          # or: clj -M:dev   |   bb run
 ```
 
-The default API is available under http://localhost:3000/api
+`clj -M:dev` starts a REPL with the dev system prepped; type `(go)` to start the
+server, then open <http://localhost:3000>. A dev admin is seeded the first time the
+user store is empty — **log in with `admin` / `admin`**.
 
-System configuration is available under `resources/system.edn`.
-
-To reload changes:
-
-```clojure
-(reset)
+```bash
+make test         # unit tests           (clj -M:test  |  bb test)
+make uberjar      # build the uberjar     (clj -T:build all  |  bb uberjar)
+java -jar target/stepvine-standalone.jar  # run the built jar
+make format       # cljstyle fix
 ```
 
-## REPLs
+Or build a container image (multi-stage build, JDK 17):
 
-### Cursive
+```bash
+docker build -t stepvine . && docker run -p 3000:3000 stepvine
+```
 
-Configure a [REPL following the Cursive documentation](https://cursive-ide.com/userguide/repl.html). Using the default "Run with IntelliJ project classpath" option will let you select an alias from the ["Clojure deps" aliases selection](https://cursive-ide.com/userguide/deps.html#refreshing-deps-dependencies).
+### End-to-end storyboard
 
-### CIDER
+A headless-browser walkthrough of every major feature (auth, live computation,
+collections, the editor, multi-page navigation, …):
 
-Use the `cider` alias for CIDER nREPL support (run `clj -M:dev:cider`). See the [CIDER docs](https://docs.cider.mx/cider/basics/up_and_running.html) for more help.
+```bash
+cd e2e && npm install && npx playwright install chromium
+# with a dev server running on :3000, from the repo root:
+node e2e/storyboard.mjs
+```
 
-Note that this alias runs nREPL during development. To run nREPL in production (typically when the system starts), use the kit-nrepl library through the +nrepl profile as described in [the documentation](https://kit-clj.github.io/docs/profiles.html#profiles).
+## Configuration
 
-### Command Line
+Set via environment variables (sensible defaults in `resources/system.edn`):
 
-Run `clj -M:dev:nrepl` or `make repl`.
+| Variable      | Default        | Purpose                            |
+| ------------- | -------------- | ---------------------------------- |
+| `PORT`        | `3000`         | HTTP port                          |
+| `HTTP_HOST`   | `0.0.0.0`      | Bind address                       |
+| `FORMS_DIR`   | `forms`        | App EDN/CSS seeded into the store  |
+| `APPS_DB`     | `data/apps.db` | SQLite file for the app store      |
+| `REPORTS_DIR` | `data/reports` | Generated PDF reports              |
 
-Note that, just like with [CIDER](#cider), this alias runs nREPL during development. To run nREPL in production (typically when the system starts), use the kit-nrepl library through the +nrepl profile as described in [the documentation](https://kit-clj.github.io/docs/profiles.html#profiles).
+> The OAuth `:mock` provider is dev/test only and is never exposed in `:prod`.
+
+## Project layout
+
+```
+src/clj/yogthos/stepvine/   platform code
+  components/                 widgets (render to HTML + Datastar bindings)
+  workflows/ cells/           Mycelium request pipelines + the document FSM
+  editor/                     vendored Domino session/reaction layer
+  web/                        routes, SSE, auth, admin, the live editor
+forms/                      example apps (EDN, with optional sibling .css)
+options/  partials/          dropdown sources + reusable markup fragments
+resources/                  system.edn, HTML templates, default theme CSS
+test/clj/                   unit tests
+e2e/                        Playwright storyboard
+```
+
+## Status
+
+Pre-release / actively developed. See `PLAN.md` for the roadmap and `CLAUDE.md`
+for contributor/agent conventions. Issues are tracked with
+[beads](https://github.com/gastownhall/beads) (`bd`).
