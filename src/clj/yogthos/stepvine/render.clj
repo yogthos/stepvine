@@ -181,13 +181,16 @@
           body       (if has-attrs? more (when a (cons a more)))
           component  (resolve-component (:aliases ctx) kw)
           fopts      (when (contains? ctx :perm-roles)
-                       (get-in ctx [:field-opts (:id attrs)]))]
+                       (get-in ctx [:field-opts (:id attrs)]))
+          ;; editable only when the user's roles permit AND (if :writable-in is set)
+          ;; the document is in one of those workflow states
+          role-no?   (and fopts (:write-roles fopts) (not (perm-ok? ctx (:write-roles fopts))))
+          state-no?  (and fopts (:writable-in fopts) (:workflow-state ctx)
+                          (not (contains? (set (:writable-in fopts)) (:workflow-state ctx))))]
       (if (and fopts (:read-roles fopts) (not (perm-ok? ctx (:read-roles fopts))))
         nil                                                  ; field hidden from this user
         (render-widget ctx component
-                       (cond-> attrs
-                         (and fopts (:write-roles fopts) (not (perm-ok? ctx (:write-roles fopts))))
-                         (assoc :read-only true))            ; read-only when not writable
+                       (cond-> attrs (or role-no? state-no?) (assoc :read-only true))
                        body)))
 
     (and (vector? node) (html-tag? (first node)))

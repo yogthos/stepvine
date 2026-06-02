@@ -697,6 +697,31 @@ try {
   (await page.locator('td:has-text("urgent@example.com")').count()) > 0
     ? ok('the :cond email recipient resolved to urgent@ for high priority') : bad('conditional recipient wrong');
 
+  // ---- 24. Role/state view selection ---------------------------------
+  step('24. State-based view selection');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Case")'), '#summary');
+  const caseUrl = page.url().replace(/\?.*$/, '');
+  (await page.locator('h1:has-text("Intake")').count()) > 0
+    ? ok('the Intake view is auto-selected for the :open state') : bad('wrong view in :open');
+  (await page.locator('#summary').getAttribute('readonly')) === null
+    ? ok('summary is editable in :open (:writable-in)') : bad('summary read-only in :open');
+  (await page.locator('#decision').count()) === 0
+    ? ok('the Review view is not shown in :open') : bad('review view leaked in :open');
+  // submit -> state :review
+  await page.fill('#summary', 'Lost shipment');
+  await page.waitForTimeout(450);
+  await page.click('.wf-btn:has-text("Submit for review")');
+  await page.waitForTimeout(700);
+  // reload (no ?view) -> the Review view is auto-selected by the new state
+  await openDoc(page, () => page.goto(caseUrl), '#decision');
+  (await page.locator('h1:has-text("Review")').count()) > 0
+    ? ok('after submit, the Review view is auto-selected by workflow state') : bad('view not auto-selected by state');
+  (await page.locator('#decision').count()) > 0
+    ? ok('the :review view shows the decision field') : bad('decision field missing in :review');
+  (await page.locator('#summary').getAttribute('readonly')) !== null
+    ? ok('summary is read-only in :review (state-based editability)') : bad('summary editable in :review');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

@@ -229,17 +229,25 @@
     (let [sess     (session/current session-manager doc-id)
           user     (users/get-user users user-id)
           views    (get-in sess [:form :views])
+          doc      (documents/get-document documents doc-id)
+          wstate   (when-let [wf (:workflow form-raw)] (documents/workflow-state doc (:initial wf)))
           ;; per-view gate (§parity): a view's :roles restrict who may see it
           view-ok? (fn [v] (access/role-permitted? user (get-in views [(keyword v) :roles])))
           ;; only the pages this user may access appear in the nav
           pages    (filterv #(view-ok? (:view %)) (:pages form-raw))
-          vid  (let [v (keyword view-id)]
+          vid  (let [v (keyword view-id)
+                     ;; with no explicit view (:default), auto-select a view whose
+                     ;; :for-states includes the current workflow state, role-permitted
+                     auto (when (= v :default)
+                            (first (keep (fn [[k vw]]
+                                           (when (and (view-ok? k) (contains? (set (:for-states vw)) wstate))
+                                             k))
+                                         views)))]
                  (cond
-                   (and (get views v) (view-ok? v)) v               ; requested + permitted
+                   auto auto                                         ; state-selected view
+                   (and (get views v) (view-ok? v)) v               ; requested/default, if it exists + permitted
                    (seq pages)        (keyword (:view (first pages))) ; first permitted page
-                   (view-ok? :default) :default
-                   :else (first (keep (fn [[k _]] (when (view-ok? k) k)) views))))
-          doc  (documents/get-document documents doc-id)
+                   :else (first (keep (fn [[k _]] (when (view-ok? k) k)) views))))  ; first permitted view
           ctx  (-> (render/session->context sess vid doc-id)
                    (assoc :uid user-id)   ; the authenticated user drives lock comparison
                    ;; granular field permissions (§parity): hide :read-roles fields
@@ -247,10 +255,9 @@
                    (assoc :perm-roles (users/roles user) :perm-admin? (users/admin? user))
                    ;; finalized documents render read-only (§15.5)
                    (assoc :locked? (documents/locked? doc))
-                   ;; current workflow state, for $state-driven action buttons (§15.10)
-                   (assoc :workflow-state
-                          (when-let [wf (:workflow form-raw)]
-                            (documents/workflow-state doc (:initial wf))))
+                   ;; current workflow state — drives $state action buttons (§15.10)
+                   ;; AND :writable-in field editability (§parity)
+                   (assoc :workflow-state wstate)
                    ;; resolve option sources for top-level AND collection-item fields
                    (assoc :options (options/resolve-field-options options-store (render/all-field-opts sess))))]
       {:vid      vid

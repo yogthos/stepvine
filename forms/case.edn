@@ -1,0 +1,47 @@
+;; Role/state-specific view selection (§parity).
+;;
+;;  • A view declares :for-states — with no explicit ?view, the view whose
+;;    :for-states includes the document's current workflow state is auto-selected.
+;;    (Role-based selection is the per-view :roles gate: a user lands on the first
+;;    view they may access.)
+;;  • A field declares :writable-in — it is editable only while the document is in
+;;    one of those states (read-only otherwise; the server also rejects the write).
+;;
+;; Here a case is edited on the Intake view while :open, then reloads to the Review
+;; view once :review; the summary is editable only in :open.
+{:id    :case
+ :title "Case"
+
+ :data
+ {:model
+  [[:summary  {:id :summary  :type :string :writable-in #{:open}}]
+   [:decision {:id :decision :type :string}]]}
+
+ :workflow
+ {:initial :open
+  :states  {:open   {:on {:submit :review}}
+            :review {:on {:close :closed}}
+            :closed {:terminal? true :locked? true}}
+  :actions {:submit {:steps [{:do :notify :message "Submitted for review."}]}
+            :close  {:steps [{:do :notify :message "Closed."}]}}}
+
+ :views
+ {:intake
+  {:for-states #{:open}
+   :opts   {:widget-namespaces {"c" "stepvine.components"}}
+   :markup [:c/form {}
+            [:h1 "Intake"]
+            [:p "Status: " [:strong {:data-text "$state"}]]
+            [:c/input-field {:id :summary :label "Summary"}]
+            [:c/workflow {:action :submit :label "Submit for review" :show-when :open}]]}
+
+  :review
+  {:for-states #{:review}
+   :opts   {:widget-namespaces {"c" "stepvine.components"}}
+   :markup [:c/form {}
+            [:h1 "Review"]
+            [:p "Status: " [:strong {:data-text "$state"}]]
+            ;; summary is read-only here (:writable-in #{:open}); decision is editable
+            [:c/input-field {:id :summary  :label "Summary"}]
+            [:c/input-field {:id :decision :label "Decision"}]
+            [:c/workflow {:action :close :label "Close" :show-when :review}]]}}}

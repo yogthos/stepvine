@@ -86,11 +86,20 @@
         (documents/locked? (documents/get-document documents doc-id))
         {:status 409 :body "Document is read-only (finalized)."}   ; §15.5 enforcement
 
-        ;; granular per-field permission: reject writes to a field the user's roles
+        ;; granular per-field permission: reject writes to a field this user's roles
         ;; don't permit (the read-only render is UX; this is the security boundary)
         (let [wroles (:write-roles (get-in (session/current session-manager doc-id) [:field-opts (keyword field-id)]))]
           (and (seq wroles) users (not (access/role-permitted? (users/get-user users uid) wroles))))
         {:status 403 :body "You don't have permission to edit this field."}
+
+        ;; state-based editability: reject a write to a :writable-in field when the
+        ;; document is not in one of those workflow states
+        (let [win    (:writable-in (get-in (session/current session-manager doc-id) [:field-opts (keyword field-id)]))
+              wstate (when (seq win)
+                       (documents/workflow-state (documents/get-document documents doc-id)
+                                                 (get-in form-raw [:workflow :initial])))]
+          (and (seq win) (not (contains? (set win) wstate))))
+        {:status 409 :body "This field can't be edited in the current state."}
 
         :else
         (let [sess   (session/current session-manager doc-id)
