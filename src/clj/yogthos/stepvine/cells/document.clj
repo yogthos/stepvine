@@ -17,6 +17,8 @@
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.editor.impl :as impl]
    [yogthos.stepvine.exports :as exports]
+   [yogthos.stepvine.index :as index]
+   [yogthos.stepvine.imports :as imports]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.hub :as hub]
    [yogthos.stepvine.options :as options]
@@ -46,7 +48,9 @@
                        ".bar{display:flex;justify-content:space-between;align-items:center}"
                        "input{padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.375rem}"
                        "button,a.btn{padding:.25rem .6rem;border:1px solid #d1d5db;border-radius:.375rem;"
-                       "background:#fff;cursor:pointer;text-decoration:none;color:#111;margin-left:.3rem}")]]
+                       "background:#fff;cursor:pointer;text-decoration:none;color:#111;margin-left:.3rem}"
+                       ".badge{color:#6b7280} .filter a{margin-left:0;margin-right:.3rem}"
+                       ".error{color:#b91c1c} label{display:block;margin:.75rem 0}")]]
          [:body
           [:div.bar
            [:h1 "Stepvine documents"]
@@ -55,17 +59,28 @@
             [:small "Signed in as " [:b (:display-name user)]]
             [:button "Sign out"]]]
           [:h2 "Create new"]
-          [:p (for [{:keys [id title]} form-list]
-                [:form {:method "post" :action (str "/form/" (name id) "/new")}
-                 (security/csrf-field)
-                 [:button (str "+ New " (or title (name id)))]])]
+          [:p (for [{:keys [id title index?]} form-list]
+                (if index?
+                  ;; index forms start from a key lookup (§15.13)
+                  [:a.btn {:href (str "/form/" (name id) "/new")} (str "+ New " (or title (name id)) "…")]
+                  [:form {:method "post" :action (str "/form/" (name id) "/new")}
+                   (security/csrf-field)
+                   [:button (str "+ New " (or title (name id)))]]))]
           [:h2 "Your documents"]
+          ;; status filter (§15.13)
+          [:p.filter "Show: "
+           (for [[k label] [[nil "all"] [:in-progress "in progress"] [:submitted "submitted"]
+                            [:completed "completed"]]]
+             [:a.btn {:href (str "/" (when k (str "?status=" (name k))))} label])]
           (if (seq docs)
             (into [:div]
-                  (for [{:keys [id form-id created-by shared]} docs]
-                    (let [owner? (= (:id user) created-by)]
+                  (for [{:keys [id form-id created-by shared status meta]} docs]
+                    (let [owner? (= (:id user) created-by)
+                          state  (get-in meta [:workflow :state])]
                       [:div.doc
                        [:a {:href (str "/doc/" id)} (str (name form-id))] " " [:small id]
+                       [:small.badge (str " · " (name (or status :in-progress)))]
+                       (when state [:small.badge (str " · " (name state))])
                        (if owner? [:small " · owner"] [:small " · shared with you"])
                        (when owner?
                          [:span
@@ -81,39 +96,106 @@
                            [:button "Delete"]]])])))
             [:p "No documents yet."])]])))
 
+(defn- index-page-html
+  "The lookup page for an index form (§15.13): enter the key (e.g. an MRN), submit
+   to create a prepopulated document."
+  [form-id form value error]
+  (let [{:keys [prompt]} (:index form)]
+    (str "<!DOCTYPE html>"
+         (h/html
+          [:html {:lang "en"}
+           [:head [:meta {:charset "utf-8"}]
+            [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
+            [:title (str "New " (or (:title form) (name form-id)))]
+            [:style "body{font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;line-height:1.5}"
+                    "input{padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:.375rem}"
+                    "button{padding:.35rem .8rem;border:1px solid #d1d5db;border-radius:.375rem;background:#2563eb;color:#fff;cursor:pointer}"
+                    ".error{color:#b91c1c} label{display:block;margin:.75rem 0}"]]
+           [:body
+            [:h1 (str "New " (or (:title form) (name form-id)))]
+            [:form {:method "post" :action (str "/form/" (name form-id) "/new")}
+             (security/csrf-field)
+             [:label (or prompt "Lookup key")
+              [:br] [:input {:name "index-key" :value (or value "") :autofocus "autofocus"}]]
+             (when error [:p.error error])
+             [:button "Look up & create"]]
+            [:p [:a {:href "/"} "← Cancel"]]]]))))
+
 (myc/defcell :index/render
   {:requires [:documents :forms :users]
    :input    {:http-request :map}
    :output   {:html :string}
-   :doc      "Render the documents landing for the signed-in user (their docs only)."}
+   :doc      "Render the documents landing for the signed-in user (their docs only),
+              optionally filtered by ?status."}
   (fn [{:keys [documents forms users]} {req :http-request}]
     (let [user-id   (get-in req [:session :user-id])
           user      (users/get-user users user-id)
-          form-list (map (fn [id] {:id id :title (:title (forms/get-form forms id))})
-                         (forms/list-forms forms))]
-      {:html (landing-html (documents/accessible-by documents user-id) form-list user users)})))
+          status    (some-> (get-in req [:query-params "status"]) keyword)
+          form-list (map (fn [id] (let [f (forms/get-form forms id)]
+                                    {:id id :title (:title f) :index? (boolean (:index f))}))
+                         (forms/list-forms forms))
+          docs      (cond->> (documents/accessible-by documents user-id)
+                      status (filter #(= status (:status %))))]
+      {:html (landing-html docs form-list user users)})))
+
+(myc/defcell :doc/new-page
+  {:requires [:forms]
+   :input    {:http-request :map}
+   :output   {:html :string}
+   :doc      "GET /form/:id/new — the index lookup page for an index form."}
+  (fn [{:keys [forms]} {req :http-request}]
+    (let [form-id (get-in req [:path-params :id])]
+      {:html (index-page-html form-id (forms/get-form forms form-id) nil nil)})))
 
 ;; --- POST /form/:id/new (create) ------------------------------------------
 
 (myc/defcell :doc/parse-create
-  {:input {:http-request :map} :output {:form-id :any :user-id :any}
-   :doc   "Form id to instantiate (from path) + creating user (from session)."}
+  {:input {:http-request :map} :output {:form-id :any :user-id :any :index-key :any}
+   :doc   "Form id (path), creating user (session), optional index key (form param)."}
   (fn [_ {req :http-request}]
-    {:form-id (get-in req [:path-params :id])
-     :user-id (get-in req [:session :user-id])}))
+    {:form-id   (get-in req [:path-params :id])
+     :user-id   (get-in req [:session :user-id])
+     :index-key (get-in req [:params :index-key])}))
+
+(defn- create-pinned! [documents forms form-id user-id]
+  (let [version (forms/latest-published forms form-id)]
+    (documents/create! documents form-id
+                       {:created-by   user-id
+                        :form-version version
+                        :form-digest  (forms/version-digest forms form-id version)})))
 
 (myc/defcell :doc/create
-  {:requires [:documents :forms]
-   :input    {:form-id :any :user-id :any}
+  {:requires [:documents :forms :session-manager :patient-client :options-store]
+   :input    {:form-id :any :user-id :any :index-key :any}
    :output   {:status :int :headers :any :body :string}
-   :doc      "Create a document, pinning the latest published form version + digest."}
-  (fn [{:keys [documents forms]} {:keys [form-id user-id]}]
-    (let [version (forms/latest-published forms form-id)
-          doc     (documents/create! documents form-id
-                                     {:created-by   user-id
-                                      :form-version version
-                                      :form-digest  (forms/version-digest forms form-id version)})]
-      {:status 303 :headers {"Location" (str "/doc/" (:id doc))} :body ""})))
+   :doc      "Create a document (pinned). For an index form, resolve the key, then
+              seed the :into field so the form's imports prepopulate it (§15.13)."}
+  (fn [{:keys [documents forms] :as resources} {:keys [form-id user-id index-key]}]
+    (let [form     (forms/get-form forms form-id)
+          idx-spec (:index form)]
+      (cond
+        ;; index form with a key: validate, create, seed, prepopulate
+        (and idx-spec (seq (str index-key)))
+        (if-not (:found? (index/lookup (imports/source-ctx resources) idx-spec index-key))
+          {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"}
+           :body (index-page-html form-id form index-key "No match for that key — please check it.")}
+          (let [doc (create-pinned! documents forms form-id user-id)
+                id  (:id doc)
+                into (:into idx-spec)]
+            (docs/ensure! resources id)
+            (session/apply-change! (:session-manager resources) id [[into index-key]])  ; seed trigger field
+            (docs/run-imports! resources form id into)               ; imports map the entity
+            {:status 303 :headers {"Location" (str "/doc/" id)} :body ""}))
+
+        ;; index form, no key yet: (re)show the lookup page
+        idx-spec
+        {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"}
+         :body (index-page-html form-id form nil nil)}
+
+        ;; plain form: create empty and go
+        :else
+        {:status 303 :headers {"Location" (str "/doc/" (:id (create-pinned! documents forms form-id user-id)))}
+         :body ""}))))
 
 ;; --- GET /doc/:id (render an instance) ------------------------------------
 

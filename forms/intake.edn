@@ -8,6 +8,12 @@
  :sources
  {:patient {:kind :client :client :patient :key :mrn}}
 
+ ;; Index lookup (§15.13): start a new intake from a patient key. The key seeds
+ ;; :patient-id, whose import then prepopulates the patient fields.
+ :index
+ {:kind :client :client :patient :key :mrn
+  :into :patient-id :prompt "Patient MRN (try p1 or p2)" :preview [:given :family]}
+
  ;; External dependency (§15.7): when :patient-id changes, fetch the patient and
  ;; map fields in. Lazy (runs only on this trigger), diff-based, chainable.
  :imports

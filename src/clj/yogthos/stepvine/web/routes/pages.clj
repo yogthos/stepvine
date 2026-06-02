@@ -60,7 +60,7 @@
      ["/logout"   (af {:post auth/logout})]
      ;; landing + create (anti-forgery)
      ["/"             (af (page doc/index))]
-     ["/form/:id/new" (af (post doc/create))]
+     ["/form/:id/new" (af (merge (page doc/new-page) (post doc/create)))]
      ;; document routes — access-controlled
      ["/doc/:id" {:middleware [doc-access]}
       [""        (page doc/render-doc)]

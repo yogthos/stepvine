@@ -9,9 +9,24 @@
   (:require
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.forms :as forms]
+   [yogthos.stepvine.imports :as imports]
    [yogthos.stepvine.migrations :as migrations]
    [yogthos.stepvine.session :as session]
+   [yogthos.stepvine.sources :as sources]
    [yogthos.stepvine.editor.impl :as impl]))
+
+(defn run-imports!
+  "Run any imports a change to `fid` triggers: resolve each import's source (§15.6),
+   fetch lazily, and transact the diff-based mapped changes. Shared by the
+   field-edit cell and index-based creation."
+  [{:keys [session-manager] :as resources} form-raw doc-id fid]
+  (let [ctx     (imports/source-ctx resources)
+        resolve (fn [sid] (when-let [spec (get-in form-raw [:sources sid])]
+                            (sources/resolve-source ctx spec)))
+        read    (fn [path] (session/value session-manager doc-id (first path)))
+        changes (imports/run (:imports form-raw) (imports/event-trigger fid) resolve read)]
+    (when (seq changes)
+      (session/apply-change! session-manager doc-id changes))))
 
 (defn ensure!
   "Ensure the live session for `doc-id` exists, loading its persisted db against

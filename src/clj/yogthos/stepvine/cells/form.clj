@@ -14,11 +14,9 @@
    [yogthos.stepvine.docs :as docs]
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.hub :as hub]
-   [yogthos.stepvine.imports :as imports]
    [yogthos.stepvine.options :as options]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
-   [yogthos.stepvine.sources :as sources]
    yogthos.stepvine.components   ; register all widget render methods
    [starfederation.datastar.clojure.api :as d*]))
 
@@ -50,20 +48,6 @@
        ;; posted value by the sanitized name, not the raw path-param field id
        :raw-value (get signals (render/signal-name (keyword field-id)))})))
 
-(defn- run-imports!
-  "Run any imports triggered by a change to `fid`: resolve each import's source
-   (§15.6), fetch lazily, and transact the diff-based mapped changes (which
-   recompute + broadcast)."
-  [resources form-raw doc-id fid]
-  (let [{:keys [session-manager]} resources
-        ctx     (imports/source-ctx resources)
-        resolve (fn [sid] (when-let [spec (get-in form-raw [:sources sid])]
-                            (sources/resolve-source ctx spec)))
-        read    (fn [path] (session/value session-manager doc-id (first path)))
-        changes (imports/run (:imports form-raw) (imports/event-trigger fid) resolve read)]
-    (when (seq changes)
-      (session/apply-change! session-manager doc-id changes))))
-
 (myc/defcell :form/apply-field
   {:requires [:forms :documents :session-manager :patient-client :audit]
    :input    {:doc-id :any :field-id :any :uid :any :raw-value :any}
@@ -84,7 +68,7 @@
             (when (not= before after)                              ; skip no-ops / lock-rejected
               (audit/record! audit {:doc-id doc-id :by uid :action :field/save
                                     :path [fid] :before before :after after})))
-          (run-imports! resources form-raw doc-id fid)
+          (docs/run-imports! resources form-raw doc-id fid)
           {:status 204 :body ""}))
       {:status 404 :body (str "No such document: " doc-id)})))
 

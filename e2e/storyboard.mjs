@@ -247,6 +247,21 @@ try {
   (pdfResp.status() === 200 && pdfHead === '%PDF')
     ? ok('approve generated a downloadable PDF report') : bad(`PDF report bad: ${pdfResp.status()} ${pdfHead}`);
 
+  // ---- 11. Index lookup — create a prepopulated document from a key -----
+  step('11. Index lookup — prepopulated creation');
+  await page.goto(BASE + '/');
+  await page.click('a:has-text("New Patient Intake")');         // index forms link to a lookup page
+  await page.waitForSelector('input[name=index-key]');
+  ok('index form opens a key-lookup page');
+  await page.fill('input[name=index-key]', 'p1');
+  await Promise.all([page.waitForURL(/\/doc\//), page.click('button:has-text("Look up & create")')]);
+  await page.waitForTimeout(500);
+  (await page.inputValue('#fname')) === 'Ada'
+    ? ok('lookup prepopulated the document (Ada Lovelace)') : bad(`fname not prepopulated: ${await page.inputValue('#fname')}`);
+  await page.goto(BASE + '/?status=in-progress');
+  (await page.locator('.badge:has-text("in-progress")').first().isVisible())
+    ? ok('document list filters + shows status badges') : bad('status badge/filter missing');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

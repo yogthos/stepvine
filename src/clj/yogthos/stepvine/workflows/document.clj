@@ -16,6 +16,9 @@
   (myc/pre-compile {:cells    {:start :doc/parse :render :doc/render}
                     :pipeline [:start :render]}))
 
+(def new-page
+  (myc/pre-compile {:cells {:start :doc/new-page} :pipeline [:start]}))
+
 (def run-export
   (myc/pre-compile {:cells    {:start :doc/parse-action :export :doc/run-export}
                     :pipeline [:start :export]}))

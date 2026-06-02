@@ -496,9 +496,14 @@ a validated `:workflow` (states + transitions + per-action `:steps`);
 compensation (mycelium `:error-groups`/`:resilience` are the hooks) — needed once
 real external steps (email/PDF/HTTP) land.
 
-**Phase 11 — Pages, index lookups & production hardening.** Multi-document
-workflow pages, index-based document creation/search, real query-DB backends,
-OAuth2/OIDC (§15.13). **✅ PDF generation done:** `yogthos.stepvine.pdf` (clj-pdf)
+**Phase 11 — Pages, index lookups & production hardening.** Real query-DB
+backends and OAuth2/OIDC remain (§15.13). **✅ Index lookups + pages done:**
+`yogthos.stepvine.index` resolves an external key to an entity via the unified
+source resolver; a form's `:index {:kind :key :into :prompt}` drives a
+lookup-creation page (`GET /form/:id/new`) that validates the key and seeds the
+`:into` field so the form's imports prepopulate the new document. The landing
+shows per-document `:status` + workflow `:state` badges and filters by `?status`.
+**✅ PDF generation done:** `yogthos.stepvine.pdf` (clj-pdf)
 renders a document to a PDF body — a default field/value table or a form-declared
 template with `{:field id}`/`{:reaction id}` substitution. A `:pdf` workflow step
 writes the report under `data/reports/<doc>/` and records it in `:meta :reports`;
