@@ -455,6 +455,26 @@ try {
   (await page.locator('.sv-page.active').innerText()).includes('Review')
     ? ok('deep-linking to ?view=review lands on the Review page') : bad('deep-link did not land on Review');
 
+  // ---- 16. Cascading derived fields — one calc field feeds the next ----
+  step('16. Cascading derived fields');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Order Calculator")'), '#qty');
+  ok('opened the order calculator');
+  await page.fill('#qty', '3');
+  await page.fill('#price', '20');
+  await page.fill('#discount-pct', '10');
+  await page.fill('#tax-rate', '8');
+  // the chain settles: subtotal 60 → discount 6 → tax 4.32 → total 58.32
+  await waitVal(page, '#total', v => parseFloat(v) === 58.32);
+  ok('the full chain computed: total = 58.32');
+  (parseFloat(await page.locator('#subtotal').inputValue()) === 60 &&
+   parseFloat(await page.locator('#tax').inputValue()) === 4.32)
+    ? ok('intermediate calc fields: subtotal=60, tax=4.32') : bad('intermediate cascade values wrong');
+  // change ONE upstream input → the whole chain recomputes live over SSE
+  await page.fill('#qty', '6');
+  await waitVal(page, '#total', v => parseFloat(v) === 116.64);
+  ok('editing qty cascaded subtotal→discount→tax→total live (total = 116.64)');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

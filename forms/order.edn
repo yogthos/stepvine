@@ -1,0 +1,81 @@
+;; Cascading derived fields. Domino :events form a lazy DAG: an event whose input
+;; is ANOTHER event's output re-fires when that output changes, so a single edit
+;; ripples through the whole chain. Here the calculated fields cascade
+;;
+;;     qty, price ─▶ subtotal ─▶ discount ─▶ tax ─▶ total
+;;
+;; i.e. changing the quantity recomputes the subtotal, which recomputes the
+;; discount, which recomputes the tax, which recomputes the total — each
+;; calculated field triggers the recalculation of the next. The server pushes
+;; every recomputed value to the browser as it settles.
+{:id    :order
+ :title "Order Calculator"
+
+ :data
+ {:model
+  [;; inputs the user edits
+   [:qty          {:id :qty          :type :number}]
+   [:price        {:id :price        :type :number}]
+   [:discount-pct {:id :discount-pct :type :number}]
+   [:tax-rate     {:id :tax-rate     :type :number}]
+   ;; calculated fields (each is an event output AND a downstream event input)
+   [:subtotal     {:id :subtotal     :type :number}]
+   [:discount     {:id :discount     :type :number}]
+   [:tax          {:id :tax          :type :number}]
+   [:total        {:id :total        :type :number}]]
+
+  :events
+  [;; 1. subtotal = qty × price
+   {:id :calc-subtotal
+    :inputs  [:qty :price]
+    :outputs [:subtotal]
+    :handler (fn [{{:keys [qty price]} :inputs}]
+               {:subtotal (let [x (* (or qty 0) (or price 0))]
+                            (/ (long (+ 0.5 (* x 100))) 100.0))})}
+   ;; 2. discount = subtotal × discount% — depends on the calculated subtotal
+   {:id :calc-discount
+    :inputs  [:subtotal :discount-pct]
+    :outputs [:discount]
+    :handler (fn [{{:keys [subtotal discount-pct]} :inputs}]
+               {:discount (let [x (/ (* (or subtotal 0) (or discount-pct 0)) 100.0)]
+                            (/ (long (+ 0.5 (* x 100))) 100.0))})}
+   ;; 3. tax = (subtotal − discount) × tax% — depends on TWO calculated fields
+   {:id :calc-tax
+    :inputs  [:subtotal :discount :tax-rate]
+    :outputs [:tax]
+    :handler (fn [{{:keys [subtotal discount tax-rate]} :inputs}]
+               {:tax (let [taxable (- (or subtotal 0) (or discount 0))
+                           x (/ (* taxable (or tax-rate 0)) 100.0)]
+                       (/ (long (+ 0.5 (* x 100))) 100.0))})}
+   ;; 4. total = subtotal − discount + tax — depends on all three above
+   {:id :calc-total
+    :inputs  [:subtotal :discount :tax]
+    :outputs [:total]
+    :handler (fn [{{:keys [subtotal discount tax]} :inputs}]
+               {:total (let [x (+ (- (or subtotal 0) (or discount 0)) (or tax 0))]
+                         (/ (long (+ 0.5 (* x 100))) 100.0))})}]
+
+  :reactions
+  [{:id :free-shipping? :args [:subtotal] :fn (fn [s] (>= (or s 0) 100))}]}
+
+ :views
+ {:default
+  {:title "Order Calculator"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Order Calculator"]
+    [:p "Edit any input — quantity, price, discount or tax — and watch the totals "
+     "cascade: subtotal → discount → tax → total."]
+    [:c/input-field {:label "Quantity"        :id :qty}]
+    [:c/input-field {:label "Unit price ($)"   :id :price}]
+    [:c/input-field {:label "Discount (%)"     :id :discount-pct}]
+    [:c/input-field {:label "Tax rate (%)"     :id :tax-rate}]
+    [:hr]
+    [:c/input-field {:label "Subtotal"  :id :subtotal :read-only true}]
+    [:c/input-field {:label "Discount"  :id :discount :read-only true}]
+    [:c/input-field {:label "Tax"       :id :tax      :read-only true}]
+    [:c/input-field {:label "Total"     :id :total    :read-only true}]
+    [:c/show {:when :free-shipping?}
+     [:p.alert.alert-success "Free shipping — subtotal is over $100."]]
+    [:p.presence "Editors online: " [:span {:data-text "$presence"}]]]}}}
