@@ -1,0 +1,35 @@
+;; Date-picker parity (stepvine-a3t): the date widget gains server-resolved
+;; constraints and quick-set helpers — all declared as data.
+;;   :min/:max  literal "yyyy-mm-dd" OR a relative spec (:today, {:weeks N}, …)
+;;   :step      day granularity (here 7 = pick whole weeks)
+;;   :helpers   quick-set buttons resolved to real dates server-side
+;;   :caption   a friendly, reformatted echo of the chosen ISO date
+{:id    :appointment
+ :title "Book Appointment"
+
+ :data
+ {:model
+  [[:preferred {:id :preferred :type :string}]
+   [:follow-up {:id :follow-up :type :string}]
+   [:notes     {:id :notes     :type :string}]]}
+
+ :views
+ {:default
+  {:title "Book Appointment"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Book Appointment"]
+    [:p "Preferred date must fall within the next 8 weeks; use the quick-set buttons "
+     "to jump to common choices."]
+    ;; constrained to [today, today+8 weeks]; quick-set helpers; friendly caption
+    [:c/date-picker {:id :preferred :label "Preferred date"
+                     :min :today :max {:weeks 8}
+                     :helpers [{:label "Today" :date :today}
+                               {:label "Next week" :date {:weeks 1}}
+                               {:label "In a month" :date {:months 1}}]
+                     :caption true}]
+    ;; weekly follow-up cadence: step by 7 days
+    [:c/date-picker {:id :follow-up :label "Follow-up (weekly)"
+                     :min :today :step 7 :caption true}]
+    [:c/input-field {:id :notes :label "Notes"}]]}}}

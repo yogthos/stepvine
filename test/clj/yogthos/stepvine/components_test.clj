@@ -704,3 +704,70 @@
       (is (str/includes? html "Intro blurb."))
       (is (str/includes? html "href=\"#sv-sec-1\""))   ; the section keeps its absolute index
       (is (not (str/includes? html "href=\"#sv-sec-0\""))))))
+
+;; --- Advanced date-picker (stepvine-a3t) ----------------------------------
+
+(def ^:private dated-ctx (assoc base-ctx :today "2026-06-02"))
+
+(deftest date-picker-keeps-literal-min-max
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/date-picker {:id :dob :label "DOB" :min "2000-01-01" :max "2030-12-31"}]
+               dated-ctx))]
+    (is (str/includes? html "min=\"2000-01-01\""))
+    (is (str/includes? html "max=\"2030-12-31\""))))
+
+(deftest date-picker-resolves-relative-constraints
+  (testing ":today resolves to the server's current date"
+    (let [html (hiccup->html
+                (render-widget-hiccup
+                 [:stepvine.components/date-picker {:id :dob :label "DOB" :min :today}] dated-ctx))]
+      (is (str/includes? html "min=\"2026-06-02\""))))
+  (testing "a relative offset map resolves against today (days/weeks/months)"
+    (let [html (hiccup->html
+                (render-widget-hiccup
+                 [:stepvine.components/date-picker
+                  {:id :dob :label "DOB" :min {:weeks -2} :max {:days 30}}] dated-ctx))]
+      (is (str/includes? html "min=\"2026-05-19\""))   ; today - 14 days
+      (is (str/includes? html "max=\"2026-07-02\"")))))  ; today + 30 days
+
+(deftest date-picker-supports-step
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/date-picker {:id :dob :label "DOB" :step 7}] dated-ctx))]
+    (is (str/includes? html "step=\"7\""))))
+
+(deftest date-picker-renders-quick-set-helpers
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/date-picker
+                {:id :dob :label "DOB"
+                 :helpers [{:label "Today" :date :today}
+                           {:label "In a week" :date {:weeks 1}}]}] dated-ctx))]
+    (testing "each helper is a button that sets the field to a resolved ISO date and posts"
+      ;; single quotes render HTML-escaped (&apos;); the browser unescapes at runtime
+      (is (str/includes? html "date-helper"))
+      (is (str/includes? html "Today"))
+      (is (str/includes? html "$dob = &apos;2026-06-02&apos;"))
+      (is (str/includes? html "In a week"))
+      (is (str/includes? html "$dob = &apos;2026-06-09&apos;"))
+      (is (str/includes? html "/field/dob")))))
+
+(deftest date-picker-caption-shows-friendly-display-format
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/date-picker {:id :dob :label "DOB" :caption true}] dated-ctx))]
+    (testing "a caption echoes the bound value reformatted for display"
+      (is (str/includes? html "date-caption"))
+      (is (str/includes? html "toLocaleDateString"))
+      (is (str/includes? html "$dob")))))
+
+(deftest date-picker-read-only-omits-helpers-and-posts
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/date-picker
+                {:id :dob :label "DOB" :read-only true
+                 :helpers [{:label "Today" :date :today}]}] dated-ctx))]
+    (is (str/includes? html "readonly"))
+    (is (not (str/includes? html "date-helper")))
+    (is (not (str/includes? html "@post")))))

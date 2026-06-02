@@ -775,6 +775,39 @@ try {
   (await page.locator('#first-name').inputValue()) === 'Grace'
     ? ok('a field edited inside the grid persisted (round-trips through SSE)') : bad('grid field did not persist');
 
+  // ---- 26. Advanced date-picker — constraints, helpers, caption ----
+  step('26. Advanced date-picker');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Book Appointment")'), '#preferred');
+  ok('opened the appointment form');
+  const minAttr = await page.locator('#preferred').getAttribute('min');
+  const maxAttr = await page.locator('#preferred').getAttribute('max');
+  /^\d{4}-\d{2}-\d{2}$/.test(minAttr || '')
+    ? ok(`preferred date min is server-resolved (:today = ${minAttr})`) : bad(`min not a date: ${minAttr}`);
+  /^\d{4}-\d{2}-\d{2}$/.test(maxAttr || '') && maxAttr > minAttr
+    ? ok(`max is server-resolved to a later date ({:weeks 8} = ${maxAttr})`) : bad(`max not a later date: ${maxAttr}`);
+  (await page.locator('#follow-up').getAttribute('step')) === '7'
+    ? ok('the follow-up date steps by 7 days (weekly granularity)') : bad('follow-up step not 7');
+  // quick-set: "Next week" should set the field to min + 7 days (TZ-safe UTC math)
+  const expectNext = (() => {
+    const [y, m, d] = minAttr.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d + 7)).toISOString().slice(0, 10);
+  })();
+  await page.click('.date-picker:has(#preferred) .date-helper:has-text("Next week")');
+  await page.waitForFunction((v) => document.querySelector('#preferred').value === v, expectNext, { timeout: 3000 })
+    .then(() => ok(`the "Next week" helper quick-set the date to ${expectNext}`))
+    .catch(async () => bad(`quick-set wrong: got ${await page.locator('#preferred').inputValue()}, expected ${expectNext}`));
+  // the caption reformats the chosen ISO date for friendly display
+  await page.waitForFunction(
+    () => { const c = document.querySelector('.date-picker:has(#preferred) .date-caption'); return c && c.textContent.trim().length > 0; },
+    null, { timeout: 3000 })
+    .then(() => ok('the caption shows the picked date in a friendly format')).catch(() => bad('caption did not update'));
+  // the helper-set value persists through SSE like any field edit
+  await settleFields(page);
+  await openDoc(page, () => page.reload(), '#preferred');
+  (await page.locator('#preferred').inputValue()) === expectNext
+    ? ok('the quick-set date persisted (round-trips through SSE)') : bad('date did not persist');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');
