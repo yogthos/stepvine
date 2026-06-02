@@ -11,14 +11,18 @@
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.users :as users]
-   [yogthos.stepvine.web.layout :as layout]))
+   [yogthos.stepvine.web.layout :as layout]
+   [yogthos.stepvine.web.security :as security]))
 
 (def ^:private styles
   (str "table{border-collapse:collapse;width:100%;margin:.25rem 0 1rem} "
        "td,th{border:1px solid #e5e7eb;padding:.4rem .5rem;text-align:left} "
        ".muted{color:#6b7280} .sv-queues{line-height:1.9} "
        ".sv-state{display:inline-block;font-size:.7rem;font-weight:700;text-transform:uppercase;"
-       "letter-spacing:.02em;background:#eef2ff;color:#3730a3;padding:.1rem .45rem;border-radius:.25rem}"))
+       "letter-spacing:.02em;background:#eef2ff;color:#3730a3;padding:.1rem .45rem;border-radius:.25rem} "
+       ".sv-mine{font-weight:700;color:#166534} "
+       "button{padding:.2rem .55rem;border:1px solid #d1d5db;border-radius:.375rem;background:#fff;cursor:pointer} "
+       "form{display:inline}"))
 
 (defn- workflowed? [form] (some? (:workflow form)))
 
@@ -74,15 +78,38 @@
           (apply page user (str "Queue — " title)
                  [{:label "Documents" :href "/"} {:label "Queues" :href "/queue"} {:label title}]
                  [:h1 (str title " queue")]
-                 (for [state (keys (:states wf))
-                       :let  [items (sort-by #(get-in % [:meta :modified-at]) > (get by-state state))]]
-                   [:section
-                    [:h2 [:span.sv-state (name state)] " " [:span.muted (str "(" (count items) ")")]]
-                    (if (seq items)
-                      (into [:table [:tr [:th "Owner"] [:th "Updated"] [:th]]]
-                            (for [d items]
-                              [:tr
-                               [:td (or (:display-name (users/get-user users-store (:created-by d))) (:created-by d))]
-                               [:td.muted (some-> (get-in d [:meta :modified-at]) (java.util.Date.) str)]
-                               [:td [:a {:href (str "/doc/" (:id d))} "Open →"]]]))
-                      [:p.muted "Nothing here."])])))))))
+                 (let [me (:id user)
+                       who (fn [uid] (or (:display-name (users/get-user users-store uid)) uid "—"))]
+                   (for [state (keys (:states wf))
+                         :let  [items (sort-by #(get-in % [:meta :modified-at]) > (get by-state state))]]
+                     [:section
+                      [:h2 [:span.sv-state (name state)] " " [:span.muted (str "(" (count items) ")")]]
+                      (if (seq items)
+                        (into [:table [:tr [:th "Owner"] [:th "Assignee"] [:th "Updated"] [:th]]]
+                              (for [d items
+                                    :let [a (documents/assignee d)]]
+                                [:tr
+                                 [:td (who (:created-by d))]
+                                 [:td (if a [:span (when (= a me) {:class "sv-mine"}) (who a)
+                                            (when (= a me) " (you)")]
+                                          [:span.muted "unassigned"])]
+                                 [:td.muted (some-> (get-in d [:meta :modified-at]) (java.util.Date.) str)]
+                                 [:td
+                                  [:a {:href (str "/doc/" (:id d))} "Open →"]
+                                  (when (not= a me)            ; claim it for yourself
+                                    [:form {:method "post" :action (str "/queue/" (name form-id) "/" (:id d) "/claim")
+                                            :style "display:inline;margin-left:.6rem"}
+                                     (security/csrf-field)
+                                     [:button "Claim"]])]]))
+                        [:p.muted "Nothing here."])]))))))))
+
+(defn claim
+  "Assign a queued document to the signed-in user (must be a team member)."
+  [documents-store forms-store users-store access-store]
+  (fn [req]
+    (let [user    (auth/current-user users-store req)
+          form-id (keyword (get-in req [:path-params :form]))
+          doc-id  (get-in req [:path-params :id])]
+      (when (access/team-member? access-store user form-id)
+        (documents/assign! documents-store doc-id (:id user) (:id user)))
+      (resp/redirect (str "/queue/" (name form-id)) :see-other))))

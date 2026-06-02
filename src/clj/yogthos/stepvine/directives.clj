@@ -62,5 +62,6 @@
       :snapshot  (snapshot! resources doc-id uid)
       :pdf       (pdf! resources form doc-id uid (second d))
       :email     (mailer/send! (:mailer resources) (second d))
+      :assign    (documents/assign! documents doc-id (second d) uid)
       nil))
   directives)

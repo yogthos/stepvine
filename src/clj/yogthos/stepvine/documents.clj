@@ -229,6 +229,22 @@
                     (assoc :status (if locked? :submitted :in-progress))
                     (update :rev (fnil inc 0))))))
 
+(defn assignee
+  "The user-id this document is currently assigned to, or nil."
+  [doc] (get-in doc [:meta :assignee]))
+
+(defn assign!
+  "Route the document to user `user-id` (nil clears the assignment), recording it
+   in `[:meta :assignee]` + the assignment history, bumping :rev."
+  [store id user-id by]
+  (-transact! store id
+              (fn [doc]
+                (-> doc
+                    (assoc-in [:meta :assignee] user-id)
+                    (update-in [:meta :assignments] (fnil conj [])
+                               {:to user-id :by by :at (System/currentTimeMillis)})
+                    (update :rev (fnil inc 0))))))
+
 (defn update-meta!
   "Persist a value at `[:meta & path]` (workflow step directive), bumping :rev."
   [store id path value]

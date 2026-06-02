@@ -85,6 +85,7 @@
      ;; work queues — a workflowed form's documents by state, for its team
      ["/queue"        (af {:get (queue/index documents forms users access)})]
      ["/queue/:form"  (af {:get (queue/for-form documents forms users access)})]
+     ["/queue/:form/:id/claim" (af {:post (queue/claim documents forms users access)})]
      ;; an app's own CSS, served live from the store (app-owned styling)
      ["/app/:id/style.css" {:get {:handler (app-style-handler forms)}}]
      ;; admin UI — role assignment (admin-only)

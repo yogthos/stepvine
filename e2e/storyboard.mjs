@@ -502,8 +502,16 @@ try {
   const qOpen = page.locator('table a:has-text("Open")').first();
   (await qOpen.count()) > 0
     ? ok('a queued document is listed with an Open link') : bad('no queued document listed');
-  // opening a queued document works (team-member access)
-  await qOpen.click();
+  // claim (assign to self) a queued document — routing
+  const claimBtn = page.locator('table button:has-text("Claim")').first();
+  if (await claimBtn.count()) {
+    await claimBtn.click();
+    await page.waitForSelector('h1:has-text("Support Ticket queue")');
+    (await page.locator('.sv-mine, td:has-text("(you)")').count()) > 0
+      ? ok('claimed a document — it shows assigned to me') : bad('claim did not assign the document');
+  } else { ok('document already assigned (claim hidden)'); }
+  // opening a queued document works (assignee / team-member access)
+  await page.locator('table a:has-text("Open")').first().click();
   await page.waitForSelector('h1:has-text("Support Ticket")');
   ok('opened a document from the queue');
 

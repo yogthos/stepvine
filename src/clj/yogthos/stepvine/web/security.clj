@@ -35,6 +35,8 @@
            (nil? doc)                          (-> (resp/response "No such document")
                                                    (resp/status 404))
            (documents/can-access? doc user-id) (handler req)
+           ;; the user this document is routed to may open it
+           (= user-id (documents/assignee doc)) (handler req)
            (and access users
                 (access/team-member? access (users/get-user users user-id) (:form-id doc)))
            (handler req)

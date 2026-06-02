@@ -107,6 +107,7 @@
 (defmethod run-step :pdf      [_ step]                [:pdf (select-keys step [:template])])
 (defmethod run-step :set-field [ctx {:keys [path value]}] [:set-field path (resolve-value ctx value)])
 (defmethod run-step :set-meta  [ctx {:keys [path value]}] [:set-meta path (resolve-value ctx value)])
+(defmethod run-step :assign    [ctx {:keys [to]}]         [:assign (resolve-value ctx to)])
 (defmethod run-step :email     [ctx step]
   [:email {:to      (resolve-template ctx (:to step))
            :subject (resolve-template ctx (:subject step))
