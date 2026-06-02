@@ -482,9 +482,19 @@ Domino error reactions + a `:valid?` reaction (which `:submit-when` gates on).
 served through splice→compile; all sci-sandboxed, never `clojure.core/eval`
 (§15.6–15.9).
 
-**Phase 10 — Workflow orchestration.** Data-defined actions/steps with a
-pluggable step dispatcher, a uniform external-client protocol, and a durable
-workflow-event log — all in-process (§15.10–15.12).
+**Phase 10 — Workflow orchestration. ✅ core done.** The document state machine
+is expressed as a **mycelium FSM** (states=cells, transitions=`:edges`,
+guard=`:dispatches` over `:permitted?`, `:default`→reject): `yogthos.stepvine.
+workflows.workflow` runs load → guard → effects → commit / reject. A form declares
+a validated `:workflow` (states + transitions + per-action `:steps`);
+`workflow.clj` holds the pure helpers + a pluggable `run-step` multimethod
+(`:notify`/`:snapshot`/`:set-field`/`:set-meta` with `{:from path}` resolution);
+`directives.clj` applies the emitted directives in-process (transition w/ history
++ lock, field/meta writes, notify, snapshot — recompute/persist/audit/broadcast).
+`:workflow` widget + `forms/ticket.edn` demo; storyboard drives open→review→closed
+(§15.10–15.12). *Deferred:* a uniform external-client protocol and multi-step
+compensation (mycelium `:error-groups`/`:resilience` are the hooks) — needed once
+real external steps (email/PDF/HTTP) land.
 
 **Phase 11 — Pages, index lookups & production hardening.** Multi-document
 workflow pages, index-based document creation/search, real query-DB backends,
