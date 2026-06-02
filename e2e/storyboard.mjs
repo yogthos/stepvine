@@ -347,10 +347,17 @@ try {
   ok('created a new app and opened the editor');
   await page.waitForSelector('.cm-editor', { timeout: 20000 });   // CodeMirror from the CDN
   ok('CodeMirror editor mounted');
+  // the editor page keeps the signed-in user in the navbar (not "Sign in")
+  (await page.locator('.sv-user').innerText()).includes('Admin') && !(await page.locator('.sv-signin').count())
+    ? ok('editor navbar shows the signed-in admin') : bad('editor navbar shows "Sign in" while logged in');
   // the live preview renders the scaffold inside the iframe
   await page.waitForTimeout(2000);
   (await page.frameLocator('#preview').locator('h1:has-text("Demo App")').count()) > 0
     ? ok('live preview rendered the form') : bad('live preview did not render');
+  // a fresh preview must NOT show the submitted/read-only lifecycle banner
+  (await page.frameLocator('#preview').locator('.sv-status').isVisible().catch(() => false))
+    ? bad('preview shows the read-only banner on a fresh form')
+    : ok('preview is clean (no spurious read-only banner)');
   // save persists the app to the DB
   await page.click('#save');
   await page.waitForTimeout(800);

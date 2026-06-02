@@ -41,7 +41,7 @@
 
 (defn users-page [users-store]
   (fn [req]
-    (let [me (auth/current-user req users-store)]
+    (let [me (auth/current-user users-store req)]
       (page me "Users"
             [:div
              [:p.muted "Assign roles (space-separated). " [:code "admin"]
@@ -100,7 +100,7 @@
 (defn delete-user [users-store]
   (fn [req]
     ;; never delete the acting admin
-    (when (not= (get-in req [:path-params :id]) (:id (auth/current-user req users-store)))
+    (when (not= (get-in req [:path-params :id]) (:id (auth/current-user users-store req)))
       (users/delete! users-store (get-in req [:path-params :id])))
     (resp/redirect "/admin/users" :see-other)))
 
@@ -108,7 +108,7 @@
 
 (defn forms-page [forms-store access-store users-store]
   (fn [req]
-    (page (auth/current-user req users-store) "Forms"
+    (page (auth/current-user users-store req) "Forms"
           [:div
            [:p.muted "Edit an app's EDN + CSS live, or restrict it to roles "
             "(space-separated; empty = open to all signed-in users)."]

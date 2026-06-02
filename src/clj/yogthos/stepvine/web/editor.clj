@@ -39,6 +39,11 @@
           view (render/render-view ctx (render/view-markup sess :default))]
       (str "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
            "<link rel=\"stylesheet\" href=\"/css/stepvine.css\">"
+           ;; the preview is static HTML with no datastar running, so elements
+           ;; datastar would hide until a signal goes truthy (the transient notice
+           ;; bar, the submitted/read-only banner) would otherwise show. Hide that
+           ;; lifecycle chrome so the preview reflects a fresh, editable document.
+           "<style>.sv-notice,.sv-status{display:none!important}</style>"
            "<style>" (or css "") "</style></head>"
            "<body><div class=\"sv-doc-body\">" view "</div></body></html>"))
     (catch Throwable e
@@ -163,7 +168,7 @@
           css   (or (:css form) "")]
       (-> (resp/response
            (layout/page
-            {:user   (auth/current-user req users-store)
+            {:user   (auth/current-user users-store req)
              :title  (str "Edit " id)
              :crumbs [{:label "Documents" :href "/"} {:label "Admin" :href "/admin/users"}
                       {:label "Forms" :href "/admin/forms"} {:label id}]
