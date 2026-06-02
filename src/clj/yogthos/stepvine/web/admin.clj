@@ -4,32 +4,29 @@
    set nothing on the session."
   (:require
    [clojure.string :as str]
-   [hiccup2.core :as h]
    [ring.util.response :as resp]
    [yogthos.stepvine.access :as access]
    [yogthos.stepvine.auth :as auth]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.users :as users]
+   [yogthos.stepvine.web.layout :as layout]
    [yogthos.stepvine.web.security :as security]))
 
-(defn- page [title body]
+(def ^:private admin-styles
+  (str "table{border-collapse:collapse;width:100%} td,th{border:1px solid #e5e7eb;padding:.4rem .5rem;text-align:left}"
+       ".subnav a{margin-right:.8rem} .sv-content input{padding:.25rem .4rem;border:1px solid #d1d5db;border-radius:.375rem}"
+       ".sv-content button{padding:.25rem .6rem;border:1px solid #d1d5db;border-radius:.375rem;background:#fff;cursor:pointer}"
+       ".muted{color:#6b7280} code{background:#f3f4f6;padding:0 .25rem;border-radius:.25rem} form{display:inline}"))
+
+(defn- page [user title body]
   (-> (resp/response
-       (str "<!DOCTYPE html>"
-            (h/html
-             [:html {:lang "en"}
-              [:head [:meta {:charset "utf-8"}]
-               [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
-               [:title (str "Admin — " title)]
-               [:style "body{font-family:system-ui,sans-serif;max-width:48rem;margin:2.5rem auto;line-height:1.5}"
-                       "table{border-collapse:collapse;width:100%} td,th{border:1px solid #e5e7eb;padding:.4rem .5rem;text-align:left}"
-                       "nav a{margin-right:.8rem} input{padding:.25rem .4rem;border:1px solid #d1d5db;border-radius:.375rem}"
-                       "button{padding:.25rem .6rem;border:1px solid #d1d5db;border-radius:.375rem;background:#fff;cursor:pointer}"
-                       ".muted{color:#6b7280} code{background:#f3f4f6;padding:0 .25rem;border-radius:.25rem}"]]
-              [:body
-               [:nav [:a {:href "/admin/users"} "Users"] [:a {:href "/admin/forms"} "Forms"]
-                [:a {:href "/"} "← Back to app"]]
-               [:h1 title]
-               body]])))
+       (layout/page
+        {:user user :title (str "Admin — " title)
+         :crumbs [{:label "Documents" :href "/"} {:label "Admin" :href "/admin/users"} {:label title}]
+         :head [:style admin-styles]}
+        [:p.subnav [:a {:href "/admin/users"} "Users"] [:a {:href "/admin/forms"} "Forms"]]
+        [:h1 title]
+        body))
       (resp/content-type "text/html")))
 
 (defn- roles-str [roles] (str/join " " (sort (map name roles))))
@@ -43,8 +40,8 @@
 ;; --- Users -> roles -------------------------------------------------------
 
 (defn users-page [users-store]
-  (fn [_req]
-    (page "Users"
+  (fn [req]
+    (page (auth/current-user req users-store) "Users"
           [:div
            [:p.muted "Assign roles (space-separated). " [:code "admin"]
             " grants the admin UI and access to every form."]
@@ -67,9 +64,9 @@
 
 ;; --- Forms -> roles -------------------------------------------------------
 
-(defn forms-page [forms-store access-store]
-  (fn [_req]
-    (page "Forms"
+(defn forms-page [forms-store access-store users-store]
+  (fn [req]
+    (page (auth/current-user req users-store) "Forms"
           [:div
            [:p.muted "Restrict a form to roles (space-separated). Empty = open to "
             "all signed-in users."]

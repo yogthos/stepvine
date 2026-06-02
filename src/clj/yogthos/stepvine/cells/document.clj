@@ -26,6 +26,7 @@
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
    [yogthos.stepvine.users :as users]
+   [yogthos.stepvine.web.layout :as layout]
    yogthos.stepvine.components   ; register all widget render methods
    [yogthos.stepvine.web.security :as security])
   (:import
@@ -64,76 +65,58 @@
          (security/csrf-field)
          [:button "Delete"]]])]))
 
+(def ^:private landing-styles
+  (str ".doc{padding:.5rem 0;border-bottom:1px solid #eee} small{color:#6b7280} form{display:inline}"
+       ".bar{display:flex;justify-content:space-between;align-items:center}"
+       ".form-sec{margin:1.5rem 0;padding-top:.5rem;border-top:2px solid #eef0f3}"
+       ".sv-content input{padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.375rem}"
+       ".sv-content button,.sv-content a.btn{padding:.25rem .6rem;border:1px solid #d1d5db;"
+       "border-radius:.375rem;background:#fff;cursor:pointer;text-decoration:none;color:#111;margin-left:.3rem}"
+       ".badge{color:#6b7280} .filter{margin-bottom:1rem} .filter a{margin-left:0;margin-right:.3rem}"))
+
 (defn- landing-html
   "The signed-in user's home: the forms they can access (by role), each with a
-   create control and their documents of that form."
-  [{:keys [forms docs-by-form user users admin? status]}]
-  (str "<!DOCTYPE html>"
-       (h/html
-        [:html {:lang "en"}
-         [:head
-          [:meta {:charset "utf-8"}]
-          [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
-          [:title "Stepvine — Documents"]
-          [:style (str "body{font-family:system-ui,sans-serif;max-width:44rem;margin:3rem auto;line-height:1.5}"
-                       ".doc{padding:.5rem 0;border-bottom:1px solid #eee}"
-                       "form{display:inline} small{color:#6b7280}"
-                       ".bar{display:flex;justify-content:space-between;align-items:center}"
-                       ".form-sec{margin:1.25rem 0;padding-top:.5rem;border-top:2px solid #eef0f3}"
-                       "input{padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.375rem}"
-                       "button,a.btn{padding:.25rem .6rem;border:1px solid #d1d5db;border-radius:.375rem;"
-                       "background:#fff;cursor:pointer;text-decoration:none;color:#111;margin-left:.3rem}"
-                       ".badge{color:#6b7280} .filter a{margin-left:0;margin-right:.3rem}"
-                       ".error{color:#b91c1c} label{display:block;margin:.75rem 0}")]]
-         [:body
-          [:div.bar
-           [:h1 "Stepvine documents"]
-           [:span
-            (when admin? [:a.btn {:href "/admin/users"} "Admin"])
-            [:form {:method "post" :action "/logout"}
-             (security/csrf-field)
-             [:small "Signed in as " [:b (:display-name user)]]
-             [:button "Sign out"]]]]
-          [:p.filter "Show: "
-           (for [[k label] [[nil "all"] [:in-progress "in progress"] [:submitted "submitted"]
-                            [:completed "completed"]]]
-             [:a.btn {:href (str "/" (when k (str "?status=" (name k))))} label])]
-          (if (seq forms)
-            (into [:div]
-                  (for [{:keys [id] :as f} forms]
-                    (let [docs (cond->> (get docs-by-form id)
-                                 status (filter #(= status (:status %))))]
-                      [:div.form-sec
-                       [:div.bar [:h2 (or (:title f) (name id))] (create-control f)]
-                       (if (seq docs)
-                         (into [:div] (map #(doc-row users user %) docs))
-                         [:p.badge "No documents yet."])])))
-            [:p "You don't have access to any forms yet. Ask an admin for a role."])]])))
+   create control and their documents of that form — inside the shared chrome."
+  [{:keys [forms docs-by-form user users status]}]
+  (layout/page
+   {:user user :title "Documents" :crumbs [{:label "Documents"}]
+    :head [:style landing-styles]}
+   [:p.filter "Show: "
+    (for [[k label] [[nil "all"] [:in-progress "in progress"] [:submitted "submitted"]
+                     [:completed "completed"]]]
+      [:a.btn {:href (str "/" (when k (str "?status=" (name k))))} label])]
+   (if (seq forms)
+     (into [:div]
+           (for [{:keys [id] :as f} forms]
+             (let [docs (cond->> (get docs-by-form id)
+                          status (filter #(= status (:status %))))]
+               [:div.form-sec
+                [:div.bar [:h2 (or (:title f) (name id))] (create-control f)]
+                (if (seq docs)
+                  (into [:div] (map #(doc-row users user %) docs))
+                  [:p.badge "No documents yet."])])))
+     [:p "You don't have access to any forms yet. Ask an admin for a role."])))
 
 (defn- index-page-html
   "The lookup page for an index form (§15.13): enter the key (e.g. an MRN), submit
-   to create a prepopulated document."
-  [form-id form value error]
-  (let [{:keys [prompt]} (:index form)]
-    (str "<!DOCTYPE html>"
-         (h/html
-          [:html {:lang "en"}
-           [:head [:meta {:charset "utf-8"}]
-            [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
-            [:title (str "New " (or (:title form) (name form-id)))]
-            [:style "body{font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;line-height:1.5}"
-                    "input{padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:.375rem}"
-                    "button{padding:.35rem .8rem;border:1px solid #d1d5db;border-radius:.375rem;background:#2563eb;color:#fff;cursor:pointer}"
-                    ".error{color:#b91c1c} label{display:block;margin:.75rem 0}"]]
-           [:body
-            [:h1 (str "New " (or (:title form) (name form-id)))]
-            [:form {:method "post" :action (str "/form/" (name form-id) "/new")}
-             (security/csrf-field)
-             [:label (or prompt "Lookup key")
-              [:br] [:input {:name "index-key" :value (or value "") :autofocus "autofocus"}]]
-             (when error [:p.error error])
-             [:button "Look up & create"]]
-            [:p [:a {:href "/"} "← Cancel"]]]]))))
+   to create a prepopulated document — inside the shared chrome."
+  [user form-id form value error]
+  (let [{:keys [prompt]} (:index form)
+        title (str "New " (or (:title form) (name form-id)))]
+    (layout/page
+     {:user user :title title
+      :crumbs [{:label "Documents" :href "/"} {:label title}]
+      :head [:style ".sv-content input{padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:.375rem}"
+                    ".sv-content button{padding:.35rem .8rem;border:1px solid #d1d5db;border-radius:.375rem;background:#2563eb;color:#fff;cursor:pointer}"
+                    ".error{color:#b91c1c} label{display:block;margin:.75rem 0}"]}
+     [:h1 title]
+     [:form {:method "post" :action (str "/form/" (name form-id) "/new")}
+      (security/csrf-field)
+      [:label (or prompt "Lookup key")
+       [:br] [:input {:name "index-key" :value (or value "") :autofocus "autofocus"}]]
+      (when error [:p.error error])
+      [:button "Look up & create"]]
+     [:p [:a {:href "/"} "← Cancel"]])))
 
 (myc/defcell :index/render
   {:requires [:documents :forms :users :access]
@@ -154,13 +137,14 @@
                             :users users :admin? (users/admin? user) :status status})})))
 
 (myc/defcell :doc/new-page
-  {:requires [:forms]
+  {:requires [:forms :users]
    :input    {:http-request :map}
    :output   {:html :string}
    :doc      "GET /form/:id/new — the index lookup page for an index form."}
-  (fn [{:keys [forms]} {req :http-request}]
-    (let [form-id (get-in req [:path-params :id])]
-      {:html (index-page-html form-id (forms/get-form forms form-id) nil nil)})))
+  (fn [{:keys [forms users]} {req :http-request}]
+    (let [form-id (get-in req [:path-params :id])
+          user    (users/get-user users (get-in req [:session :user-id]))]
+      {:html (index-page-html user form-id (forms/get-form forms form-id) nil nil)})))
 
 ;; --- POST /form/:id/new (create) ------------------------------------------
 
@@ -180,15 +164,16 @@
                         :form-digest  (forms/version-digest forms form-id version)})))
 
 (defn- do-create
-  [{:keys [documents forms] :as resources} form-id user-id index-key]
+  [{:keys [documents forms users] :as resources} form-id user-id index-key]
   (let [form     (forms/get-form forms form-id)
-        idx-spec (:index form)]
+        idx-spec (:index form)
+        user     (users/get-user users user-id)]
     (cond
       ;; index form with a key: validate, create, seed, prepopulate
       (and idx-spec (seq (str index-key)))
       (if-not (:found? (index/lookup (imports/source-ctx resources) idx-spec index-key))
         {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"}
-         :body (index-page-html form-id form index-key "No match for that key — please check it.")}
+         :body (index-page-html user form-id form index-key "No match for that key — please check it.")}
         (let [doc (create-pinned! documents forms form-id user-id)
               id  (:id doc)
               into (:into idx-spec)]
@@ -200,7 +185,7 @@
       ;; index form, no key yet: (re)show the lookup page
       idx-spec
       {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"}
-       :body (index-page-html form-id form nil nil)}
+       :body (index-page-html user form-id form nil nil)}
 
       ;; plain form: create empty and go
       :else
@@ -230,11 +215,12 @@
      :user-id (get-in req [:session :user-id])}))
 
 (myc/defcell :doc/render
-  {:requires [:forms :documents :session-manager :options-store]
+  {:requires [:forms :documents :session-manager :options-store :users]
    :input    {:doc-id :any :view-id :any :user-id :any}
    :output   {:html :string}
-   :doc      "Ensure the document's session and render the requested view."}
-  (fn [{:keys [session-manager options-store documents] :as resources} {:keys [doc-id view-id user-id]}]
+   :doc      "Ensure the document's session and render the requested view, inside
+              the shared navbar/footer chrome with breadcrumbs."}
+  (fn [{:keys [session-manager options-store documents users] :as resources} {:keys [doc-id view-id user-id]}]
     (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
       (let [sess (session/current session-manager doc-id)
             vid  (let [v (keyword view-id)]
@@ -250,11 +236,15 @@
                               (documents/workflow-state doc (:initial wf))))
                      ;; resolve option sources for top-level AND collection-item fields
                      (assoc :options (options/resolve-field-options options-store (render/all-field-opts sess))))
-            view (render/render-view ctx (render/view-markup sess vid))]
+            view (render/render-view ctx (render/view-markup sess vid))
+            user (users/get-user users user-id)
+            crumbs [{:label "Documents" :href "/"} {:label (or (:title form-raw) (name (:form-id doc)))}]]
         {:html (selmer/render-file "html/form.html"
-                                   {:title (:title form-raw)
-                                    :view  view
-                                    :theme (render/theme-href sess vid)})})
+                                   {:title  (:title form-raw)
+                                    :view   view
+                                    :theme  (render/theme-href sess vid)
+                                    :navbar (layout/navbar-html user crumbs)
+                                    :footer (layout/footer-html)})})
       {:html (selmer/render-file "html/form.html"
                                  {:title "Not found" :view "<p>No such document.</p>"})})))
 

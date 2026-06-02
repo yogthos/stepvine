@@ -73,7 +73,7 @@
      ["/admin" {:middleware [(partial admin/wrap-admin users)]}
       ["/users"           (af {:get  (admin/users-page users)})]
       ["/users/:id/roles" (af {:post (admin/set-user-roles users)})]
-      ["/forms"           (af {:get  (admin/forms-page forms access)})]
+      ["/forms"           (af {:get  (admin/forms-page forms access users)})]
       ["/forms/:id/roles" (af {:post (admin/set-form-roles access)})]]
      ;; document routes — access-controlled
      ["/doc/:id" {:middleware [doc-access]}

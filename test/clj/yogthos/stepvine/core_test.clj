@@ -41,7 +41,7 @@
 (deftest landing-after-login
   (let [ctx (p/request (login) "/" :request-method :get)]
     (is (= 200 (status ctx)))
-    (is (str/includes? (body ctx) "Stepvine documents"))
+    (is (str/includes? (body ctx) "sv-brand"))          ; shared navbar chrome present
     (is (str/includes? (body ctx) "/form/bmi/new"))
     (is (str/includes? (body ctx) "Sign out"))))
 

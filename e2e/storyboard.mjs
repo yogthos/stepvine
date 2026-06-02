@@ -54,7 +54,11 @@ try {
   await page.fill('input[name=password]', 'admin');
   await page.click('button:has-text("Sign in")');
   await page.waitForLoadState('networkidle');
-  (await page.content()).includes('Stepvine documents') ? ok('logged in, landing shown') : bad('login failed');
+  (await page.locator('.sv-topbar .sv-brand').isVisible()) ? ok('logged in, landing shown') : bad('login failed');
+  // shared chrome: navbar (user + breadcrumbs) + footer
+  (await page.locator('.sv-user').innerText()).includes('Admin') ? ok('navbar shows the signed-in user') : bad('user not shown in navbar');
+  (await page.locator('.sv-crumbs').isVisible()) ? ok('breadcrumbs present') : bad('no breadcrumbs');
+  (await page.locator('.sv-footer').isVisible()) ? ok('footer present') : bad('no footer');
 
   // ---- 2. BMI reactive calculation (the regression) ---------------------
   step('2. BMI calculator — live server computation');
@@ -185,6 +189,11 @@ try {
   await page.goto(BASE + '/');
   await openDoc(page, () => page.click('button:has-text("New Widget Showcase")'), '#name');
   ok('opened the widget showcase');
+  // the editor carries the chrome with a breadcrumb back to the document list
+  (await page.locator('.sv-topbar .sv-crumbs a:has-text("Documents")').getAttribute('href')) === '/'
+    ? ok('editor breadcrumb links back to documents') : bad('editor breadcrumb missing/wrong');
+  (await page.locator('.sv-crumbs').innerText()).includes('Widget Showcase')
+    ? ok('breadcrumb shows the current form') : bad('breadcrumb missing form name');
   // every widget kind is present
   const present = await page.evaluate(() => [
     '.widget.dropdown', '.widget.radio', '.widget.selections', '.widget.menu',
@@ -271,7 +280,7 @@ try {
   (await opage.locator('a.oauth:has-text("Demo SSO")').isVisible())
     ? ok('login page offers the SSO provider') : bad('SSO provider link missing');
   await Promise.all([opage.waitForURL(BASE + '/'), opage.click('a.oauth:has-text("Demo SSO")')]);
-  (await opage.locator('h1:has-text("Stepvine documents")').isVisible())
+  (await opage.locator('.sv-topbar .sv-brand').isVisible())
     ? ok('mock SSO logged in and reached the app') : bad('SSO did not reach the app');
   await octx.close();
 

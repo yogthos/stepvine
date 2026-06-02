@@ -8,29 +8,24 @@
    client-supplied signal."
   (:require
    [clojure.string :as str]
-   [hiccup2.core :as h]
    [ring.util.response :as resp]
    [yogthos.stepvine.auth :as auth]
    [yogthos.stepvine.users :as users]
+   [yogthos.stepvine.web.layout :as layout]
    [yogthos.stepvine.web.security :as security]))
 
 ;; --- Pages ----------------------------------------------------------------
 
 (defn- auth-page [title form]
-  (str "<!DOCTYPE html>"
-       (h/html
-        [:html {:lang "en"}
-         [:head
-          [:meta {:charset "utf-8"}]
-          [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
-          [:title title]
-          [:style (str "body{font-family:system-ui,sans-serif;max-width:22rem;margin:4rem auto;line-height:1.6}"
-                       "label{display:block;margin:.6rem 0 .15rem;color:#374151}"
-                       "input{width:100%;padding:.4rem .5rem;border:1px solid #d1d5db;border-radius:.375rem}"
-                       "button{margin-top:1rem;padding:.45rem .9rem;background:#2563eb;color:#fff;border:0;border-radius:.375rem;cursor:pointer}"
+  ;; pre-login pages: brand + footer chrome, no user/breadcrumbs
+  (layout/page
+   {:title title
+    :head [:style (str ".sv-content{max-width:22rem} label{display:block;margin:.6rem 0 .15rem;color:#374151}"
+                       ".sv-content input{width:100%;padding:.4rem .5rem;border:1px solid #d1d5db;border-radius:.375rem}"
+                       ".sv-content button{margin-top:1rem;padding:.45rem .9rem;background:#2563eb;color:#fff;border:0;border-radius:.375rem;cursor:pointer}"
                        ".err{color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;padding:.4rem .6rem;border-radius:.375rem}"
-                       "a{color:#2563eb}")]]
-         [:body form]])))
+                       ".oauth{display:inline-block;margin-top:.6rem}")]}
+   form))
 
 (defn login-page [{:keys [error providers]}]
   (auth-page "Sign in"

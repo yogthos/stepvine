@@ -13,6 +13,8 @@
     {% if theme %}<link rel="stylesheet" href="{{theme}}">{% endif %}
   </head>
   <body>
-    {{view|safe}}
+    {{navbar|safe}}
+    <div class="sv-doc-body">{{view|safe}}</div>
+    {{footer|safe}}
   </body>
 </html>

@@ -8,7 +8,37 @@
    stable so alternate themes can target the same structure.
    ────────────────────────────────────────────────────────────────────────── */
 
-body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; line-height: 1.5; }
+body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #1f2937; }
+
+/* ── Page chrome (navbar / breadcrumbs / footer), shared by all pages ──── */
+.sv-topbar { display: flex; align-items: center; justify-content: space-between;
+             gap: 1rem; padding: .55rem 1.25rem; background: #fff;
+             border-bottom: 1px solid #e5e7eb; }
+.sv-topbar-left { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+.sv-topbar-right { display: flex; align-items: center; gap: .75rem; }
+.sv-brand { font-weight: 700; color: #111827; text-decoration: none; white-space: nowrap;
+            letter-spacing: .01em; }
+.sv-crumbs { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; margin: 0;
+             padding: 0; color: #6b7280; font-size: .9rem; }
+.sv-crumbs li { display: flex; gap: .4rem; }
+.sv-crumbs li::before { content: "›"; color: #cbd5e1; }
+.sv-crumbs li:first-child::before { content: ""; }
+.sv-crumbs a { color: #2563eb; text-decoration: none; }
+.sv-crumbs a:hover { text-decoration: underline; }
+.sv-user { color: #374151; font-size: .9rem; }
+.sv-role { margin-left: .35rem; font-size: .68rem; background: #eef2ff; color: #3730a3;
+           padding: .05rem .35rem; border-radius: .25rem; text-transform: uppercase; }
+.sv-navlink { color: #2563eb; text-decoration: none; font-size: .9rem; }
+.sv-logout { padding: .3rem .7rem; border: 1px solid #d1d5db; border-radius: .375rem;
+             background: #fff; cursor: pointer; }
+.sv-content { padding: 1.5rem 1.25rem; max-width: 48rem; margin: 0 auto; }
+.sv-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+             padding: 1rem 1.25rem; margin-top: 2rem; border-top: 1px solid #e5e7eb;
+             color: #9ca3af; font-size: .85rem; }
+.sv-footer a { color: #6b7280; }
+/* document editor body: centered by default, full-bleed for a .sv-shell layout */
+.sv-doc-body { max-width: 32rem; margin: 0 auto; padding: 1.5rem 1.25rem; }
+.sv-doc-body:has(.sv-shell) { max-width: none; margin: 0; padding: 0; }
 
 /* ── Fields ───────────────────────────────────────────────────────────── */
 .field { display: flex; align-items: center; gap: .75rem; margin: .5rem 0; }
