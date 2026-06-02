@@ -1,0 +1,37 @@
+;; A workflow demo (§15.10): a support ticket moving through a declarative state
+;; machine (open -> review -> closed) expressed as a mycelium FSM. Action buttons
+;; appear only in the states they are legal from, driven by the $state signal.
+{:id :ticket
+ :version 1
+ :title "Support Ticket"
+
+ :data
+ {:model
+  [[:title  {:id :title  :type :string :validation [:required]}]
+   [:detail {:id :detail :type :string}]]}
+
+ :workflow
+ {:initial :open
+  :states  {:open   {:on {:submit :review}}
+            :review {:on {:approve :closed :reject :open}}
+            :closed {:terminal? true :locked? true}}
+  :actions {:submit  {:guard :valid?
+                      :steps [{:do :notify :message "Submitted for review."}]}
+            :approve {:steps [{:do :snapshot}
+                              {:do :notify :message "Approved and closed."}]}
+            :reject  {:steps [{:do :notify :message "Sent back for changes."}]}}}
+
+ :views
+ {:default
+  {:title "Support Ticket"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Support Ticket"]
+    [:p "Status: " [:strong {:data-text "$state"}]]
+    [:c/input-field {:id :title :label "Title"}]
+    [:c/input-field {:id :detail :label "Detail"}]
+    [:c/h-box {:gap :sm :align :center}
+     [:c/workflow {:action :submit  :label "Submit for review" :show-when :open}]
+     [:c/workflow {:action :approve :label "Approve"           :show-when :review}]
+     [:c/workflow {:action :reject  :label "Send back"         :show-when :review}]]]}}}

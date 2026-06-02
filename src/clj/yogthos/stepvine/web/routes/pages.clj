@@ -18,7 +18,8 @@
    [yogthos.stepvine.web.security :as security]
    [yogthos.stepvine.web.sse :as sse]
    [yogthos.stepvine.workflows.document :as doc]
-   [yogthos.stepvine.workflows.form :as form]))
+   [yogthos.stepvine.workflows.form :as form]
+   [yogthos.stepvine.workflows.workflow :as wf]))
 
 (defn page-routes [{:keys [forms documents session hub options-store patient-client users audit]}]
   (let [resources  {:forms           forms
@@ -52,6 +53,7 @@
       ["/delete" (af (post doc/delete))]
       ["/submit" (ds (post doc/submit))]
       ["/revise" (ds (post doc/revise))]
+      ["/wf/:action" (ds (post wf/run-action))]
       ["/field/:fid"         (ds (post form/update-field))]
       ["/field/:fid/lock"    (ds (post form/lock-field))]
       ["/field/:fid/unlock"  (ds (post form/unlock-field))]

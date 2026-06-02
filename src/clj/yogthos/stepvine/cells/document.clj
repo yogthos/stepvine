@@ -135,10 +135,15 @@
       (let [sess (session/current session-manager doc-id)
             vid  (let [v (keyword view-id)]
                    (if (get-in sess [:form :views v]) v :default))
+            doc  (documents/get-document documents doc-id)
             ctx  (-> (render/session->context sess vid doc-id)
                      (assoc :uid user-id)   ; the authenticated user drives lock comparison
                      ;; finalized documents render read-only (§15.5)
-                     (assoc :locked? (documents/locked? (documents/get-document documents doc-id)))
+                     (assoc :locked? (documents/locked? doc))
+                     ;; current workflow state, for $state-driven action buttons (§15.10)
+                     (assoc :workflow-state
+                            (when-let [wf (:workflow form-raw)]
+                              (documents/workflow-state doc (:initial wf))))
                      ;; resolve option sources for top-level AND collection-item fields
                      (assoc :options (options/resolve-field-options options-store (render/all-field-opts sess))))
             view (render/render-view ctx (render/view-markup sess vid))]

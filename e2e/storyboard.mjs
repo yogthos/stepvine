@@ -220,6 +220,27 @@ try {
   (await page.locator('.submit-btn').isVisible())
     ? ok('submit button restored after revise') : bad('submit button not restored after revise');
 
+  // ---- 10. Workflow state machine — ticket open→review→closed ----------
+  step('10. Workflow state machine — mycelium FSM');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Support Ticket")'), '#title');
+  const stateText = () => page.locator('[data-text="$state"]').innerText();
+  ok('opened a ticket');
+  (await stateText()) === 'open' ? ok('initial state :open') : bad(`state not open: ${await stateText()}`);
+  await page.fill('#title', 'Printer down'); await page.waitForTimeout(450);
+  (await page.locator('.wf-btn:has-text("Submit for review")').isVisible())
+    ? ok('submit action shown in :open') : bad('submit action not shown in :open');
+  await page.click('.wf-btn:has-text("Submit for review")'); await page.waitForTimeout(600);
+  (await stateText()) === 'review' ? ok('FSM transitioned :open → :review') : bad(`state not review: ${await stateText()}`);
+  (await page.locator('.wf-btn:has-text("Submit for review")').isVisible())
+    ? bad('submit still shown after transition') : ok('submit hidden once out of :open');
+  (await page.locator('.wf-btn:has-text("Approve")').isVisible())
+    ? ok('approve/reject shown in :review') : bad('approve not shown in :review');
+  await page.click('.wf-btn:has-text("Approve")'); await page.waitForTimeout(600);
+  (await stateText()) === 'closed' ? ok('FSM transitioned :review → :closed') : bad(`state not closed: ${await stateText()}`);
+  (await page.locator('.sv-status').isVisible())
+    ? ok('terminal :closed state is read-only') : bad('closed document not read-only');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

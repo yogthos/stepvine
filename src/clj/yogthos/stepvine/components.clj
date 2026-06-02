@@ -51,6 +51,7 @@
    yogthos.stepvine.components.widgets.buttons.hyperlink
    yogthos.stepvine.components.widgets.buttons.info-button
    yogthos.stepvine.components.widgets.buttons.submit
+   yogthos.stepvine.components.widgets.buttons.workflow
    ;; display / feedback
    yogthos.stepvine.components.widgets.display.progress-bar
    yogthos.stepvine.components.widgets.display.throbber

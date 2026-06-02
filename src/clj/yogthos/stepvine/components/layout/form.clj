@@ -33,7 +33,10 @@
                                                 :else      "")]))
                    (merge (render/signal-map ctx)
                           {"uid" uid "presence" 1 "locks" {}
-                           "locked" (boolean (:locked? ctx)) "notice" ""}))]
+                           "locked" (boolean (:locked? ctx)) "notice" ""
+                           ;; current workflow state name, for $state-driven
+                           ;; action-button visibility (§15.10)
+                           "state" (some-> (:workflow-state ctx) name)}))]
     ;; Rendered as a <div>, not a <form>: there is no submit (inputs POST via
     ;; data-on:input), and an empty data-on:submit value crashes Datastar's
     ;; engine (ValueRequired), which would break every binding on the page.

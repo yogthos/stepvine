@@ -170,6 +170,9 @@ body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; 
 .revise-btn { padding: .4rem .9rem; background: #fff; color: #374151;
               border: 1px solid #d1d5db; border-radius: .375rem; cursor: pointer; }
 .revise-btn:hover { background: #f3f4f6; }
+.wf-btn { padding: .4rem .9rem; background: #2563eb; color: #fff; border: none;
+          border-radius: .375rem; cursor: pointer; }
+.wf-btn:hover { background: #1d4ed8; }
 
 /* ── Layout primitives (scroller / border / gap / line) ───────────────── */
 .scroller { overflow: auto; }
