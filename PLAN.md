@@ -496,8 +496,13 @@ a validated `:workflow` (states + transitions + per-action `:steps`);
 compensation (mycelium `:error-groups`/`:resilience` are the hooks) — needed once
 real external steps (email/PDF/HTTP) land.
 
-**Phase 11 — Pages, index lookups & production hardening.** OAuth2/OIDC remains
-(§15.13). **✅ Query-DB backend done:** `:store/documents` is pluggable behind a
+**Phase 11 — Pages, index lookups & production hardening. ✅ done** — completes
+the §15 roadmap. **✅ OAuth2/OIDC done:** `web/oauth.clj` runs the
+authorization-code flow (`/oauth/:provider` → provider → `/oauth/:provider/
+callback`) with a CSRF `state` guard, a server-to-server token exchange (injected
+for tests), id_token decoding, and `find-or-create-oauth!` federating a
+password-less user; a dev/test-only `:mock?` provider gives a self-contained demo.
+**✅ Query-DB backend done:** `:store/documents` is pluggable behind a
 `DocStore` protocol (atoms/duratoms satisfy it directly, so all callers are
 backend-agnostic); a `SqlStore` keeps the document EDN in a SQLite `doc` column
 with indexed `owner`/`form_id`/`status`/`created_at` columns and an indexed
