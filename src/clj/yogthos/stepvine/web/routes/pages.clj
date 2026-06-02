@@ -23,6 +23,7 @@
    [yogthos.stepvine.web.oauth :as oauth]
    [yogthos.stepvine.web.pagenav :as pagenav]
    [yogthos.stepvine.web.queue :as queue]
+   [yogthos.stepvine.web.search :as search]
    [yogthos.stepvine.web.security :as security]
    [yogthos.stepvine.web.sse :as sse]
    [yogthos.stepvine.workflows.document :as doc]
@@ -109,6 +110,8 @@
                                                     :forms forms :documents documents})}}]
       ;; in-place page switch (multi-page forms): morph the view region, no reload
       ["/page/:vid" (ds {:post {:handler (pagenav/switch-handler resources)}})]
+      ;; server-side typeahead: query a source, morph in only the matches
+      ["/search/:fid" (ds {:post {:handler (search/handler resources)}})]
       ["/share"  (af (post doc/share))]
       ["/delete" (af (post doc/delete))]
       ["/submit" (ds (post doc/submit))]

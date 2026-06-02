@@ -1,0 +1,33 @@
+;; Server-side typeahead demo. The :countries source (a list the browser never
+;; receives) is queried on the server as you type; only the matching options are
+;; morphed into the results list. Each option is [label value] — search matches the
+;; label, picking stores the value.
+{:id    :lookup
+ :title "Country Lookup"
+
+ :sources
+ {:countries
+  {:kind :static
+   :data [["Argentina" "AR"] ["Australia" "AU"] ["Austria" "AT"] ["Brazil" "BR"]
+          ["Canada" "CA"] ["Chile" "CL"] ["China" "CN"] ["Denmark" "DK"]
+          ["Egypt" "EG"] ["France" "FR"] ["Germany" "DE"] ["India" "IN"]
+          ["Italy" "IT"] ["Japan" "JP"] ["Mexico" "MX"] ["Nigeria" "NG"]
+          ["Norway" "NO"] ["Portugal" "PT"] ["Spain" "ES"] ["Sweden" "SE"]
+          ["United Kingdom" "GB"] ["United States" "US"]]}}
+
+ :data
+ {:model
+  [[:country {:id :country :type :string}]
+   [:notes   {:id :notes   :type :string}]]}
+
+ :views
+ {:default
+  {:title "Country Lookup"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Country Lookup"]
+    [:p "Type to search — the server filters a list it never sends to your browser."]
+    [:c/search-select {:id :country :label "Country" :source :countries
+                       :placeholder "Search countries…"}]
+    [:c/input-field {:id :notes :label "Notes"}]]}}}

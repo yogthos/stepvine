@@ -566,6 +566,37 @@ try {
   ((await page.locator('#clinic').inputValue()) === '' && (await page.locator('#department').inputValue()) === '')
     ? ok('stale clinic + department selections were cleared') : bad('stale selections not cleared');
 
+  // ---- 19. Server-side typeahead -------------------------------------
+  step('19. Server-side typeahead');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Country Lookup")'), '#country');
+  ok('opened the country lookup form');
+  // the option list lives on the server — nothing in the browser until you search
+  (await page.locator('#search-country li').count()) === 0
+    ? ok('no options in the browser until you search') : bad('options present before searching');
+  // type a query -> the server filters and morphs in ONLY the matches
+  await page.fill('#country', 'can');
+  await page.waitForFunction(() => {
+    const items = [...document.querySelectorAll('#search-country li')].map((e) => e.textContent);
+    return items.includes('Canada') && !items.some((t) => t.includes('Argentina'));
+  }, null, { timeout: 5000 })
+    .then(() => ok('typing "can" returned only Canada (server-filtered, full list never sent)'))
+    .catch(() => bad('server-side search did not filter'));
+  // picking a result stores the option VALUE (not the label) and persists it
+  await page.click('#search-country button:has-text("Canada")');
+  await page.waitForFunction(() => /CA/.test(document.querySelector('.ss-selected')?.innerText || ''),
+                             null, { timeout: 4000 })
+    .then(() => ok('picking a result stored the option value (CA)'))
+    .catch(() => bad('pick did not set the field value'));
+  // a different query re-filters server-side
+  await page.fill('#country', 'united');
+  await page.waitForFunction(() => {
+    const items = [...document.querySelectorAll('#search-country li button')].map((e) => e.textContent);
+    return items.includes('United Kingdom') && items.includes('United States') && !items.includes('Canada');
+  }, null, { timeout: 5000 })
+    .then(() => ok('re-searching "united" returned UK + US'))
+    .catch(() => bad('server-side re-search failed'));
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');

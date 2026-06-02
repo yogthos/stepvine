@@ -38,6 +38,7 @@
    yogthos.stepvine.components.widgets.selection.tree-select
    yogthos.stepvine.components.widgets.selection.menu
    yogthos.stepvine.components.widgets.selection.typeahead
+   yogthos.stepvine.components.widgets.selection.search-select
    ;; navigation
    yogthos.stepvine.components.widgets.navigation.tabs
    ;; overlays

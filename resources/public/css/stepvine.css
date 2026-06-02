@@ -90,6 +90,18 @@ body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #
 .alert-warning { color: #b45309; background: #fffbeb; border: 1px solid #fcd34d; }
 .alert-danger { color: #991b1b; background: #fee2e2; border: 1px solid #fecaca; }
 
+/* ── Server-side typeahead (search-select) ────────────────────────────── */
+.search-select .ss-control { flex: 1; position: relative; display: flex; align-items: center; gap: .5rem; }
+.search-select .ss-control input { flex: 1; padding: .35rem .5rem; border: 1px solid #d1d5db; border-radius: .375rem; }
+.ss-results { list-style: none; margin: .2rem 0 0; padding: .2rem; border: 1px solid #d1d5db;
+  border-radius: .375rem; background: #fff; max-height: 12rem; overflow: auto;
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 20; box-shadow: 0 6px 16px rgba(0,0,0,.1); }
+.ss-results li button { display: block; width: 100%; text-align: left; border: none; background: none;
+  padding: .35rem .55rem; cursor: pointer; border-radius: .25rem; font-size: .92rem; }
+.ss-results li button:hover { background: #eff6ff; }
+.ss-empty { padding: .35rem .55rem; color: #9ca3af; font-size: .9rem; }
+.ss-selected { font-size: .8rem; color: #16a34a; white-space: nowrap; }
+
 /* ── Radio ────────────────────────────────────────────────────────────── */
 .radio-group { display: flex; flex-direction: column; gap: .25rem; }
 .radio-group.radio-stacked { flex-direction: column; }
