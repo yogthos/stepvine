@@ -65,7 +65,7 @@
 
 (myc/defcell :wf/commit
   {:doc      "Apply the directives (transition + steps), audit the action, ack 204."
-   :requires [:documents :session-manager :hub :audit]}
+   :requires [:documents :session-manager :hub :audit :mailer]}
   (fn [{:keys [audit] :as resources} {:keys [form doc-id uid action directives]}]
     (directives/apply! resources form doc-id uid directives)
     (audit/record! audit {:doc-id doc-id :by uid :action :wf/action :detail {:action action}})

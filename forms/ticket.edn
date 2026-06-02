@@ -16,7 +16,15 @@
             :review {:on {:approve :closed :reject :open}}
             :closed {:terminal? true :locked? true}}
   :actions {:submit  {:guard :valid?
-                      :steps [{:do :notify :message "Submitted for review."}]}
+                      :steps [{:do :notify :message "Submitted for review."}
+                              ;; notify the triage queue by email — subject/body are
+                              ;; templated from the document (a vector concatenates
+                              ;; literals with {:from path} / {:reaction id} values)
+                              {:do :email
+                               :to      "triage@example.com"
+                               :subject ["New ticket for review: " {:from [:title]}]
+                               :body    ["A support ticket was submitted for review.\n\nTitle: "
+                                         {:from [:title]} "\nDetail: " {:from [:detail]}]}]}
             :approve {:steps [{:do :pdf}            ; generate a PDF report on close (report 0)
                               {:do :notify :message "Approved and closed."}]}
             :reject  {:steps [{:do :notify :message "Sent back for changes."}]}}}

@@ -17,6 +17,7 @@
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.editor.impl :as impl]
    [yogthos.stepvine.hub :as hub]
+   [yogthos.stepvine.mailer :as mailer]
    [yogthos.stepvine.pdf :as pdf]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
@@ -60,5 +61,6 @@
       :notify    (hub/broadcast-signals! hub doc-id {"notice" (second d)})
       :snapshot  (snapshot! resources doc-id uid)
       :pdf       (pdf! resources form doc-id uid (second d))
+      :email     (mailer/send! (:mailer resources) (second d))
       nil))
   directives)

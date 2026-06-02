@@ -52,6 +52,7 @@
   :users          #ig/ref :store/users
   :audit          #ig/ref :store/audit
   :access         #ig/ref :store/access
+  :mailer         #ig/ref :mailer/mailer
   :reports-dir    #or [#env REPORTS_DIR "data/reports"]
   ;; OAuth2/OIDC providers (§15.13). Dev/test ship a self-contained :mock provider
   ;; that short-circuits the external round trip; prod configures real providers
@@ -120,6 +121,17 @@
 
  :datastar/hub
  {}
+
+ ;; Outbound email for workflow :email steps. Dev/test record to an in-memory
+ ;; outbox (no delivery); prod delivers via SMTP (configure SMTP_HOST etc).
+ :mailer/mailer
+ {:kind #profile {:dev :recording :test :recording :prod :smtp}
+  :from #or [#env MAIL_FROM "stepvine@localhost"]
+  :smtp {:host #or [#env SMTP_HOST "localhost"]
+         :port #long #or [#env SMTP_PORT 587]
+         :user #or [#env SMTP_USER nil]
+         :pass #or [#env SMTP_PASS nil]
+         :tls  true}}
 
  ;; Periodic keep-alive: detects dropped SSE clients (the ring adapter only
  ;; notices a broken connection on a failed write) so their thread + locks are

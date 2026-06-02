@@ -85,6 +85,15 @@
     (and (map? v) (contains? v :reaction)) (get-in ctx [:rxns (:reaction v)])
     :else                                  v))
 
+(defn resolve-template
+  "Resolve a templated step value: a vector concatenates its resolved parts into
+   one string (so `[\"Hi \" {:from [:name]}]` interpolates a field); anything else
+   resolves as a single value via `resolve-value`."
+  [ctx v]
+  (if (vector? v)
+    (apply str (map (partial resolve-value ctx) v))
+    (resolve-value ctx v)))
+
 (defmulti run-step
   "Compile an action step into a directive (or seq of directives). Dispatch on
    `:do` — adding a step kind is one defmethod (§15.11)."
@@ -98,6 +107,10 @@
 (defmethod run-step :pdf      [_ step]                [:pdf (select-keys step [:template])])
 (defmethod run-step :set-field [ctx {:keys [path value]}] [:set-field path (resolve-value ctx value)])
 (defmethod run-step :set-meta  [ctx {:keys [path value]}] [:set-meta path (resolve-value ctx value)])
+(defmethod run-step :email     [ctx step]
+  [:email {:to      (resolve-template ctx (:to step))
+           :subject (resolve-template ctx (:subject step))
+           :body    (resolve-template ctx (:body step))}])
 
 (defn action-steps [workflow action] (get-in workflow [:actions action :steps]))
 

@@ -49,6 +49,9 @@
            juji/editscript                 {:mvn/version "0.7.0"}
            duratom/duratom                 {:mvn/version "0.5.9"}
 
+           ;; Outbound email (workflow :email steps; SMTP in prod)
+           com.draines/postal              {:mvn/version "2.0.5"}
+
            ;; Ring + Jetty9 (async, for persistent SSE streams)
            info.sunng/ring-jetty9-adapter  {:mvn/version "0.39.4"}
            metosin/ring-http-response      {:mvn/version "0.9.5"}

@@ -8,6 +8,7 @@
    [yogthos.stepvine.access :as access]
    [yogthos.stepvine.auth :as auth]
    [yogthos.stepvine.forms :as forms]
+   [yogthos.stepvine.mailer :as mailer]
    [yogthos.stepvine.users :as users]
    [yogthos.stepvine.web.layout :as layout]
    [yogthos.stepvine.web.security :as security]))
@@ -24,10 +25,28 @@
         {:user user :title (str "Admin — " title)
          :crumbs [{:label "Documents" :href "/"} {:label "Admin" :href "/admin/users"} {:label title}]
          :head [:style admin-styles]}
-        [:p.subnav [:a {:href "/admin/users"} "Users"] [:a {:href "/admin/forms"} "Forms"]]
+        [:p.subnav [:a {:href "/admin/users"} "Users"] [:a {:href "/admin/forms"} "Forms"]
+         [:a {:href "/admin/outbox"} "Outbox"]]
         [:h1 title]
         body))
       (resp/content-type "text/html")))
+
+(defn outbox-page
+  "Dev/admin view of emails sent by workflow :email steps. The recording mailer
+   keeps them in memory (no delivery); an SMTP mailer returns nil (delivered)."
+  [mailer-impl users-store]
+  (fn [req]
+    (page (auth/current-user users-store req) "Outbox"
+          (let [box (reverse (or (mailer/outbox mailer-impl) []))]
+            [:div
+             [:p.muted "Emails sent by workflow " [:code ":email"] " steps. In dev these are "
+              "recorded here (not delivered); prod delivers via SMTP (no record)."]
+             (if (seq box)
+               (into [:table [:tr [:th "To"] [:th "Subject"] [:th "Body"]]]
+                     (for [m box]
+                       [:tr [:td (:to m)] [:td (:subject m)]
+                        [:td [:pre {:style "white-space:pre-wrap;margin:0"} (:body m)]]]))
+               [:p.muted "No emails sent yet."])]))))
 
 (defn- roles-str [roles] (str/join " " (sort (map name roles))))
 

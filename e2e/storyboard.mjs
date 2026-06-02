@@ -269,6 +269,11 @@ try {
   const pdfHead = (await pdfResp.body()).subarray(0, 4).toString('latin1');
   (pdfResp.status() === 200 && pdfHead === '%PDF')
     ? ok('approve generated a downloadable PDF report') : bad(`PDF report bad: ${pdfResp.status()} ${pdfHead}`);
+  // the :email step on submit sent a templated message (recorded in the dev outbox)
+  await page.goto(BASE + '/admin/outbox');
+  (await page.locator('td:has-text("New ticket for review: Printer down")').count()) > 0
+    ? ok('the :email workflow step sent a templated message (in the outbox)')
+    : bad('email step did not record a message in the outbox');
 
   // ---- 11. Index lookup — create a prepopulated document from a key -----
   step('11. Index lookup — prepopulated creation');

@@ -17,6 +17,7 @@
    [yogthos.stepvine.hub]
    [yogthos.stepvine.session]
    [yogthos.stepvine.options]
+   [yogthos.stepvine.mailer]
    [yogthos.stepvine.clients]
    [yogthos.stepvine.users]
    [yogthos.stepvine.access]
