@@ -56,7 +56,17 @@
                          (/ (long (+ 0.5 (* x 100))) 100.0))})}]
 
   :reactions
-  [{:id :free-shipping? :args [:subtotal] :fn (fn [s] (>= (or s 0) 100))}]}
+  [{:id :free-shipping? :args [:subtotal] :fn (fn [s] (>= (or s 0) 100))}]
+
+  ;; An EFFECT — the engine's outbound signal. When the (derived) total changes,
+  ;; the engine fires this; the handler returns an intent the host layer performs
+  ;; (here a transient in-app notice). It rides the same DAG as the calc events:
+  ;; editing the quantity moves the total, which fires the effect.
+  :effects
+  [{:on [:total]
+    :handler (fn [{:keys [inputs]}]
+               (when (> (or (:total inputs) 0) 100)
+                 {:kind :notify :message "Large order — flagged for review."}))}]}
 
  :views
  {:default

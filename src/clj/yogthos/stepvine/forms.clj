@@ -29,6 +29,7 @@
    [integrant.core :as ig]
    [next.jdbc :as jdbc]
    [yogthos.stepvine.cascades :as cascades]
+   [yogthos.stepvine.imports :as imports]
    [yogthos.stepvine.partials :as partials]
    [yogthos.stepvine.validation :as validation]
    [yogthos.stepvine.versions :as versions]))
@@ -46,16 +47,26 @@
 
 ;; --- Authoring (pure-ish helpers) -----------------------------------------
 
+(defn- compile-import-effects
+  "Add a form effect per event-triggered import, so an import is fired by the
+   engine's effect signal (not the host inspecting changes)."
+  [form]
+  (let [effs (imports/->effects form)]
+    (cond-> form
+      (seq effs) (update-in [:data :effects] (fnil into []) effs))))
+
 (defn prepare-form
   "Resolve a served form: splice partials (§15.9), compile declarative validation
-   into error + :valid? reactions (§15.8), and compile cascading-dropdown
-   dependencies into Domino clearing events (§ parity). Public so the live editor
-   can preview a form exactly as it will be served."
+   into error + :valid? reactions (§15.8), compile cascading-dropdown dependencies
+   into Domino clearing events, and event-triggered imports into Domino effect
+   signals. Public so the live editor can preview a form exactly as it will be
+   served."
   [store form]
   (some->> form
            (partials/splice (:partials store))
            validation/compile-validations
-           cascades/compile-cascades))
+           cascades/compile-cascades
+           compile-import-effects))
 
 (def ^:private prepare prepare-form)
 

@@ -53,6 +53,12 @@
   [session]
   (data/changed-ids (::data/ctx session)))
 
+(defn emitted-effects
+  "Effect intents the engine emitted during the session's last transact — the
+   signals the host layer performs (email, pdf, import, …)."
+  [session]
+  (data/emitted-effects session))
+
 (defn apply-changes [session changes]
   (data/transact-ctx session changes))
 

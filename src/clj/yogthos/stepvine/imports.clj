@@ -32,6 +32,23 @@
   [field-id]
   (keyword "event" (name field-id)))
 
+(defn- event-fields
+  "Field ids an import's `:on` event-triggers reference (:event/patient-id ->
+   :patient-id); :create/:open triggers (handled at creation) are ignored."
+  [import]
+  (keep (fn [t] (when (= "event" (namespace t)) (keyword (name t)))) (:on import)))
+
+(defn ->effects
+  "Form effects (data) that emit an `:import` intent when an event-triggered
+   import's trigger fields change — so imports are layered on the engine's effect
+   signal. Handlers are quoted forms (they survive the sci round-trip)."
+  [form]
+  (keep (fn [imp]
+          (when-let [fields (seq (event-fields imp))]
+            {:on      (vec fields)
+             :handler (list 'fn ['_] {:kind :import :fields (vec fields)})}))
+        (:imports form)))
+
 (defn- as-path [p] (if (vector? p) p [p]))
 
 (defn run

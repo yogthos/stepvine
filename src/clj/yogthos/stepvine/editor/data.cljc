@@ -45,6 +45,25 @@
             (fn [ctx inputs outputs]
               (h {:inputs inputs :outputs outputs :ctx ctx})))))
 
+;; ---- effects (engine-emitted side-effect signals) ----------------------------
+;; Events change document data; *effects* are notifications the engine emits when
+;; data changes, for the host layer to act on (send email, generate a pdf, run an
+;; import). A form effect `{:on [field-ids] :handler (fn [{:keys [inputs]}] intent)}`
+;; becomes a domino effect: when any `:on` field changes, the handler runs (inputs
+;; = {field-id -> value}) and its returned intent map is collected for the host.
+
+(def ^:dynamic *effect-sink*
+  "An atom collecting effect intents emitted during a `transact`, or nil to
+   discard them (e.g. during initialize / a structural rebuild)."
+  nil)
+
+(defn- bridge-effect
+  [{:keys [on handler]}]
+  {:inputs  (vec on)
+   :handler (fn [_ctx in-map]
+              (when-let [intent (handler {:inputs in-map})]
+                (some-> *effect-sink* (swap! conj intent))))})
+
 ;; ---- collections -------------------------------------------------------------
 ;; A top-level model entry tagged `:collection? true` carries an item `:schema`
 ;; (its own model/events/reactions). Items live at db path `[coll idx]`.
@@ -177,10 +196,11 @@
    The per-item (recursive) expansion is computed once and feeds both the live
    schema and the reaction defs."
   [form db]
-  (let [{:keys [model events reactions]} (:data form)
+  (let [{:keys [model events reactions effects]} (:data form)
         exps   (expansions form db)
-        schema {:model  (into (vec model) (mapcat :model exps))
-                :events (into (mapv bridge-event events) (mapcat :events exps))}]
+        schema {:model   (into (vec model) (mapcat :model exps))
+                :events  (into (mapv bridge-event events) (mapcat :events exps))
+                :effects (mapv bridge-effect effects)}]
     (-> (d/initialize schema db)
         (assoc ::reaction-defs (topo-reactions (into (vec reactions) (mapcat :reaction-defs exps))))
         with-reactions)))
@@ -236,13 +256,21 @@
         path-fn (partial id->path ctx)
         model   (get-in session [:form :data :model])
         new-db  (apply-ops (::d/db ctx) path-fn changes)]
-    (assoc session ::ctx
-           (if (and (seq (collection-fields model))
-                    (not= (coll-signature model (::d/db ctx))
-                          (coll-signature model new-db)))
-             (build-ctx (:form session) new-db)                          ; item set changed
-             (-> (d/transact ctx (mapv (fn [[id v]] [(path-fn id) v]) changes))
-                 with-reactions)))))
+    (if (and (seq (collection-fields model))
+             (not= (coll-signature model (::d/db ctx))
+                   (coll-signature model new-db)))
+      (assoc session ::ctx (build-ctx (:form session) new-db) ::emitted [])  ; item set changed
+      ;; value edit: transact incrementally, capturing any effect intents the
+      ;; engine emits (change-triggered) so the host can act on them
+      (let [sink    (atom [])
+            new-ctx (binding [*effect-sink* sink]
+                      (-> (d/transact ctx (mapv (fn [[id v]] [(path-fn id) v]) changes))
+                          with-reactions))]
+        (assoc session ::ctx new-ctx ::emitted @sink)))))
+
+(defn emitted-effects
+  "The effect intents the engine emitted during the session's last transact."
+  [session] (::emitted session []))
 
 ;; ---- values ------------------------------------------------------------------
 

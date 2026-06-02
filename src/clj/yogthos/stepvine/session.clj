@@ -66,6 +66,11 @@
   [manager id]
   (impl/changed-ids (current manager id)))
 
+(defn emitted-effects
+  "Effect intents the engine emitted during the document's last transact."
+  [manager id]
+  (impl/emitted-effects (current manager id)))
+
 (defn snapshot-of
   [manager id]
   (snapshot (current manager id)))

@@ -487,6 +487,12 @@ try {
   await page.fill('#qty', '6');
   await waitLv('total', '$116.64');
   ok('editing qty cascaded subtotal→discount→tax→total live (total = $116.64)');
+  // crossing the total threshold fires a DOMINO EFFECT → the host shows a notice
+  await page.waitForFunction(
+    () => { const n = document.querySelector('.sv-notice'); return n && /flagged for review/.test(n.textContent); },
+    null, { timeout: 5000 })
+    .then(() => ok('a domino effect signalled the host, which raised a notice (total > threshold)'))
+    .catch(() => bad('threshold effect did not raise a notice'));
 
   // ---- 17. Work queues — documents by workflow state, across owners ----
   step('17. Work queues');

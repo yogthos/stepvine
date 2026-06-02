@@ -13,6 +13,7 @@
    [yogthos.stepvine.audit :as audit]
    [yogthos.stepvine.docs :as docs]
    [yogthos.stepvine.documents :as documents]
+   [yogthos.stepvine.effects :as effects]
    [yogthos.stepvine.hub :as hub]
    [yogthos.stepvine.options :as options]
    [yogthos.stepvine.render :as render]
@@ -72,10 +73,10 @@
   {:requires [:forms :documents :session-manager :patient-client :audit :hub :options-store]
    :input    {:doc-id :any :field-id :any :uid :any :raw-value :any}
    :output   {:status :int :body :string}
-   :doc      "Coerce + transact the change (lock-aware + finalized-doc-aware), then —
-              driven by the transaction's change-set — audit the diff, re-render
-              dependent (cascading) dropdowns, and run any triggered imports (so an
-              import fires for a cascaded change too)."}
+   :doc      "Coerce + transact the change (lock-aware + finalized-doc-aware), then
+              audit the diff, re-render dependent (cascading) dropdowns from the
+              change-set, and perform the side-effect intents the engine emitted
+              (email / notify / import)."}
   (fn [{:keys [session-manager patient-client documents audit] :as resources}
        {:keys [doc-id field-id uid raw-value]}]
     (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
@@ -86,15 +87,16 @@
               value  (coerce (get-in sess [:field-opts fid]) raw-value)
               before (session/value session-manager doc-id fid)]
           (session/apply-field-as! session-manager doc-id uid fid value)
-          (let [after   (session/value session-manager doc-id fid)
-                ;; the engine's change-set: every field this transaction moved
-                ;; (the edited field + anything its events cascaded)
-                changed (session/changed-ids session-manager doc-id)]
+          (let [after    (session/value session-manager doc-id fid)
+                ;; the engine's change-set + the effect intents it emitted, both
+                ;; from this transaction (the edit + whatever its events moved)
+                changed  (session/changed-ids session-manager doc-id)
+                emitted  (session/emitted-effects session-manager doc-id)]
             (when (not= before after)                              ; skip no-ops / lock-rejected
               (audit/record! audit {:doc-id doc-id :by uid :action :field/save
                                     :path [fid] :before before :after after})
-              (rerender-dependents! resources doc-id changed)      ; re-render what changed
-              (docs/run-imports! resources form-raw doc-id changed))) ; imports for any changed field
+              (rerender-dependents! resources doc-id changed)      ; re-render what changed (UI)
+              (effects/perform-all! resources doc-id form-raw emitted))) ; email / notify / import
           {:status 204 :body ""}))
       {:status 404 :body (str "No such document: " doc-id)})))
 
