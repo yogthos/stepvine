@@ -629,12 +629,27 @@ try {
     ? ok('a :read-roles field is hidden from a non-reviewer') : bad('read-restricted field leaked');
   (await cpage.locator('#submission').getAttribute('readonly')) === null
     ? ok('an open field stays editable') : bad('open field wrongly read-only');
+  // per-VIEW gate: a non-reviewer sees only the open page of a multi-page form
+  await cpage.goto(BASE + '/');
+  await openDoc(cpage, () => cpage.click('button:has-text("New Triage")'), '#summary');
+  (await cpage.locator('.sv-page:has-text("Review")').count()) === 0
+    ? ok('a :roles-gated page is filtered from the nav for a non-reviewer') : bad('gated page leaked to non-reviewer');
+  // directly requesting the gated view falls back to a permitted one
+  await cpage.goto(cpage.url().replace(/\?.*$/, '') + '?view=review');
+  await cpage.waitForSelector('#summary');
+  (await cpage.locator('#priority').count()) === 0
+    ? ok('requesting a forbidden view falls back to a permitted one') : bad('forbidden view rendered');
   await cctx.close();
   // the admin (always permitted) sees + edits everything
   await page.goto(BASE + '/');
   await openDoc(page, () => page.click('button:has-text("New Submission Review")'), '#submission');
   ((await page.locator('#decision').getAttribute('readonly')) === null && (await page.locator('#score').count()) > 0)
     ? ok('an admin sees and edits every field') : bad('admin wrongly restricted');
+  // admin sees the reviewer-only page of the multi-page form
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Triage")'), '#summary');
+  (await page.locator('.sv-page:has-text("Review")').count()) > 0
+    ? ok('an admin sees the reviewer-only page in the nav') : bad('admin missing the gated page');
 
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');

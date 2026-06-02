@@ -1,0 +1,28 @@
+;; Per-view permissions. A view may declare :roles — only those roles (and admins)
+;; may see it. Here the Review page is reviewer-only: a non-reviewer sees just the
+;; Intake page (the Review tab is filtered out of the nav and can't be reached),
+;; while a reviewer sees both.
+{:id    :triage
+ :title "Triage"
+
+ :pages [{:view :intake :label "Intake"}
+         {:view :review :label "Review"}]
+
+ :data
+ {:model
+  [[:summary  {:id :summary  :type :string}]
+   [:priority {:id :priority :type :string}]]}
+
+ :views
+ {:intake
+  {:opts   {:widget-namespaces {"c" "stepvine.components"}}
+   :markup [:c/form {}
+            [:h1 "Intake"]
+            [:c/input-field {:id :summary :label "Summary"}]]}
+
+  :review
+  {:roles  #{:reviewer}                    ; reviewer-only page
+   :opts   {:widget-namespaces {"c" "stepvine.components"}}
+   :markup [:c/form {}
+            [:h1 "Review"]
+            [:c/input-field {:id :priority :label "Priority"}]]}}}

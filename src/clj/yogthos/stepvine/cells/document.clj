@@ -226,15 +226,19 @@
    Shared by the full-page render and the in-place page switch."
   [{:keys [session-manager options-store documents users] :as resources} doc-id view-id user-id]
   (when-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
-    (let [sess (session/current session-manager doc-id)
-          user (users/get-user users user-id)
-          vid  (let [v     (keyword view-id)
-                     views (get-in sess [:form :views])]
+    (let [sess     (session/current session-manager doc-id)
+          user     (users/get-user users user-id)
+          views    (get-in sess [:form :views])
+          ;; per-view gate (§parity): a view's :roles restrict who may see it
+          view-ok? (fn [v] (access/role-permitted? user (get-in views [(keyword v) :roles])))
+          ;; only the pages this user may access appear in the nav
+          pages    (filterv #(view-ok? (:view %)) (:pages form-raw))
+          vid  (let [v (keyword view-id)]
                  (cond
-                   (get views v)           v
-                   ;; multi-page form: land on the first page when none requested
-                   (seq (:pages form-raw)) (keyword (:view (first (:pages form-raw))))
-                   :else                   :default))
+                   (and (get views v) (view-ok? v)) v               ; requested + permitted
+                   (seq pages)        (keyword (:view (first pages))) ; first permitted page
+                   (view-ok? :default) :default
+                   :else (first (keep (fn [[k _]] (when (view-ok? k) k)) views))))
           doc  (documents/get-document documents doc-id)
           ctx  (-> (render/session->context sess vid doc-id)
                    (assoc :uid user-id)   ; the authenticated user drives lock comparison
@@ -252,7 +256,7 @@
       {:vid      vid
        :html     (render/render-view ctx (render/view-markup sess vid))
        :form-raw form-raw
-       :pages    (:pages form-raw)               ; ordered [{:view :label} …] → page nav
+       :pages    pages               ; permitted pages only → page nav
        :doc      doc
        :theme    (render/theme-href sess vid)})))
 
