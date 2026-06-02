@@ -181,6 +181,16 @@
                              (= (:dir sort) :asc)   {:col col :dir :desc}
                              :else                  nil))))))
 
+(defn set-table-filter!
+  "Set the table's row filter (view-state) to `{:col <col> :value <v>}`. A blank
+   value clears the filter (all rows shown). View-only — no document change."
+  [manager doc-id coll-id col value]
+  (update-view! manager doc-id coll-id
+                (fn [vs]
+                  (if (str/blank? (str value))
+                    (dissoc vs :filter)
+                    (assoc vs :filter {:col (keyword col) :value (str value)})))))
+
 (defn set-table-page!
   "Move the table page: dir is \"next\"/\"prev\" or an absolute integer string."
   [manager doc-id coll-id dir]

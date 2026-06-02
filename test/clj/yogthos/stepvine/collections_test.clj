@@ -266,3 +266,36 @@
           (session/set-table-page! mgr "tasks" :tasks "next")
           (is (str/includes? (render-tasks mgr) "Page 2 of 2"))
           (is (= 1 (row-count (render-tasks mgr)))))))))
+
+(deftest table-filter-narrows-rows
+  (let [[_ _ mgr] (mgr+)
+        form (forms/load-form "tasks")]
+    (session/ensure-document! mgr "tasks" form {})
+    (let [a (session/add-item! mgr "tasks" :tasks)
+          b (session/add-item! mgr "tasks" :tasks)
+          c (session/add-item! mgr "tasks" :tasks)]
+      (doseq [[idx t p] [[a "Alpha" 1] [b "Bravo" 2] [c "Charlie" 1]]]
+        (session/set-item-field! mgr "tasks" :tasks idx :title t)
+        (session/set-item-field! mgr "tasks" :tasks idx :priority p))
+      (testing "the filter dropdown renders the distinct column values"
+        (let [html (render-tasks mgr)]
+          (is (str/includes? html "widget-table-filter"))
+          (is (str/includes? html "Priority:"))
+          (is (str/includes? html ">All<"))
+          (is (str/includes? html "/filter?col=priority"))))
+      (testing "no filter: all rows shown"
+        (is (= 3 (row-count (render-tasks mgr)))))
+      (testing "filtering by priority=1 keeps only matching rows"
+        (session/set-table-filter! mgr "tasks" :tasks :priority "1")
+        (let [html (render-tasks mgr)]
+          (is (= 2 (row-count html)))      ; Alpha + Charlie
+          ;; the non-matching row (Bravo) is not rendered (its value still appears
+          ;; in the seeded data-signals JSON, so check the row element by id)
+          (is (str/includes? html (str "id=\"row-tasks-" a "\"")))
+          (is (str/includes? html (str "id=\"row-tasks-" c "\"")))
+          (is (not (str/includes? html (str "id=\"row-tasks-" b "\""))))))
+      (testing "the active filter value is marked selected (survives re-render)"
+        (is (str/includes? (render-tasks mgr) "selected")))
+      (testing "a blank value clears the filter"
+        (session/set-table-filter! mgr "tasks" :tasks :priority "")
+        (is (= 3 (row-count (render-tasks mgr))))))))

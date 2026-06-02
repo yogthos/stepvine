@@ -270,10 +270,13 @@
   {:requires [:forms :documents :session-manager :hub :options-store]
    :input    {:doc-id :any :coll-id :any :query-params :any}
    :output   {:status :int :body :string}
-   :doc      "Re-render the collection with filter applied (view-only, no data change)."}
-  (fn [resources {:keys [doc-id coll-id]}]
+   :doc      "Set the row filter (view-state) and re-render — view-only, no data change."}
+  (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id query-params]}]
     (when (docs/ensure! resources doc-id)
-      (rerender-collection! resources doc-id (keyword coll-id)))
+      (let [coll (keyword coll-id)]
+        (session/set-table-filter! session-manager doc-id coll
+                                   (get query-params "col") (get query-params "value"))
+        (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
 (myc/defcell :form/coll-move-row

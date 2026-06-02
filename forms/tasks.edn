@@ -31,6 +31,9 @@
       :can-delete-rows? true
       :can-move-rows?   true
       :can-clear-table? true
+      ;; a column filter: narrow rows to a chosen priority (distinct values are
+      ;; auto-derived from the data)
+      :filter           {:col :priority :label "Priority:"}
       :paged?           true
       :page-size        3
       :striped?         true}]]}}}

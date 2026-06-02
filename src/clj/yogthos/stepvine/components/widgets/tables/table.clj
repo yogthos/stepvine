@@ -39,14 +39,20 @@
     :else                          (compare (str a) (str b))))
 
 (defn- apply-view
-  "Apply the table's server-side view-state (sort column/dir, paging) to the row
-   order. Returns {:order display-order :sort {:col :dir} :page p :pages n}."
+  "Apply the table's server-side view-state (filter, sort column/dir, paging) to
+   the row order. Returns {:order display-order :sort {:col :dir} :page p :pages n
+   :filter {:col :value} :total n}."
   [ctx coll-id order items {:keys [page-size paged?]}]
-  (let [{:keys [sort page] :or {page 0}} (get-in ctx [:view-state coll-id])
+  (let [{:keys [sort page] flt :filter :or {page 0}} (get-in ctx [:view-state coll-id])
+        ;; row filter: keep rows whose filter column matches the chosen value
+        filtered (if-let [{:keys [col value]} flt]
+                   (vec (clojure.core/filter
+                         (fn [idx] (= (str value) (str (get-in items [idx col])))) order))
+                   (vec order))
         sorted (if-let [col (:col sort)]
-                 (let [asc (sort-by #(get-in items [% col]) cmp-vals (vec order))]
+                 (let [asc (sort-by #(get-in items [% col]) cmp-vals filtered)]
                    (vec (if (= :desc (:dir sort)) (reverse asc) asc)))
-                 (vec order))
+                 filtered)
         total  (count sorted)
         psize  (max 1 (or page-size 100))
         pages  (max 1 (long (Math/ceil (/ (double (max 1 total)) psize))))
@@ -54,7 +60,7 @@
         win    (if paged?
                  (subvec sorted (min (* page psize) total) (min (* (inc page) psize) total))
                  sorted)]
-    {:order win :sort sort :page page :pages pages :total total}))
+    {:order win :sort sort :page page :pages pages :total total :filter flt}))
 
 ;; ═══════════════════════════════════════════════════════════════════════════
 ;; per-cell widget construction
@@ -121,19 +127,31 @@
 ;; ═══════════════════════════════════════════════════════════════════════════
 
 (defn- filter-dropdown
-  [ctx coll-id {:keys [label] :or {label "Filter:"}}]
-  (let [filter-id   (keyword (str (name coll-id) "-filter"))
-        sig         (render/item-signal-name ctx filter-id)
-        filter-opts (get-in ctx [:options filter-id])]
+  "A column filter: choose a value present in `:col` to narrow the rows. Options
+   are an explicit `:source` (from the options store) or, by default, the distinct
+   values present in that column. The choice posts to /filter and the server
+   re-renders with the filtered view; the active value persists in view-state."
+  [ctx coll-id {:keys [col label source] :or {label "Filter:"}}]
+  (let [col       (keyword col)
+        sig       (render/item-signal-name ctx (keyword (str (name coll-id) "-filter")))
+        items     (get-in ctx [:collections coll-id :items])
+        explicit  (when source (get-in ctx [:options source]))
+        values    (if explicit
+                    (map (fn [o] (if (vector? o) (second o) o)) explicit)
+                    (->> (vals items) (map #(get % col)) (remove nil?)
+                         (map str) distinct sort))
+        current   (get-in ctx [:view-state coll-id :filter :value])]
     [:div.widget-table-filter
      [:label label]
      [:select {"data-bind" sig
-               "data-on:change" (str "@post('" (coll-base ctx coll-id) "/filter')")}
+               "data-on:change"
+               (str "@post('" (coll-base ctx coll-id) "/filter?col=" (name col)
+                    "&value='+encodeURIComponent($" sig "))")}
       [:option {:value ""} "All"]
-      (for [opt (or filter-opts [])
-            :let [v (if (vector? opt) (second opt) opt)
-                  l (if (vector? opt) (first opt) opt)]]
-        [:option {:value (str v)} (str l)])]]))
+      (for [v values]
+        [:option (cond-> {:value (str v)}
+                   (= (str v) (str current)) (assoc :selected true))
+         (str v)])]]))
 
 ;; ═══════════════════════════════════════════════════════════════════════════
 ;; paging
