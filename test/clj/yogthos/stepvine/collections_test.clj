@@ -230,6 +230,46 @@
         (is (= "Ada Lovelace" (impl/value s4 [:teams "t1" :members "m1" :full])))
         (is (nil? (impl/value s4 [:teams "t1" :members "m2" :first])))))))
 
+;; --- Nested collection rendering + deep-path edits (§jj9) ------------------
+
+(defn- render-teams [mgr]
+  (let [sess (session/current mgr "teams")
+        ctx  (assoc (render/session->context sess :default "teams") :options {})]
+    (render/render-view ctx (render/view-markup sess :default))))
+
+(deftest nested-collection-renders-and-edits-by-deep-path
+  (let [[_ _ mgr] (mgr+)
+        form (forms/load-form "teams")]
+    (session/ensure-document! mgr "teams" form {})
+    (let [tid (session/add-item! mgr "teams" :teams)]
+      (session/set-item-field! mgr "teams" :teams tid :tname "Platform")
+      (testing "an empty team renders a nested members collection with a scoped add"
+        (let [html (render-teams mgr)]
+          (is (str/includes? html (str "data-bind=\"teams_" tid "_tname\"")))
+          ;; the nested collection container + its add button are path-scoped
+          (is (str/includes? html (str "id=\"coll-teams-" tid "-members\"")))
+          (is (str/includes? html (str "/citem/add?path=teams/" tid "/members")))))
+      (let [mid (session/add-deep-item! mgr "teams" [:teams tid :members])]
+        (session/set-deep-item-field! mgr "teams" [:teams tid :members mid] :mname "Ada")
+        (session/set-deep-item-field! mgr "teams" [:teams tid :members mid] :role "Lead")
+        (testing "the deep edit lands at the nested path (read back via the engine)"
+          (is (= "Ada"  (impl/value (session/current mgr "teams") [:teams tid :members mid :mname])))
+          (is (= "Lead" (impl/value (session/current mgr "teams") [:teams tid :members mid :role]))))
+        (testing "the nested item renders with full-path signals + endpoints"
+          (let [html (render-teams mgr)]
+            (is (str/includes? html (str "data-bind=\"teams_" tid "_members_" mid "_mname\"")))
+            (is (str/includes? html (str "id=\"item-teams-" tid "-members-" mid "\"")))
+            ;; the nested field posts to the generic deep-path endpoint
+            (is (str/includes? html (str "/citem/field/mname?path=teams/" tid "/members/" mid)))
+            ;; the nested remove is path-scoped
+            (is (str/includes? html (str "/citem/remove?path=teams/" tid "/members/" mid)))))
+        (testing "the nested member value is seeded into data-signals (bindable)"
+          (is (str/includes? (render-teams mgr) (str "teams_" tid "_members_" mid "_mname"))))
+        (testing "removing the nested item drops it"
+          (session/remove-deep-item! mgr "teams" [:teams tid :members mid])
+          (is (nil? (impl/value (session/current mgr "teams") [:teams tid :members mid :mname])))
+          (is (not (str/includes? (render-teams mgr) (str "item-teams-" tid "-members-" mid "\"")))))))))
+
 (defn- row-count [html] (count (re-seq #"id=\"row-tasks-" html)))
 
 (deftest table-sort-and-page

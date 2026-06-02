@@ -132,6 +132,28 @@
   [manager doc-id coll-id idx]
   (apply-change! manager doc-id [[[coll-id idx] nil]]))
 
+;; --- Nested collections (deep paths, §jj9) ---------------------------------
+;; A nested item is addressed by a full path [coll idx coll idx …]; the engine
+;; already stores nested data, so these are plain transacts at the deep id.
+
+(defn add-deep-item!
+  "Add an empty item at a nested collection path `[coll idx coll …]` (the path
+   ends in a collection segment); returns the new index."
+  [manager doc-id coll-path]
+  (let [idx (new-index)]
+    (apply-change! manager doc-id [[(conj (vec coll-path) idx) {}]])
+    idx))
+
+(defn remove-deep-item!
+  "Remove a nested item at `[coll idx coll idx …]` (the path ends in an index)."
+  [manager doc-id item-path]
+  (apply-change! manager doc-id [[(vec item-path) nil]]))
+
+(defn set-deep-item-field!
+  "Set one field of a nested item: `item-path` is `[coll idx coll idx …]`."
+  [manager doc-id item-path field-id value]
+  (apply-change! manager doc-id [[(conj (vec item-path) (keyword field-id)) value]]))
+
 (defn- item-keys
   "Current item index keys of a collection, in db order."
   [manager doc-id coll-id]

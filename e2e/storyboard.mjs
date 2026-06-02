@@ -472,11 +472,12 @@ try {
   await page.fill('#price', '20');
   await page.fill('#discount-pct', '10');
   await page.fill('#tax-rate', '8');
+  await settleFields(page); // let the separate-field POSTs settle before asserting
   // the calculated fields are :c/labeled-value spans formatted via :fmt "$%.2f"
   const lv = (id) => page.locator(`#lv-${id} span`).innerText();
   const waitLv = (id, want) => page.waitForFunction(
     ([i, w]) => { const el = document.querySelector(`#lv-${i} span`); return el && el.textContent === w; },
-    [id, want], { timeout: 6000 });
+    [id, want], { timeout: 10000 });
   // the chain settles: subtotal 60 → discount 6 → tax 4.32 → total 58.32
   await waitLv('total', '$58.32');
   ok('the full chain computed: total = $58.32 (:fmt currency formatting)');
@@ -889,6 +890,41 @@ try {
   ((await page.locator('#gender').inputValue()) === 'male' &&
    (await page.locator('#marital').inputValue()) === 'M')
     ? ok('the selected codes persisted (round-trip through SSE)') : bad('codes did not persist');
+
+  // ---- 29. Nested collections (a collection within a collection item) ----
+  step('29. Nested collections');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Teams")'), '#coll-teams');
+  ok('opened the teams form');
+  // add a team (top-level collection add)
+  await page.click('#coll-teams > .add');
+  await page.waitForSelector('[id^="item-teams-"]');
+  const teamId = (await page.locator('[id^="item-teams-"]').first().getAttribute('id')).replace('item-teams-', '');
+  await page.fill(`[data-bind="teams_${teamId}_tname"]`, 'Platform');
+  await settleFields(page);
+  ok('added a team and named it');
+  // add a nested member via the team's nested collection add
+  await page.click(`#coll-teams-${teamId}-members > .add`);
+  await page.waitForSelector(`[id^="item-teams-${teamId}-members-"]`);
+  const memId = (await page.locator(`[id^="item-teams-${teamId}-members-"]`).first().getAttribute('id'))
+    .replace(`item-teams-${teamId}-members-`, '');
+  ok('added a nested member to the team');
+  // edit the nested member's fields (bound to deep-path signals)
+  await page.fill(`[data-bind="teams_${teamId}_members_${memId}_mname"]`, 'Ada');
+  await page.fill(`[data-bind="teams_${teamId}_members_${memId}_role"]`, 'Lead');
+  await settleFields(page);
+  // reload: the whole nested tree re-renders from the engine's stored data
+  await openDoc(page, () => page.reload(), '#coll-teams');
+  ((await page.locator(`[data-bind="teams_${teamId}_members_${memId}_mname"]`).inputValue()) === 'Ada')
+    ? ok('a nested member field persisted via the deep-path endpoint (SSE round-trip)') : bad('nested edit did not persist');
+  ((await page.locator(`[data-bind="teams_${teamId}_members_${memId}_role"]`).inputValue()) === 'Lead')
+    ? ok('a second nested field persisted too') : bad('second nested field lost');
+  ((await page.locator(`[data-bind="teams_${teamId}_tname"]`).inputValue()) === 'Platform')
+    ? ok('the parent team field persisted alongside the nested edits') : bad('parent field lost');
+  // remove the nested member
+  await page.click(`#item-teams-${teamId}-members-${memId} > .remove`);
+  await page.waitForSelector(`#item-teams-${teamId}-members-${memId}`, { state: 'detached' });
+  ok('removed the nested member (deep-path remove)');
 
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');

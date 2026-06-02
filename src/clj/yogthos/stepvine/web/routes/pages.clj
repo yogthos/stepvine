@@ -23,6 +23,7 @@
    [yogthos.stepvine.web.oauth :as oauth]
    [yogthos.stepvine.web.pagenav :as pagenav]
    [yogthos.stepvine.web.collection-entry :as collection-entry]
+   [yogthos.stepvine.web.collection-item :as collection-item]
    [yogthos.stepvine.web.queue :as queue]
    [yogthos.stepvine.web.report :as report]
    [yogthos.stepvine.web.search :as search]
@@ -129,6 +130,12 @@
       ["/coll/:coll/add"             (ds (post form/coll-add))]
       ;; modal data-entry: commit scratch/temp fields as a new row (§ugx)
       ["/coll/:coll/add-from" (ds {:post {:handler (collection-entry/handler resources)}})]
+      ;; nested collections (§jj9): deep-path item edits via ?path=coll/idx/coll…
+      ["/citem/field/:fid"        (ds {:post {:handler (collection-item/handler resources :field)}})]
+      ["/citem/field/:fid/lock"   (ds {:post {:handler (collection-item/handler resources :noop)}})]
+      ["/citem/field/:fid/unlock" (ds {:post {:handler (collection-item/handler resources :noop)}})]
+      ["/citem/add"               (ds {:post {:handler (collection-item/handler resources :add)}})]
+      ["/citem/remove"            (ds {:post {:handler (collection-item/handler resources :remove)}})]
       ["/coll/:coll/:idx/remove"     (ds (post form/coll-remove))]
       ["/coll/:coll/:idx/field/:fid"        (ds (post form/coll-field))]
       ["/coll/:coll/:idx/field/:fid/lock"   (ds (post form/coll-lock))]

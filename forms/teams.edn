@@ -1,0 +1,36 @@
+;; Nested collections (stepvine-jj9 part 3). A :c/collection inside an item
+;; template renders the engine's nested data; its item signals and add/remove/edit
+;; endpoints are scoped to the full path (teams/<tid>/members/<mid>). Each team
+;; holds its own list of members.
+{:id    :teams
+ :title "Teams"
+
+ :data
+ {:model
+  [[:teams
+    {:id :teams :collection? true :index-id :tid
+     :schema
+     {:model
+      [[:tid   {:id :tid}]
+       [:tname {:id :tname :type :string}]
+       [:members
+        {:id :members :collection? true :index-id :mid
+         :schema
+         {:model [[:mid   {:id :mid}]
+                  [:mname {:id :mname :type :string}]
+                  [:role  {:id :role  :type :string}]]}}]]}}]]}
+
+ :views
+ {:default
+  {:title "Teams"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Teams"]
+    [:c/collection {:id :teams}
+     [:c/input-field {:id :tname :label "Team name"}]
+     [:h3 "Members"]
+     ;; nested collection — renders this team's members, scoped to its path
+     [:c/collection {:id :members}
+      [:c/input-field {:id :mname :label "Member"}]
+      [:c/input-field {:id :role  :label "Role"}]]]]}}}
