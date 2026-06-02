@@ -642,3 +642,65 @@
     (is (str/includes? html "$i1 = !$i1"))
     (is (str/includes? html "data-show=\"$i1\""))
     (is (str/includes? html "Helpful note."))))
+
+;; --- Grid layout (stepvine-9by) -------------------------------------------
+
+(deftest grid-lays-children-in-responsive-columns
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/grid {:cols 3 :gap :md}
+                [:stepvine.components/input-field {:id :my-field :label "A"}]
+                [:stepvine.components/input-field {:id :num-field :label "B"}]]))]
+    (testing "container carries the grid + column-count + gap classes"
+      (is (str/includes? html "widget grid"))
+      (is (str/includes? html "cols-3"))
+      (is (str/includes? html "gap-md")))
+    (testing "each child is wrapped in a grid cell"
+      (is (= 2 (count (re-seq #"grid-cell" html)))))))
+
+(deftest grid-cell-span-controls-width
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/grid {:cols 2}
+                [:stepvine.components/input-field {:id :my-field :label "Wide" :span 2}]
+                [:stepvine.components/input-field {:id :num-field :label "Narrow"}]]))]
+    (testing ":span becomes a span-N class on the cell"
+      (is (str/includes? html "span-2")))
+    (testing ":span is stripped from the inner widget (not leaked as a DOM attr)"
+      (is (not (str/includes? html "span=\"2\""))))))
+
+;; --- Section navigation (stepvine-9by) ------------------------------------
+
+(deftest section-nav-builds-a-jump-to-section-sidebar
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/section-nav {:title "On this page"}
+                [:stepvine.components/section {:title "Personal"}
+                 [:stepvine.components/input-field {:id :my-field :label "Name"}]]
+                [:stepvine.components/section {:title "Contact"}
+                 [:stepvine.components/input-field {:id :num-field :label "Phone"}]]]))]
+    (testing "a nav sidebar lists each section title as an anchor link"
+      (is (str/includes? html "sv-section-nav"))
+      (is (str/includes? html "On this page"))
+      (is (str/includes? html "href=\"#sv-sec-0\""))
+      (is (str/includes? html "href=\"#sv-sec-1\""))
+      (is (str/includes? html "Personal"))
+      (is (str/includes? html "Contact")))
+    (testing "each section is wrapped in a matching scroll anchor"
+      (is (str/includes? html "id=\"sv-sec-0\""))
+      (is (str/includes? html "id=\"sv-sec-1\"")))
+    (testing "section bodies still render"
+      (is (str/includes? html "data-bind=\"my_field\""))
+      (is (str/includes? html "data-bind=\"num_field\"")))))
+
+(deftest section-nav-skips-non-section-children-in-the-toc
+  (let [html (hiccup->html
+              (render-widget-hiccup
+               [:stepvine.components/section-nav {}
+                [:stepvine.components/paragraph {:text "Intro blurb."}]
+                [:stepvine.components/section {:title "Only Section"}
+                 [:stepvine.components/input-field {:id :my-field :label "Name"}]]]))]
+    (testing "non-section children render in the body but not the TOC"
+      (is (str/includes? html "Intro blurb."))
+      (is (str/includes? html "href=\"#sv-sec-1\""))   ; the section keeps its absolute index
+      (is (not (str/includes? html "href=\"#sv-sec-0\""))))))

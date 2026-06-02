@@ -15,6 +15,8 @@
    yogthos.stepvine.components.layout.show
    yogthos.stepvine.components.layout.alert
    yogthos.stepvine.components.layout.box
+   yogthos.stepvine.components.layout.grid
+   yogthos.stepvine.components.layout.section-nav
    yogthos.stepvine.components.layout.primitives
    ;; basic inputs + display
    yogthos.stepvine.components.widgets.basics.input-field

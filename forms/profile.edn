@@ -1,0 +1,44 @@
+;; Layout parity (stepvine-9by): a longer form laid out with the responsive grid
+;; and a jump-to-section sidebar. :c/section-nav wraps a run of :c/sections and
+;; renders a sticky table of contents; inside each section :c/grid places fields
+;; in columns (:cols) with per-field widths (:span), collapsing to one column on
+;; narrow screens. No layout code — just data.
+{:id    :profile
+ :title "Member Profile"
+
+ :data
+ {:model
+  [[:first-name {:id :first-name :type :string}]
+   [:last-name  {:id :last-name  :type :string}]
+   [:dob        {:id :dob        :type :string}]
+   [:member-id  {:id :member-id  :type :string}]
+   [:phone      {:id :phone      :type :string}]
+   [:email      {:id :email      :type :string}]
+   [:address    {:id :address    :type :string}]
+   [:role       {:id :role       :type :string}]
+   [:bio        {:id :bio        :type :string}]]}
+
+ :views
+ {:default
+  {:title "Member Profile"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Member Profile"]
+    [:c/section-nav {:title "On this page"}
+     [:c/section {:title "Identity"}
+      [:c/grid {:cols 2 :gap :md}
+       [:c/input-field {:id :first-name :label "First name"}]
+       [:c/input-field {:id :last-name  :label "Last name"}]
+       [:c/input-field {:id :dob        :label "Date of birth"}]
+       [:c/input-field {:id :member-id  :label "Member ID"}]]]
+     [:c/section {:title "Contact"}
+      [:c/grid {:cols 2 :gap :md}
+       [:c/input-field {:id :phone   :label "Phone"}]
+       [:c/input-field {:id :email   :label "Email"}]
+       ;; a full-width field spans both columns
+       [:c/input-field {:id :address :label "Address" :span 2}]]]
+     [:c/section {:title "About"}
+      [:c/grid {:cols 1}
+       [:c/input-field {:id :role :label "Role"}]
+       [:c/input-field {:id :bio  :label "Short bio"}]]]]]}}}

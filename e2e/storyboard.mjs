@@ -737,6 +737,44 @@ try {
   (await page.locator('#summary').getAttribute('readonly')) !== null
     ? ok('summary is read-only in :review (state-based editability)') : bad('summary editable in :review');
 
+  // ---- 25. Responsive grid + section navigation ----
+  step('25. Grid layout + section navigation');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Member Profile")'), '#first-name');
+  ok('opened the member profile (grid + section nav)');
+  // the section-nav sidebar lists each section as a jump link
+  const navLinks = page.locator('.sv-section-nav a');
+  (await navLinks.count()) === 3
+    ? ok('the section-nav sidebar lists all three sections') : bad(`expected 3 nav links, got ${await navLinks.count()}`);
+  (await page.locator('.sv-section-nav a[href="#sv-sec-0"]').innerText()).includes('Identity')
+    ? ok('first nav link targets the Identity section') : bad('first nav link wrong');
+  // fields are laid out in a real CSS grid (2 columns in the Identity section)
+  const idGridCols = await page.evaluate(() => {
+    const g = document.querySelector('#sv-sec-0 .widget.grid');
+    return g ? getComputedStyle(g).gridTemplateColumns.split(' ').length : 0;
+  });
+  idGridCols === 2 ? ok('the Identity section renders a 2-column grid')
+                   : bad(`Identity grid not 2 columns (got ${idGridCols})`);
+  // a :span 2 field occupies the full row (both columns)
+  const addressSpans2 = await page.evaluate(() => {
+    const cell = document.querySelector('#sv-sec-1 .grid-cell.span-2');
+    if (!cell) return false;
+    const cs = getComputedStyle(cell);
+    return /span 2/.test(cs.gridColumn) || /span 2/.test(cs.gridColumnStart);
+  });
+  addressSpans2 ? ok('the Address field spans both columns (:span 2)') : bad('address :span 2 not applied');
+  // clicking a TOC link scrolls to that section (anchor navigation)
+  await page.click('.sv-section-nav a[href="#sv-sec-2"]');
+  await page.waitForFunction(() => /sv-sec-2$/.test(location.hash), null, { timeout: 3000 })
+    .then(() => ok('clicking a section link jumps to that section (anchor nav)'))
+    .catch(() => bad('section anchor navigation did not update the hash'));
+  // the grid is a real form: editing a field still flows through datastar/SSE
+  await page.fill('#first-name', 'Grace');
+  await settleFields(page);
+  await openDoc(page, () => page.reload(), '#first-name');
+  (await page.locator('#first-name').inputValue()) === 'Grace'
+    ? ok('a field edited inside the grid persisted (round-trips through SSE)') : bad('grid field did not persist');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');
