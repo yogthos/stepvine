@@ -32,6 +32,14 @@ async function waitVal(page, sel, pred, ms = 6000) {
 // open before a post-hoc listener attaches), then waits for the stream to
 // connect (== datastar is live) before returning — exactly what a real user's
 // reaction time gives for free.
+// Blur the focused field so its lock/unlock POST flushes, then let it land. A
+// real user gets this for free in the beat before clicking a nav link; without
+// it a page navigation can abort an in-flight field request.
+async function settleFields(page, ms = 600) {
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
+  await page.waitForTimeout(ms);
+}
+
 async function openDoc(page, navigate, readySel, ms = 5000) {
   const sse = page.waitForRequest((r) => /\/sse/.test(r.url()), { timeout: ms });
   await navigate();
@@ -352,6 +360,41 @@ try {
   await page.goto(BASE + '/');
   (await page.locator('h2:has-text("Demo App")').count()) > 0
     ? ok('the new app appears on the landing') : bad('new app not on the landing');
+
+  // ---- 15. Multi-page form — pages, breadcrumbs, prev/next, shared data -
+  step('15. Multi-page form navigation');
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Onboarding")'), '#full-name');
+  ok('opened a multi-page onboarding form');
+  (await page.locator('.sv-pages .sv-page').count()) === 3
+    ? ok('three page tabs shown') : bad('page tabs missing');
+  (await page.locator('.sv-page.active').innerText()).includes('Account')
+    ? ok('Account is the active page') : bad('wrong active page');
+  // fill page 1, then settle (blur the field so its unlock POST completes before
+  // we navigate away — otherwise the page unload aborts the in-flight fetch)
+  await page.fill('#full-name', 'Ada Lovelace');
+  await page.fill('#email', 'ada@example.com');
+  await settleFields(page);
+  // Next → Profile (full reload; SSE reconnects)
+  await openDoc(page, () => page.click('.sv-pagenav-next'), '#role');
+  (await page.locator('.sv-page.active').innerText()).includes('Profile')
+    ? ok('Next advanced to Profile') : bad('Next did not advance the page');
+  await page.selectOption('#role', 'engineer').catch(() => {});
+  await page.fill('#bio', 'Mathematician').catch(() => {});
+  await settleFields(page);
+  // jump straight to Review via the breadcrumb tab
+  await openDoc(page, () => page.click('.sv-page:has-text("Review")'), '.sv-doc-body');
+  ok('jumped to Review via the breadcrumb tab');
+  const reviewText = await page.locator('.sv-doc-body').innerText();
+  reviewText.includes('Ada Lovelace')
+    ? ok('Review shows the name entered on page 1 (shared data model)')
+    : bad('shared data did not carry across pages');
+  reviewText.includes('ada@example.com')
+    ? ok('Review shows the email entered on page 1') : bad('email not carried across pages');
+  // Prev goes back
+  await openDoc(page, () => page.click('.sv-pagenav-prev'), '#role');
+  (await page.locator('.sv-page.active').innerText()).includes('Profile')
+    ? ok('Prev returned to Profile') : bad('Prev did not go back');
 
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');

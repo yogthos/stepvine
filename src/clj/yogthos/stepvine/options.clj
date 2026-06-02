@@ -49,9 +49,14 @@
   (into {}
         (keep (fn [[id opts]]
                 (when-let [options (:options opts)]
-                  (let [resolve (sources/resolve-source {:options-store store}
-                                                        (options-spec options))]
-                    [id (resolve)]))))     ; full list (no query)
+                  (if (map? options)
+                    ;; a source spec ({:source …} / {:kind …}) → resolve via the store
+                    (let [resolve (sources/resolve-source {:options-store store}
+                                                          (options-spec options))]
+                      [id (resolve)])       ; full list (no query)
+                    ;; a literal option list ([{:value :label} …] / [[label value] …])
+                    ;; declared inline on the field → use it verbatim
+                    [id options]))))
         field-opts))
 
 (defmethod ig/init-key :store/options

@@ -16,7 +16,9 @@
   </head>
   <body>
     {{navbar|safe}}
+    {% if page_tabs %}{{page_tabs|safe}}{% endif %}
     <div class="sv-doc-body">{{view|safe}}</div>
+    {% if page_nav %}{{page_nav|safe}}{% endif %}
     {{footer|safe}}
   </body>
 </html>

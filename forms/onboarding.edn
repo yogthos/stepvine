@@ -1,0 +1,64 @@
+;; Multi-page form demo. One data model, several *views* — each view is a "page"
+;; over a different slice of the same data. The platform renders page tabs at the
+;; top and prev/next at the bottom from the ordered :pages list; navigating between
+;; pages is just `?view=<id>` on the same document, so the shared session data is
+;; preserved across pages. The :review page binds the SAME fields with display
+;; widgets (:c/value), so it reflects what you typed on the earlier pages live.
+{:id    :onboarding
+ :title "Onboarding"
+
+ ;; Ordered pages → the breadcrumb tabs + prev/next nav. Each references a view.
+ :pages [{:view :account :label "Account"}
+         {:view :profile :label "Profile"}
+         {:view :review  :label "Review"}]
+
+ :data
+ {:model
+  [[:full-name {:id :full-name :type :string}]
+   [:email     {:id :email     :type :string}]
+   [:role      {:id :role      :type :enum
+                :options [{:value "engineer" :label "Engineer"}
+                          {:value "designer" :label "Designer"}
+                          {:value "manager"  :label "Manager"}]}]
+   [:bio       {:id :bio       :type :string}]]
+
+  :reactions
+  [{:id :email-error :args [:email]
+    :fn (fn [e] (cond (or (nil? e) (= "" e)) nil
+                      (and (some #{\@} e) (some #{\.} e)) nil
+                      :else "Enter a valid email"))}
+   {:id :ready? :args [:full-name :email-error]
+    :fn (fn [n e] (boolean (and (seq (str n)) (nil? e))))}]}
+
+ :views
+ {;; ── Page 1 — Account ──────────────────────────────────────────────────
+  :account
+  {:opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Account"]
+    [:p "Tell us who you are. Your answers carry across the pages."]
+    [:c/input-field {:label "Full name" :id :full-name}]
+    [:c/input-field {:label "Email" :id :email :error :email-error}]]}
+
+  ;; ── Page 2 — Profile ──────────────────────────────────────────────────
+  :profile
+  {:opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Profile"]
+    [:c/dropdown-select {:label "Role" :id :role}]
+    [:c/input-field {:label "Short bio" :id :bio}]]}
+
+  ;; ── Page 3 — Review (same fields, display widgets, updates live) ───────
+  :review
+  {:opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Review"]
+    [:p "Confirm your details — these reflect the earlier pages live."]
+    [:p [:strong "Name: "]  [:c/value {:id :full-name :default "—"}]]
+    [:p [:strong "Email: "] [:c/value {:id :email :default "—"}]]
+    [:p [:strong "Role: "]  [:c/value {:id :role :default "—"}]]
+    [:p [:strong "Bio: "]   [:c/value {:id :bio :default "—"}]]
+    [:p "Ready to submit: " [:c/value {:rxn :ready?}]]]}}}

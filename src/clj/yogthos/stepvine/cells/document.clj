@@ -223,8 +223,13 @@
   (fn [{:keys [session-manager options-store documents users] :as resources} {:keys [doc-id view-id user-id]}]
     (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
       (let [sess (session/current session-manager doc-id)
-            vid  (let [v (keyword view-id)]
-                   (if (get-in sess [:form :views v]) v :default))
+            vid  (let [v     (keyword view-id)
+                       views (get-in sess [:form :views])]
+                   (cond
+                     (get views v)          v
+                     ;; multi-page form: land on the first page when none requested
+                     (seq (:pages form-raw)) (keyword (:view (first (:pages form-raw))))
+                     :else                   :default))
             doc  (documents/get-document documents doc-id)
             ctx  (-> (render/session->context sess vid doc-id)
                      (assoc :uid user-id)   ; the authenticated user drives lock comparison
@@ -236,16 +241,19 @@
                               (documents/workflow-state doc (:initial wf))))
                      ;; resolve option sources for top-level AND collection-item fields
                      (assoc :options (options/resolve-field-options options-store (render/all-field-opts sess))))
-            view (render/render-view ctx (render/view-markup sess vid))
-            user (users/get-user users user-id)
+            view  (render/render-view ctx (render/view-markup sess vid))
+            user  (users/get-user users user-id)
+            pages (:pages form-raw)                 ; ordered [{:view :label} …] → multi-page nav
             crumbs [{:label "Documents" :href "/"} {:label (or (:title form-raw) (name (:form-id doc)))}]]
         {:html (selmer/render-file "html/form.html"
-                                   {:title   (:title form-raw)
-                                    :view    view
-                                    :theme   (render/theme-href sess vid)
-                                    :app_css (forms/app-css-href (:forms resources) (:form-id doc))  ; live app styling
-                                    :navbar  (layout/navbar-html user crumbs)
-                                    :footer  (layout/footer-html)})})
+                                   {:title     (:title form-raw)
+                                    :view      view
+                                    :theme     (render/theme-href sess vid)
+                                    :app_css   (forms/app-css-href (:forms resources) (:form-id doc))  ; live app styling
+                                    :navbar    (layout/navbar-html user crumbs)
+                                    :page_tabs (layout/page-tabs-html pages vid doc-id)
+                                    :page_nav  (layout/page-prevnext-html pages vid doc-id)
+                                    :footer    (layout/footer-html)})})
       {:html (selmer/render-file "html/form.html"
                                  {:title "Not found" :view "<p>No such document.</p>"})})))
 

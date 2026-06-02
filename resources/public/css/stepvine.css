@@ -25,12 +25,21 @@ body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #
 .sv-crumbs li:first-child::before { content: ""; }
 .sv-crumbs a { color: #2563eb; text-decoration: none; }
 .sv-crumbs a:hover { text-decoration: underline; }
-.sv-user { color: #374151; font-size: .9rem; }
-.sv-role { margin-left: .35rem; font-size: .68rem; background: #eef2ff; color: #3730a3;
-           padding: .05rem .35rem; border-radius: .25rem; text-transform: uppercase; }
+.sv-usermenu { display: flex; align-items: center; gap: .6rem; }
+.sv-avatar { display: inline-flex; align-items: center; justify-content: center;
+             width: 1.9rem; height: 1.9rem; border-radius: 50%; background: #2563eb;
+             color: #fff; font-weight: 700; font-size: .85rem; flex: 0 0 auto; }
+.sv-user { color: #111827; font-size: .92rem; font-weight: 500; }
+.sv-role { margin-left: .35rem; font-size: .65rem; background: #eef2ff; color: #3730a3;
+           padding: .08rem .35rem; border-radius: .25rem; text-transform: uppercase;
+           letter-spacing: .02em; font-weight: 700; vertical-align: middle; }
 .sv-navlink { color: #2563eb; text-decoration: none; font-size: .9rem; }
+.sv-navlink:hover { text-decoration: underline; }
+.sv-signin { font-weight: 600; }
+.sv-logout-form { margin: 0; }
 .sv-logout { padding: .3rem .7rem; border: 1px solid #d1d5db; border-radius: .375rem;
-             background: #fff; cursor: pointer; }
+             background: #f9fafb; cursor: pointer; font-size: .85rem; color: #374151; }
+.sv-logout:hover { background: #f3f4f6; }
 .sv-content { padding: 1.5rem 1.25rem; max-width: 48rem; margin: 0 auto; }
 .sv-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
              padding: 1rem 1.25rem; margin-top: 2rem; border-top: 1px solid #e5e7eb;
@@ -39,6 +48,28 @@ body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #
 /* document editor body: centered by default, full-bleed for a .sv-shell layout */
 .sv-doc-body { max-width: 32rem; margin: 0 auto; padding: 1.5rem 1.25rem; }
 .sv-doc-body:has(.sv-shell) { max-width: none; margin: 0; padding: 0; }
+
+/* ── Multi-page forms (each page is a view over the same data) ─────────── */
+.sv-pages { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center;
+            padding: .9rem 1.25rem .2rem; max-width: 40rem; margin: 0 auto; }
+.sv-page { display: inline-flex; align-items: center; gap: .45rem; text-decoration: none;
+           padding: .35rem .8rem; border: 1px solid #e5e7eb; border-radius: 1.25rem;
+           color: #6b7280; background: #fff; font-size: .88rem; }
+.sv-page:hover { border-color: #c7d2fe; color: #374151; }
+.sv-page-num { display: inline-flex; align-items: center; justify-content: center;
+               width: 1.3rem; height: 1.3rem; border-radius: 50%; background: #f3f4f6;
+               color: #6b7280; font-size: .72rem; font-weight: 700; }
+.sv-page.active { border-color: #2563eb; color: #1d4ed8; background: #eff6ff; font-weight: 600; }
+.sv-page.active .sv-page-num { background: #2563eb; color: #fff; }
+.sv-pagenav { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+              max-width: 32rem; margin: 1.25rem auto 0; padding: .9rem 1.25rem 0;
+              border-top: 1px solid #e5e7eb; }
+.sv-pagenav a { text-decoration: none; color: #2563eb; font-weight: 600; padding: .4rem .9rem;
+                border: 1px solid #d1d5db; border-radius: .375rem; background: #fff; }
+.sv-pagenav-next { background: #2563eb !important; color: #fff !important; border-color: #2563eb !important; }
+.sv-pagenav a:hover { filter: brightness(.97); }
+.sv-pagenav-pos { color: #9ca3af; font-size: .85rem; }
+.sv-pagenav-spacer { flex: 0 0 auto; }
 
 /* ── Fields ───────────────────────────────────────────────────────────── */
 .field { display: flex; align-items: center; gap: .75rem; margin: .5rem 0; }
