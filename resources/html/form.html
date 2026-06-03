@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{title}}</title>
-    <script type="module"
-            src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"></script>
+    <!-- Datastar engine, vendored locally (see vendor-build/) — no CDN. -->
+    <script type="module" src="/vendor/datastar.js"></script>
     <!-- Default theme. Widgets emit only HTML structure; all presentation is
          external CSS. A form view may layer its own theme on top via
          :opts {:theme "…"} (a /name, an absolute /path, or a full URL). -->

@@ -131,13 +131,8 @@
 
 (def ^:private editor-js
   "(async () => {
-  const V = await import('https://esm.sh/@codemirror/view@6.40.0');
-  const S = await import('https://esm.sh/@codemirror/state@6.6.0');
-  const L = await import('https://esm.sh/@codemirror/language@6.12.2');
-  const C = await import('https://esm.sh/@codemirror/commands@6.10.3');
-  const HL = await import('https://esm.sh/@lezer/highlight@1');
-  const {clojure} = await import('https://esm.sh/@codemirror/legacy-modes@6.5.1/mode/clojure');
-  const {css:cssMode} = await import('https://esm.sh/@codemirror/legacy-modes@6.5.1/mode/css');
+  // CodeMirror, bundled locally (vendor-build/) and served from /vendor — no CDN.
+  const {V, S, L, C, HL, clojure, cssMode} = await import('/vendor/codemirror.js');
   const t = HL.tags;
   const hl = L.HighlightStyle.define([
     {tag:t.keyword,color:'#7c3aed'},{tag:t.atom,color:'#b45309'},{tag:t.number,color:'#b45309'},

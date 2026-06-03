@@ -54,10 +54,9 @@
                                (get-in ctx [:values events-id]))]
                      (if (and (string? v) (seq v)) v "[]"))]
     (list
-     [:link {:rel "stylesheet"
-             :href "https://cdn.jsdelivr.net/npm/@calendarjs/ce/dist/style.min.css"}]
-     [:script {:src "https://cdn.jsdelivr.net/npm/lemonadejs/dist/lemonade.min.js"}]
-     [:script {:src "https://cdn.jsdelivr.net/npm/@calendarjs/ce/dist/index.min.js"}]
+     [:link {:rel "stylesheet" :href "/vendor/calendarjs.min.css"}]
+     [:script {:src "/vendor/lemonade.min.js"}]
+     [:script {:src "/vendor/calendarjs.min.js"}]
      [:div.widget.calendar.field
       (when label [:h3 label])
       [:div.calendar-canvas

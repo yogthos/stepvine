@@ -1,0 +1,19 @@
+{
+  "name": "stepvine-vendor-build",
+  "private": true,
+  "description": "Bundles CodeMirror (+ legacy modes) into a single local ESM file served from resources/public/vendor — no CDN at runtime. Run: npm install && npm run build",
+  "scripts": {
+    "build": "esbuild cm-entry.mjs --bundle --format=esm --minify --legal-comments=none --outfile=../resources/public/vendor/codemirror.js"
+  },
+  "dependencies": {
+    "@codemirror/view": "6.40.0",
+    "@codemirror/state": "6.6.0",
+    "@codemirror/language": "6.12.2",
+    "@codemirror/commands": "6.10.3",
+    "@codemirror/legacy-modes": "6.5.1",
+    "@lezer/highlight": "1.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.0"
+  }
+}

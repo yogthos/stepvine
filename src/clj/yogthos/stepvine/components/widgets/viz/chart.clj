@@ -46,7 +46,7 @@
                           (get-in ctx [:values data-key])
                           "[]"))]
     (list
-     [:script {:src "https://cdn.jsdelivr.net/npm/highcharts@11/highcharts.js"}]
+     [:script {:src "/vendor/highcharts.js"}]
      [:div.widget.chart.field
       (when label [:label label])
       [:div.chart-canvas
