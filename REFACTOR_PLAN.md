@@ -1,5 +1,34 @@
 # Architecture Refactor Plan
 
+## Status (branch `arch-refactor`)
+
+**Done & verified** (217 tests + clean storyboard after each):
+- ✅ Phase 0 — dead code removed (−236 LOC net): `web/routes/utils.clj` +
+  `editor/actions.cljc` deleted; `editor.cljc` rewritten (5 dead fns, cruft, dead
+  requires gone); `apply-changes!`/`get-fields`/`snapshot-of` removed.
+- ✅ Phase 1 (partial) — triplicate `rerender-collection!` collapsed to one shared fn.
+- ✅ Phase 2 (partial) — `:fmt` formatting extracted from `render.clj` → `format.clj`.
+- ✅ Phase 3 — `workflow.clj` → `workflow_rules.clj` (the worst name collision).
+- ✅ Phase 4 — documentation: **ARCHITECTURE.md** (request flow + invariants + feature
+  map), `forms/README.md`, `components/README.md` (widget catalog), inline `:meta`
+  schema (`documents.clj`) + table view-state shape (`session.clj`).
+
+**Deferred** (documented here; not done — judged high-churn or tangled for a late
+single-session pass; safe to pick up incrementally next):
+- ⏳ `render.clj` signals + endpoints extraction — ~50 widget/caller files use these
+  as the rendering SPI; high mechanical churn, do as a dedicated pass.
+- ⏳ `session.clj` table view-state → `view_state.clj` — shares `update-view!`/
+  `item-keys` with `move-item!`/`clear-items!`; unpick those couplings first.
+- ⏳ `cells/document.clj` landing HTML → `web/views/landing.clj`.
+- ⏳ `forms.clj` `prepare-form` → `forms_compile.clj` (store shouldn't compile).
+- ⏳ `table.clj` inline JS blobs → a served `/vendor` asset.
+- ⏳ remaining dedups: `load-edn-dir`, `opt-value/opt-label`, `field-bind-attrs`,
+  `read-signals`, `append-meta!`.
+- ⏳ store protocol parity (`users`/`access`/`audit`) + shared `store/sqlite`.
+
+---
+
+
 Synthesis of a chiasmus structural analysis (low community cohesion 0.04–0.13;
 `render.clj`/`session.clj` functions scattered across 6+ clusters = overloaded
 modules) + four parallel review agents (dead code, duplication, architecture,
