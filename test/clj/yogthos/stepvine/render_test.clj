@@ -58,6 +58,11 @@
       (is (str/includes? html "/doc/bmi/field/kg"))
       (is (str/includes? html "value=\"100\"")))
 
+    (testing "editable input carries the server-authoritative lock attrs (components.bind)"
+      (is (str/includes? html "data-on:focus=\"@post(&apos;/doc/bmi/field/kg/lock&apos;)\""))
+      (is (str/includes? html "data-on:blur=\"@post(&apos;/doc/bmi/field/kg/unlock&apos;)\""))
+      (is (str/includes? html "data-attr:disabled=\"!!$locks.kg &amp;&amp; $locks.kg != $uid\"")))
+
     (testing "computed field rendered read-only and signal-bound"
       (is (str/includes? html "data-bind=\"bmi\""))
       (is (str/includes? html "readonly"))

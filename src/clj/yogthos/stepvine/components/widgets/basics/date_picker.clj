@@ -12,6 +12,7 @@
      :caption     true to show a friendly reformatted echo of the picked date
                   (the native input always stores/edits ISO yyyy-mm-dd)."
   (:require
+   [yogthos.stepvine.components.bind :as bind]
    [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.endpoints :as endpoints]
    [yogthos.stepvine.render :refer [render-widget]])
@@ -56,10 +57,7 @@
         step                       (assoc :step (str step))
         read-only                  (assoc :readonly true)
         (not read-only)
-        (assoc "data-on:change" (str "@post('" post-url "')")
-               "data-on:focus"  (str "@post('" (endpoints/field-lock-url ctx id) "')")
-               "data-on:blur"   (str "@post('" (endpoints/field-unlock-url ctx id) "')")
-               "data-attr:disabled" (str "!!$locks." sig " && $locks." sig " != $uid")))]
+        (merge (bind/edit-bind-attrs ctx id sig "data-on:change")))]
      ;; quick-set helpers: set the signal to a resolved literal date, then post
      (when (and (seq helpers) (not read-only))
        (into [:div.date-helpers]

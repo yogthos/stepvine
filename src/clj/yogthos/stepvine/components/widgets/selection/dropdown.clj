@@ -2,7 +2,7 @@
   "Select/dropdown widget with option formatting, placeholder, and filtering.
    Serves both `:dropdown` and the form-facing `:dropdown-select` alias."
   (:require
-   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.components.bind :as bind]
    [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.sources :as sources]
    [yogthos.stepvine.render :refer [render-widget]]))
@@ -45,11 +45,8 @@
      [:label {:for (when-not in-item? (name id))}
       (or label (name id))]
      (into [:select
-            (cond-> {"data-bind" sig
-                     "data-on:change" (str "@post('" (endpoints/field-post-url ctx id) "')")
-                     "data-on:focus"  (str "@post('" (endpoints/field-lock-url ctx id) "')")
-                     "data-on:blur"   (str "@post('" (endpoints/field-unlock-url ctx id) "')")
-                     "data-attr:disabled" (str "!!$locks." sig " && $locks." sig " != $uid")}
+            (cond-> (merge {"data-bind" sig}
+                           (bind/edit-bind-attrs ctx id sig "data-on:change"))
               ;; only top-level fields get a stable id/name (item ids would collide)
               (not in-item?) (assoc :id (name id) :name (name id))
               read-only      (assoc :disabled true))]

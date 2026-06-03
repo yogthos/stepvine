@@ -1,8 +1,8 @@
 (ns yogthos.stepvine.components.widgets.selection.checkbox
   "Checkbox widget — boolean toggle with label."
   (:require
+   [yogthos.stepvine.components.bind :as bind]
    [yogthos.stepvine.signals :as signals]
-   [yogthos.stepvine.endpoints :as endpoints]
    [yogthos.stepvine.render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/checkbox
@@ -18,8 +18,5 @@
         checked?       (assoc :checked true)   ; reflect the persisted value
         read-only      (assoc :disabled true)
         (not read-only)
-        (assoc "data-on:change" (str "@post('" (endpoints/field-post-url ctx id) "')")
-               "data-on:focus"  (str "@post('" (endpoints/field-lock-url ctx id) "')")
-               "data-on:blur"   (str "@post('" (endpoints/field-unlock-url ctx id) "')")
-               "data-attr:disabled" (str "!!$locks." sig " && $locks." sig " != $uid")))]
+        (merge (bind/edit-bind-attrs ctx id sig "data-on:change")))]
      [:label {:for (when-not in-item? (name id))} (or label (name id))]]))

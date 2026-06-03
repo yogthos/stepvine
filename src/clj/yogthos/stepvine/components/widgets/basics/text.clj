@@ -1,9 +1,9 @@
 (ns yogthos.stepvine.components.widgets.basics.text
   "Textarea and labeled-value widgets."
   (:require
+   [yogthos.stepvine.components.bind :as bind]
    [yogthos.stepvine.format :as fmt]
    [yogthos.stepvine.signals :as signals]
-   [yogthos.stepvine.endpoints :as endpoints]
    [yogthos.stepvine.render :refer [render-widget]]))
 
 ;; --- Textarea -------------------------------------------------------------
@@ -22,10 +22,7 @@
         true              (assoc "data-bind" sig)
         (not in-item?)    (assoc :id (name id) :name (name id))
         (not read-only)
-        (assoc "data-on:input__debounce.300ms" (str "@post('" (endpoints/field-post-url ctx id) "')")
-               "data-on:focus" (str "@post('" (endpoints/field-lock-url ctx id) "')")
-               "data-on:blur"  (str "@post('" (endpoints/field-unlock-url ctx id) "')")
-               "data-attr:disabled" (str "!!$locks." sig " && $locks." sig " != $uid")))
+        (merge (bind/edit-bind-attrs ctx id sig "data-on:input__debounce.300ms")))
       (str (if (nil? value) "" value))]]))
 
 ;; --- Labeled value --------------------------------------------------------
