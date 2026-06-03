@@ -14,7 +14,8 @@
    [yogthos.stepvine.cells.form :as cform]
    [yogthos.stepvine.docs :as docs]
    [yogthos.stepvine.signals :as signals]
-   [yogthos.stepvine.session :as session]))
+   [yogthos.stepvine.session :as session]
+   [yogthos.stepvine.web.request :as request]))
 
 (defn- parse-fields
   "Parse `item:tmp,qty:newqty` into [[item-field-kw temp-field-kw temp-signal] …]."
@@ -32,7 +33,7 @@
           coll    (keyword (get-in req [:path-params :coll]))
           modal   (not-empty (get-in req [:query-params "modal"]))
           pairs   (parse-fields (get-in req [:query-params "fields"]))
-          signals (try (json/read-value (d*/get-signals req)) (catch Exception _ {}))]
+          signals (request/read-signals req)]
       (when (docs/ensure! resources doc-id)
         (let [sess  (session/current session-manager doc-id)
               fopts (get-in (signals/collections-data sess) [coll :field-opts])

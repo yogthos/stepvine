@@ -8,26 +8,16 @@
    data). A real database query slots in behind `resolve-source` without touching
    callers."
   (:require
-   [clojure.edn :as edn]
-   [clojure.java.io :as io]
-   [clojure.string :as str]
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
+   [yogthos.stepvine.edn-dir :as edn-dir]
    [yogthos.stepvine.sources :as sources]
    [yogthos.stepvine.terminology :as terminology]))
-
-(defn- edn-file? [^java.io.File f]
-  (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
 
 (defn load-dir
   "Load every *.edn option-set in `dir` into a {source-id -> options} map."
   [dir]
-  (let [d (io/file dir)]
-    (when-not (.isDirectory d)
-      (throw (ex-info "Options directory not found" {:dir dir})))
-    (into {}
-          (map (fn [f] (let [m (edn/read-string (slurp f))] [(:id m) (:options m)])))
-          (filter edn-file? (.listFiles d)))))
+  (edn-dir/load-edn-dir dir (fn [f] (let [m (edn-dir/read-edn f)] [(:id m) (:options m)]))))
 
 (defn- options-spec
   "Normalize a field's `:options` into a source spec (§15.6). The legacy shorthand

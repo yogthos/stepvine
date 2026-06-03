@@ -8,7 +8,6 @@
    broadcasts happen in their handlers."
   (:require
    [clojure.string :as str]
-   [jsonista.core :as json]
    [mycelium.core :as myc]
    [yogthos.stepvine.access :as access]
    [yogthos.stepvine.audit :as audit]
@@ -22,8 +21,8 @@
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.view-state :as view-state]
    [yogthos.stepvine.session :as session]
-   yogthos.stepvine.components   ; register all widget render methods
-   [starfederation.datastar.clojure.api :as d*]))
+   [yogthos.stepvine.web.request :as request]
+   yogthos.stepvine.components))   ; register all widget render methods
 
 (defn coerce
   "Coerce an incoming signal value to the field's declared type. Datastar may
@@ -44,7 +43,7 @@
    :output {:doc-id :any :field-id :any :uid :any :raw-value :any}
    :doc    "Read the field id from the path and value + uid from posted signals."}
   (fn [_resources {req :http-request}]
-    (let [signals  (json/read-value (d*/get-signals req))
+    (let [signals  (request/read-signals req)
           field-id (get-in req [:path-params :fid])]
       {:doc-id    (get-in req [:path-params :id])
        :field-id  field-id
@@ -162,7 +161,7 @@
    :doc    "Parse a collection op: doc/coll/idx/field from the path, value+uid from signals."}
   (fn [_resources {req :http-request}]
     (let [pp      (:path-params req)
-          signals (try (json/read-value (d*/get-signals req)) (catch Exception _ {}))
+          signals (request/read-signals req)
           coll    (:coll pp)
           idx     (:idx pp)
           fid     (:fid pp)]

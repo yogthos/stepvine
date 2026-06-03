@@ -6,12 +6,12 @@
   (:require
    [clojure.string :as str]
    [hiccup2.core :as h]
-   [jsonista.core :as json]
    [starfederation.datastar.clojure.api :as d*]
    [starfederation.datastar.clojure.adapter.ring :as ds-ring]
    [yogthos.stepvine.docs :as docs]
    [yogthos.stepvine.signals :as signals]
-   [yogthos.stepvine.sources :as sources]))
+   [yogthos.stepvine.sources :as sources]
+   [yogthos.stepvine.web.request :as request]))
 
 (defn- opt-value [o] (cond (map? o) (:value o) (vector? o) (second o) :else o))
 (defn- opt-label [o] (cond (map? o) (:label o) (vector? o) (first o) :else o))
@@ -41,7 +41,7 @@
           fid     (keyword (get-in req [:path-params :fid]))
           sig     (signals/signal-name fid)
           src-id  (some-> (get-in req [:query-params "source"]) not-empty keyword)
-          signals (try (json/read-value (d*/get-signals req)) (catch Exception _ {}))
+          signals (request/read-signals req)
           query   (get signals (str sig "_q"))
           spec    (when src-id (get-in (:form-raw (docs/ensure! resources doc-id)) [:sources src-id]))
           matches (when (and spec (not (str/blank? (str query))))

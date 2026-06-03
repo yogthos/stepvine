@@ -10,9 +10,7 @@
    The `:value` is the FHIR code that is stored; the `:label` is the human display
    shown in the widget; `:system` names the code system the code belongs to."
   (:require
-   [clojure.edn :as edn]
-   [clojure.java.io :as io]
-   [clojure.string :as str]))
+   [yogthos.stepvine.edn-dir :as edn-dir]))
 
 (defn- concept->option [system {:keys [code display] :as c}]
   {:value  code
@@ -31,16 +29,8 @@
                      [])]
     (mapv (partial concept->option system) contains)))
 
-(defn- edn-file? [^java.io.File f]
-  (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
-
 (defn load-dir
   "Load a directory of ValueSet EDN files into `{value-set-id -> coded-options}`,
    expanding each. A missing directory yields `{}` (terminology is optional)."
   [dir]
-  (let [d (io/file dir)]
-    (if (.isDirectory d)
-      (into {}
-            (map (fn [f] (let [m (edn/read-string (slurp f))] [(:id m) (expand m)])))
-            (filter edn-file? (.listFiles d)))
-      {})))
+  (edn-dir/load-edn-dir dir (fn [f] (let [m (edn-dir/read-edn f)] [(:id m) (expand m)])) :empty))

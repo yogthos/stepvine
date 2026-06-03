@@ -10,7 +10,6 @@
    [jsonista.core :as json]
    [mycelium.core :as myc]
    [selmer.parser :as selmer]
-   [starfederation.datastar.clojure.api :as d*]
    [yogthos.stepvine.access :as access]
    [yogthos.stepvine.audit :as audit]
    [yogthos.stepvine.builder :as builder]
@@ -30,6 +29,7 @@
    [yogthos.stepvine.users :as users]
    [yogthos.stepvine.web.landing :as landing]
    [yogthos.stepvine.web.layout :as layout]
+   [yogthos.stepvine.web.request :as request]
    yogthos.stepvine.components)  ; register all widget render methods
   (:import
    [java.util Date]))
@@ -249,8 +249,7 @@
     {:doc-id  (get-in req [:path-params :id])
      :view-id (keyword (or (get-in req [:query-params "view"]) "default"))
      :uid     (get-in req [:session :user-id])
-     :rev     (try (some-> (json/read-value (d*/get-signals req)) (get "rev") long)
-                   (catch Exception _ nil))}))
+     :rev     (request/read-rev req)}))
 
 (defn- broadcast-lock! [hub doc-id locked?]
   (hub/broadcast-signals! hub doc-id {"locked" locked?}))

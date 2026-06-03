@@ -7,9 +7,7 @@
    data (`:permitted?`), so the action-execution machine — and the document state
    transition it performs — is expressed in mycelium, not a hand-rolled loop."
   (:require
-   [jsonista.core :as json]
    [mycelium.core :as myc]
-   [starfederation.datastar.clojure.api :as d*]
    [yogthos.stepvine.audit :as audit]
    [yogthos.stepvine.directives :as directives]
    [yogthos.stepvine.docs :as docs]
@@ -18,6 +16,7 @@
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
    [yogthos.stepvine.users :as users]
+   [yogthos.stepvine.web.request :as request]
    [yogthos.stepvine.workflow-rules :as workflow]))
 
 (defn posted-rev
@@ -25,8 +24,7 @@
    client seeds + keeps `$rev` current over SSE; an action commits a decision, so
    it sends the rev it acted on."
   [req]
-  (try (some-> (json/read-value (d*/get-signals req)) (get "rev") long)
-       (catch Exception _ nil)))
+  (request/read-rev req))
 
 (myc/defcell :wf/parse
   {:doc "Parse the workflow-action request: doc id (path), action (path), user, rev."}

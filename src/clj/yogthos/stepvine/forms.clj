@@ -24,10 +24,10 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
-   [clojure.string :as str]
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
    [next.jdbc :as jdbc]
+   [yogthos.stepvine.edn-dir :as edn-dir]
    [yogthos.stepvine.versions :as versions]))
 
 ;; --- Protocol -------------------------------------------------------------
@@ -51,9 +51,6 @@
 
 ;; --- Loading helpers (pure EDN/disk) --------------------------------------
 
-(defn- edn-file? [^java.io.File f]
-  (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
-
 (defn- read-form
   "Read a form's EDN, plus its sibling `<id>.css` (the app's own styling) loaded
    into `:css` when present — so an app is its EDN + its CSS."
@@ -65,12 +62,7 @@
 (defn load-dir
   "Load every *.edn form file in `dir` into a {form-id -> form} map."
   [dir]
-  (let [d (io/file dir)]
-    (when-not (.isDirectory d)
-      (throw (ex-info "Forms directory not found" {:dir dir})))
-    (into {}
-          (map (fn [f] (let [form (read-form f)] [(:id form) form])))
-          (filter edn-file? (.listFiles d)))))
+  (edn-dir/load-edn-dir dir (fn [f] (let [form (read-form f)] [(:id form) form]))))
 
 (defn load-form
   "Read a single form by id from a forms directory (default \"forms\")."

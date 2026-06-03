@@ -14,12 +14,11 @@
    broadcast, which redraws the whole nested tree."
   (:require
    [clojure.string :as str]
-   [jsonista.core :as json]
-   [starfederation.datastar.clojure.api :as d*]
    [yogthos.stepvine.cells.form :as cform]
    [yogthos.stepvine.docs :as docs]
    [yogthos.stepvine.signals :as signals]
-   [yogthos.stepvine.session :as session]))
+   [yogthos.stepvine.session :as session]
+   [yogthos.stepvine.web.request :as request]))
 
 (defn- parse-path
   "`teams/t1/members/m1` -> `[:teams \"t1\" :members \"m1\"]` (collection segments
@@ -50,7 +49,7 @@
       (when (and (docs/ensure! resources doc-id) (seq path))
         (case op
           :field  (let [fid     (get-in req [:path-params :fid])
-                        signals (try (json/read-value (d*/get-signals req)) (catch Exception _ {}))
+                        signals (request/read-signals req)
                         sig     (signals/item-signal-name {:item {:path path}} (keyword fid))
                         form    (:form (session/current session-manager doc-id))
                         fopts   (leaf-field-opts form (vec (take-nth 2 path)) fid)]
