@@ -1,6 +1,7 @@
 (ns yogthos.stepvine.components.widgets.basics.text
   "Textarea and labeled-value widgets."
   (:require
+   [yogthos.stepvine.format :as fmt]
    [yogthos.stepvine.render :as render :refer [render-widget]]))
 
 ;; --- Textarea -------------------------------------------------------------
@@ -33,5 +34,5 @@
         current (get-in ctx [:values id])]
     [:div.widget.labeled-value.field (when (and id (not (:item ctx))) {:id (str "lv-" (name id))})
      [:label label]
-     [:span {"data-text" (render/fmt-text-expr fmt sig)}     ; :fmt formats live + on render
-      (str (if (nil? current) (or default "") (render/fmt-value fmt current)))]]))
+     [:span {"data-text" (fmt/fmt-text-expr fmt sig)}     ; :fmt formats live + on render
+      (str (if (nil? current) (or default "") (fmt/fmt-value fmt current)))]]))

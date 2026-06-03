@@ -18,11 +18,11 @@
    [hiccup2.core :as h]
    [markdown.core :as md]
    [yogthos.stepvine.exports :as exports]
-   [yogthos.stepvine.render :as render]))
+   [yogthos.stepvine.format :as fmt]))
 
 (defn- transform [v {:keys [join fmt upper lower]}]
   (let [v (cond->> v join (str/join (if (string? join) join ", ")))
-        v (if fmt (render/fmt-value fmt v) (str v))
+        v (if fmt (fmt/fmt-value fmt v) (str v))
         v (cond-> v upper str/upper-case lower str/lower-case)]
     v))
 

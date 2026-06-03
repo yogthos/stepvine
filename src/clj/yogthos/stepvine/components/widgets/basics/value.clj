@@ -1,6 +1,7 @@
 (ns yogthos.stepvine.components.widgets.basics.value
   "Inline signal-bound text — renders a field or reaction value as a <span>."
   (:require
+   [yogthos.stepvine.format :as fmt]
    [yogthos.stepvine.render :as render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/value
@@ -15,5 +16,5 @@
         current  (if in-item?
                    (get (:values ctx) sig-id)
                    (get (if rxn (:rxns ctx) (:values ctx)) sig-id))]
-    [:span {"data-text" (render/fmt-text-expr fmt sig)}
-     (str (if (nil? current) (or default "") (render/fmt-value fmt current)))]))
+    [:span {"data-text" (fmt/fmt-text-expr fmt sig)}
+     (str (if (nil? current) (or default "") (fmt/fmt-value fmt current)))]))
