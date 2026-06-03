@@ -472,12 +472,11 @@ try {
   await page.fill('#price', '20');
   await page.fill('#discount-pct', '10');
   await page.fill('#tax-rate', '8');
-  await settleFields(page); // let the separate-field POSTs settle before asserting
   // the calculated fields are :c/labeled-value spans formatted via :fmt "$%.2f"
   const lv = (id) => page.locator(`#lv-${id} span`).innerText();
   const waitLv = (id, want) => page.waitForFunction(
     ([i, w]) => { const el = document.querySelector(`#lv-${i} span`); return el && el.textContent === w; },
-    [id, want], { timeout: 10000 });
+    [id, want], { timeout: 6000 });
   // the chain settles: subtotal 60 → discount 6 → tax 4.32 → total 58.32
   await waitLv('total', '$58.32');
   ok('the full chain computed: total = $58.32 (:fmt currency formatting)');

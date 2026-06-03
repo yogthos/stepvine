@@ -79,20 +79,27 @@
     session-id))
 
 (defn swap-session! [manager session-id f & args]
-  (let [f' (if-some [wrap (:wrap-update manager)]
-             (wrap f)
-             f)
-        [old new]
-        (apply swap-vals! (get-session-atom! manager session-id)
-               f' args)]
-    (when-some [on-update (:on-update manager)]
-      (try
-        (on-update session-id old new)
-        (catch #?(:clj Throwable
-                  :cljs js/Error) e
-          (println "UPDATE FAILED!!!")
-          (throw e))))
-    new))
+  (let [f'    (if-some [wrap (:wrap-update manager)]
+                (wrap f)
+                f)
+        satom (get-session-atom! manager session-id)]
+    ;; Serialize the state swap AND its on-update side-effects (persist + SSE
+    ;; broadcast) per session. on-update runs OUTSIDE swap-vals!, so without this
+    ;; lock two concurrent edits to one document can apply in order T1→T2 but
+    ;; broadcast T2→T1 — a stale derived value (e.g. a pre-cascade total) then
+    ;; arrives last and wins on the client. Locking the whole unit makes apply,
+    ;; persist and broadcast order identical, so the latest value always wins.
+    ;; (In CLJS `locking` just runs the body — JS is single-threaded.)
+    (locking satom
+      (let [[old new] (apply swap-vals! satom f' args)]
+        (when-some [on-update (:on-update manager)]
+          (try
+            (on-update session-id old new)
+            (catch #?(:clj Throwable
+                      :cljs js/Error) e
+              (println "UPDATE FAILED!!!")
+              (throw e))))
+        new))))
 
 (defn connect! [manager session-id connection]
   (swap-session! manager session-id
