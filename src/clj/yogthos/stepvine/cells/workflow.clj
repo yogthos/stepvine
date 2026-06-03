@@ -79,12 +79,20 @@
     (assoc data :directives (workflow/action-directives workflow state action ctx))))
 
 (myc/defcell :wf/commit
-  {:doc      "Apply the directives (transition + steps), audit the action, ack 204."
+  {:doc      "Run the action as a resilient saga (data mutations -> side effects ->
+              transition-on-success). 204 on success; on a failed external step the
+              transition is NOT committed (the action can be retried) and we notify."
    :requires [:documents :session-manager :hub :audit :mailer :reports-dir :http-client]}
-  (fn [{:keys [audit] :as resources} {:keys [form doc-id uid action directives]}]
-    (directives/apply! resources form doc-id uid directives)
-    (audit/record! audit {:doc-id doc-id :by uid :action :wf/action :detail {:action action}})
-    {:status 204 :body ""}))
+  (fn [{:keys [audit hub] :as resources} {:keys [form doc-id uid action state directives]}]
+    (let [result (directives/apply! resources form doc-id uid action state directives)]
+      (if (= :ok (:status result))
+        (do (audit/record! audit {:doc-id doc-id :by uid :action :wf/action :detail {:action action}})
+            {:status 204 :body ""})
+        (do (hub/broadcast-signals! hub doc-id
+                                    {"notice" "Couldn't complete the action — an external step failed. Please retry."})
+            (audit/record! audit {:doc-id doc-id :by uid :action :wf/action
+                                  :detail {:action action :failed (get-in result [:saga :failed-step])}})
+            {:status 502 :body "step-failed"})))))
 
 (def ^:private reject-message
   {:illegal-transition "That action isn't allowed from the current state."

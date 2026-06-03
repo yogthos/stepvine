@@ -124,18 +124,24 @@
 
 (defmethod run-step :notify   [ctx {:keys [message]}] [:notify (resolve-value ctx message)])
 (defmethod run-step :snapshot [_ _]                   [:snapshot])
-(defmethod run-step :pdf      [_ step]                [:pdf (select-keys step [:template])])
+;; resilience config a step may carry: `:retry N` (extra attempts on transient
+;; failure) and `:compensate {:kind … …}` (an intent run if a LATER step fails)
+(defn- resilience [step] (select-keys step [:retry :compensate]))
+
+(defmethod run-step :pdf      [_ step]                [:pdf (merge (select-keys step [:template]) (resilience step))])
 (defmethod run-step :set-field [ctx {:keys [path value]}] [:set-field path (resolve-value ctx value)])
 (defmethod run-step :set-meta  [ctx {:keys [path value]}] [:set-meta path (resolve-value ctx value)])
 (defmethod run-step :assign    [ctx {:keys [to]}]         [:assign (resolve-value ctx to)])
 (defmethod run-step :email     [ctx step]
-  [:email {:to      (resolve-template ctx (:to step))
-           :subject (resolve-template ctx (:subject step))
-           :body    (resolve-template ctx (:body step))}])
+  [:email (merge {:to      (resolve-template ctx (:to step))
+                  :subject (resolve-template ctx (:subject step))
+                  :body    (resolve-template ctx (:body step))}
+                 (resilience step))])
 (defmethod run-step :http      [ctx step]
   ;; call an external service: the body map's values are resolved from the document
   [:http (-> (select-keys step [:url :host-allow :method :headers])
-             (assoc :body (into {} (map (fn [[k v]] [k (resolve-value ctx v)])) (:body step))))])
+             (assoc :body (into {} (map (fn [[k v]] [k (resolve-value ctx v)])) (:body step)))
+             (merge (resilience step)))])
 
 (defn action-steps [workflow action] (get-in workflow [:actions action :steps]))
 

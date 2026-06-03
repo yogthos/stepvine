@@ -35,9 +35,15 @@
                               ;; call an external service on close — the body is
                               ;; templated from the document; the host must be on
                               ;; the SSRF allowlist
+                              ;; resilience (§8gj): retry transient failures up to
+                              ;; twice; if a LATER step fails, this :compensate intent
+                              ;; runs. The transition to :closed commits only once
+                              ;; every step here has succeeded (idempotent on retry).
                               {:do :http
                                :url "https://hooks.example.com/tickets/closed"
                                :host-allow ["hooks.example.com"]
+                               :retry 2
+                               :compensate {:kind :notify :message "Rolled back the external close notification."}
                                :body {:event "ticket-closed"
                                       :title {:from [:title]}
                                       :priority {:from [:priority]}}}
