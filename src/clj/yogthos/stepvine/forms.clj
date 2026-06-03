@@ -22,12 +22,12 @@
      two and could silently mutate a published version;
    - CSS is a live column on the working form, **never** in the versioned archive."
   (:require
-   [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
    [next.jdbc :as jdbc]
    [yogthos.stepvine.edn-dir :as edn-dir]
+   [yogthos.stepvine.store :as store]
    [yogthos.stepvine.versions :as versions]))
 
 ;; --- Protocol -------------------------------------------------------------
@@ -55,7 +55,7 @@
   "Read a form's EDN, plus its sibling `<id>.css` (the app's own styling) loaded
    into `:css` when present — so an app is its EDN + its CSS."
   [^java.io.File f]
-  (let [form (edn/read-string (slurp f))
+  (let [form (store/read-edn (slurp f))
         css  (io/file (.getParentFile f) (str (name (:id form)) ".css"))]
     (cond-> form (.isFile css) (assoc :css (slurp css)))))
 
@@ -82,7 +82,7 @@
     (let [id (:id form)]
       (when dir
         (io/make-parents (io/file dir "_"))
-        (spit (io/file dir (str (name id) ".edn")) (pr-str (dissoc form :css)))
+        (spit (io/file dir (str (name id) ".edn")) (store/write-edn (dissoc form :css)))
         (when (:css form) (spit (io/file dir (str (name id) ".css")) (:css form))))
       (swap! forms assoc id form)
       id))
@@ -119,19 +119,19 @@
   FormStore
   (-form [_ id]
     (when-let [row (jdbc/execute-one! ds ["select edn, css from forms where id=?" (name id)])]
-      (cond-> (edn/read-string (:forms/edn row))
+      (cond-> (store/read-edn (:forms/edn row))
         (:forms/css row) (assoc :css (:forms/css row)))))
   (-form-ids [_]
     (mapv (comp keyword :forms/id) (jdbc/execute! ds ["select id from forms"])))
   (-draft [_ id]
     (when-let [row (jdbc/execute-one! ds ["select edn, css from form_drafts where form_id=?" (name id)])]
-      (cond-> (edn/read-string (:form_drafts/edn row))
+      (cond-> (store/read-edn (:form_drafts/edn row))
         (:form_drafts/css row) (assoc :css (:form_drafts/css row)))))
   (-store-draft! [_ form]
     (jdbc/execute! ds ["insert into form_drafts(form_id,edn,css,updated_at) values(?,?,?,?)
                         on conflict(form_id) do update set edn=excluded.edn, css=excluded.css,
                         updated_at=excluded.updated_at"
-                       (name (:id form)) (pr-str (dissoc form :css)) (:css form)
+                       (name (:id form)) (store/write-edn (dissoc form :css)) (:css form)
                        (System/currentTimeMillis)])
     (:id form))
   (-discard-draft! [_ id]
@@ -140,12 +140,12 @@
     (jdbc/execute! ds ["insert into forms(id,edn,css,updated_at) values(?,?,?,?)
                         on conflict(id) do update set edn=excluded.edn, css=excluded.css,
                         updated_at=excluded.updated_at"
-                       (name (:id form)) (pr-str (dissoc form :css)) (:css form)
+                       (name (:id form)) (store/write-edn (dissoc form :css)) (:css form)
                        (System/currentTimeMillis)])
     (:id form))
   (-archived [_ id v]
     (some-> (jdbc/execute-one! ds ["select edn from form_versions where form_id=? and version=?" (name id) v])
-            :form_versions/edn edn/read-string))
+            :form_versions/edn store/read-edn))
   (-latest-published [_ id]
     (:m (jdbc/execute-one! ds ["select max(version) m from form_versions where form_id=? and draft=0" (name id)])))
   (-archived-digest [_ id v]
@@ -165,7 +165,7 @@
                             values(?,?,?,?,?,?)
                             on conflict(form_id,version) do update set digest=excluded.digest,
                             draft=excluded.draft, edn=excluded.edn, published_at=excluded.published_at"
-                           id v d (if (:draft? form) 1 0) (pr-str (dissoc form :css))
+                           id v d (if (:draft? form) 1 0) (store/write-edn (dissoc form :css))
                            (System/currentTimeMillis)]))
       {:id (:id form) :version v :digest d})))
 
@@ -268,14 +268,13 @@
 (defmethod ig/init-key :store/forms
   [_ {:keys [dir versions-file partials backend db-file]}]
   (case (or backend :atom)
-    :sql (let [_  (io/make-parents (or db-file "data/apps.db"))
-               ds (jdbc/get-datasource (str "jdbc:sqlite:" (or db-file "data/apps.db")))
+    :sql (let [db    (or db-file "data/apps.db")
+               ds    (store/sqlite-datasource db sql-schema)
                store (->SqlFormStore ds partials)]
-           (doseq [stmt sql-schema] (jdbc/execute! ds [stmt]))
            (when (and dir (empty? (-form-ids store)))
              (seed-from-dir! store dir)
              (log/info "seeded SQLite app store from" dir))
-           (log/info "apps backed by SQLite at" (or db-file "data/apps.db"))
+           (log/info "apps backed by SQLite at" db)
            store)
     (let [store (->MapFormStore dir (atom (load-dir dir))
                                 (versions/init-archive versions-file) partials (atom {}))]

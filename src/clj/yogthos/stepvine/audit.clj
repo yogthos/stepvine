@@ -12,10 +12,9 @@
    Backed by a duratom when a file is configured, an atom for tests; an append-only
    vector keyed query-side by :doc-id."
   (:require
-   [clojure.java.io :as io]
    [clojure.tools.logging :as log]
-   [duratom.core :as duratom]
-   [integrant.core :as ig])
+   [integrant.core :as ig]
+   [yogthos.stepvine.store :as store])
   (:import
    [java.util UUID]))
 
@@ -49,8 +48,4 @@
 
 (defmethod ig/init-key :store/audit
   [_ {:keys [file]}]
-  (if file
-    (do (io/make-parents file)
-        (log/info "audit log persisted to" file)
-        (duratom/duratom :local-file :file-path file :init []))
-    (store)))
+  (store/edn-file-store file {:init [] :label "audit log persisted to"}))

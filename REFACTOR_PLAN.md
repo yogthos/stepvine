@@ -61,8 +61,17 @@
   table.clj 624→465 LOC. Verified: 220 tests + full storyboard (table sort/page,
   0 console errors).
 
-**Deferred** (lower priority, Phase 5):
-- ⏳ store protocol parity (`users`/`access`/`audit`) + shared `store/sqlite`.
+- ✅ Phase 5 — store consistency: shared **`store.clj`** helpers collapse the
+  copy-pasted persistence mechanics. `sqlite-datasource` (make-parents + jdbc:sqlite
+  + DDL) dedups the `documents`/`forms` SQLite init; `edn-file-store` (duratom-on-
+  file or in-memory atom) dedups the init across `documents` (default), `users`,
+  `access`, `audit`; `read-edn`/`write-edn` are the shared EDN column/file codec.
+  ~6 duplicated blocks → one source; `documents`/`forms` dropped their
+  `edn`/`io`/`duratom` requires where now unused. Decided NOT to add a 1-impl
+  protocol + SQLite backend to users/access/audit (YAGNI — single backend). The
+  `access`/`audit` `store` test-constructors stay (alias + var coexist). Verified:
+  220 tests + full clean-data storyboard (every persistence path: SQLite schema
+  creation, admin seeded into the users duratom, 0 console errors).
 
 ---
 

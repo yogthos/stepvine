@@ -10,11 +10,9 @@
    Backed by a duratom on disk (admin-managed content lives in storage, never in
    system.edn), or a plain atom for tests."
   (:require
-   [clojure.java.io :as io]
    [clojure.set :as set]
-   [clojure.tools.logging :as log]
-   [duratom.core :as duratom]
    [integrant.core :as ig]
+   [yogthos.stepvine.store :as store]
    [yogthos.stepvine.users :as users]))
 
 (defn store [] (atom {}))
@@ -70,8 +68,4 @@
 
 (defmethod ig/init-key :store/access
   [_ {:keys [file]}]
-  (if file
-    (do (io/make-parents file)
-        (log/info "form-access roles persisted to" file)
-        (duratom/duratom :local-file :file-path file :init {}))
-    (store)))
+  (store/edn-file-store file {:init {} :label "form-access roles persisted to"}))

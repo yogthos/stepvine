@@ -13,14 +13,12 @@
    over the protocol, so every caller is backend-agnostic. Plain atoms satisfy
    the protocol directly, so existing tests pass an `(atom {})` unchanged."
   (:require
-   [clojure.edn :as edn]
-   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
    [clojure.walk :as walk]
-   [duratom.core :as duratom]
    [integrant.core :as ig]
-   [next.jdbc :as jdbc])
+   [next.jdbc :as jdbc]
+   [yogthos.stepvine.store :as store])
   (:import
    [java.util UUID]))
 
@@ -56,14 +54,14 @@
    "create index if not exists idx_documents_owner  on documents(owner)"
    "create index if not exists idx_documents_status on documents(status)"])
 
-(defn- row->doc [row] (some-> (:documents/doc row) edn/read-string))
+(defn- row->doc [row] (store/read-edn (:documents/doc row)))
 
 (defn- upsert! [ds doc]
   (jdbc/execute!
    ds ["insert or replace into documents(id,owner,form_id,status,created_at,doc)
         values(?,?,?,?,?,?)"
        (:id doc) (some-> (:owner doc) str) (some-> (:form-id doc) name)
-       (some-> (:status doc) name) (:created-at doc) (pr-str doc)]))
+       (some-> (:status doc) name) (:created-at doc) (store/write-edn doc)]))
 
 (defrecord SqlStore [ds]
   DocStore
@@ -337,9 +335,7 @@
   "An embedded SQLite-backed document store at `db-file` (the schema is created on
    first use)."
   [db-file]
-  (io/make-parents db-file)
-  (let [ds (jdbc/get-datasource (str "jdbc:sqlite:" db-file))]
-    (doseq [stmt schema] (jdbc/execute! ds [stmt]))
+  (let [ds (store/sqlite-datasource db-file schema)]
     (log/info "documents backed by SQLite at" db-file)
     (->SqlStore ds)))
 
@@ -347,8 +343,4 @@
   [_ {:keys [backend file db-file]}]
   (case (or backend :atom)
     :sql (sql-store (or db-file "data/documents.db"))
-    (if file
-      (do (io/make-parents file)
-          (log/info "documents persisted to" file)
-          (duratom/duratom :local-file :file-path file :init {}))
-      (atom {}))))
+    (store/edn-file-store file {:init {} :label "documents persisted to"})))

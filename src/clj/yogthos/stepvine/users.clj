@@ -8,10 +8,9 @@
    empty. Swappable to a real DB behind this API."
   (:require
    [buddy.hashers :as hashers]
-   [clojure.java.io :as io]
    [clojure.tools.logging :as log]
-   [duratom.core :as duratom]
-   [integrant.core :as ig])
+   [integrant.core :as ig]
+   [yogthos.stepvine.store :as store])
   (:import
    [java.util UUID]))
 
@@ -102,10 +101,6 @@
 
 (defmethod ig/init-key :store/users
   [_ {:keys [file]}]
-  (let [store (if file
-                (do (io/make-parents file)
-                    (log/info "users persisted to" file)
-                    (duratom/duratom :local-file :file-path file :init {}))
-                (atom {}))]
+  (let [store (store/edn-file-store file {:init {} :label "users persisted to"})]
     (seed-admin! store)
     store))
