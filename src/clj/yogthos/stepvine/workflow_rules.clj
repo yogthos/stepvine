@@ -1,4 +1,4 @@
-(ns yogthos.stepvine.workflow
+(ns yogthos.stepvine.workflow-rules
   "Declarative document state machine — pure building blocks (PLAN.md §15.10–15.12).
 
    A form declares a `:workflow`:

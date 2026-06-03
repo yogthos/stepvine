@@ -9,7 +9,7 @@
    [yogthos.stepvine.http :as http]
    [yogthos.stepvine.imports :as imports]
    [yogthos.stepvine.mailer :as mailer]
-   [yogthos.stepvine.workflow :as workflow]))
+   [yogthos.stepvine.workflow-rules :as workflow]))
 
 ;; --- the engine emits intents, change-triggered + conditional --------------
 

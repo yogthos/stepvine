@@ -23,7 +23,7 @@
    [yogthos.stepvine.effects :as effects]
    [yogthos.stepvine.hub :as hub]
    [yogthos.stepvine.session :as session]
-   [yogthos.stepvine.workflow :as workflow]))
+   [yogthos.stepvine.workflow-rules :as workflow]))
 
 (defn- side-effect-intent
   "The effect intent for a side-effect directive, or nil for a non-side-effect."

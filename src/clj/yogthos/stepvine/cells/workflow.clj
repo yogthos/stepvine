@@ -18,7 +18,7 @@
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
    [yogthos.stepvine.users :as users]
-   [yogthos.stepvine.workflow :as workflow]))
+   [yogthos.stepvine.workflow-rules :as workflow]))
 
 (defn posted-rev
   "The optimistic-concurrency `rev` signal a datastar POST carried, or nil. The

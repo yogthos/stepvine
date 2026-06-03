@@ -4,7 +4,7 @@
    dispatcher. The orchestration itself is a mycelium FSM (workflow_fsm_test)."
   (:require
    [clojure.test :refer [deftest testing is]]
-   [yogthos.stepvine.workflow :as wf]))
+   [yogthos.stepvine.workflow-rules :as wf]))
 
 (def flow
   {:initial :draft
