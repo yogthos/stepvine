@@ -18,8 +18,6 @@
    [starfederation.datastar.clojure.api :as d*]
    [yogthos.stepvine.cells.form :as cform]
    [yogthos.stepvine.docs :as docs]
-   [yogthos.stepvine.hub :as hub]
-   [yogthos.stepvine.options :as options]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]))
 
@@ -43,14 +41,6 @@
       (let [entry (some #(when (= (keyword fid) (first %)) %) model)]
         (if (map? (second entry)) (second entry) {})))))
 
-(defn- rerender-root! [{:keys [session-manager hub options-store]} doc-id root-coll]
-  (let [sess (session/current session-manager doc-id)
-        ctx  (-> (render/session->context sess :default doc-id)
-                 (assoc :options (options/resolve-field-options
-                                  options-store (render/all-field-opts sess))))]
-    (when-let [html (render/render-collection ctx sess :default root-coll)]
-      (hub/broadcast-elements! hub doc-id html))))
-
 (defn handler
   "Build a deep-path collection handler for `op` (:field, :add, :remove, :noop)."
   [{:keys [session-manager] :as resources} op]
@@ -71,5 +61,5 @@
           :noop   nil)
         ;; the root collection (first path segment) redraws the whole nested tree
         (when (not= op :noop)
-          (rerender-root! resources doc-id (first path))))
+          (cform/rerender-collection! resources doc-id (first path))))
       {:status 204 :body ""})))

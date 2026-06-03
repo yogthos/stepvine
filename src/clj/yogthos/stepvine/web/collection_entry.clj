@@ -13,8 +13,6 @@
    [starfederation.datastar.clojure.adapter.ring :as ds-ring]
    [yogthos.stepvine.cells.form :as cform]
    [yogthos.stepvine.docs :as docs]
-   [yogthos.stepvine.hub :as hub]
-   [yogthos.stepvine.options :as options]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]))
 
@@ -25,16 +23,6 @@
         :let [[ifield tfield] (str/split pair #":")]
         :when (and (seq ifield) (seq tfield))]
     [(keyword ifield) (keyword tfield) (render/signal-name (keyword tfield))]))
-
-(defn- rerender-collection!
-  "Re-render the collection container and broadcast it to every viewer."
-  [{:keys [session-manager hub options-store]} doc-id coll-id]
-  (let [sess (session/current session-manager doc-id)
-        ctx  (-> (render/session->context sess :default doc-id)
-                 (assoc :options (options/resolve-field-options
-                                  options-store (render/all-field-opts sess))))]
-    (when-let [html (render/render-collection ctx sess :default coll-id)]
-      (hub/broadcast-elements! hub doc-id html))))
 
 (defn handler
   "Build the modal-entry commit handler closed over the document resources."
@@ -58,7 +46,7 @@
           ;; later submission (the broadcast clears the bound inputs for viewers)
           (session/apply-change! session-manager doc-id
                                  (vec (for [[_ tfield _] pairs] [tfield nil])))
-          (rerender-collection! resources doc-id coll)))
+          (cform/rerender-collection! resources doc-id coll)))
       ;; close the modal + clear the scratch signals on the committing client
       (ds-ring/->sse-response
        req {ds-ring/on-open

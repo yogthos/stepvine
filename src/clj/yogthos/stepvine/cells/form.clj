@@ -142,10 +142,10 @@
 
 ;; --- POST /doc/:id/coll/:coll[/add | /:idx/remove | /:idx/field/:fid] ------
 
-(defn- rerender-collection!
+(defn rerender-collection!
   "Re-render a collection's container and patch it (by element id) to all peers.
    Resolves option sources (incl. item-field dropdowns) so re-rendered items keep
-   their dropdown options."
+   their dropdown options. Public — shared by the collection web handlers (§dedup)."
   [{:keys [session-manager hub options-store]} doc-id coll-id]
   (let [sess (session/current session-manager doc-id)
         ctx  (-> (render/session->context sess :default doc-id)
