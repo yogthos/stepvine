@@ -13,8 +13,6 @@
    [yogthos.stepvine.sources :as sources]
    [yogthos.stepvine.web.request :as request]))
 
-(defn- opt-value [o] (cond (map? o) (:value o) (vector? o) (second o) :else o))
-(defn- opt-label [o] (cond (map? o) (:label o) (vector? o) (first o) :else o))
 
 (defn- results-markup
   "The results <ul> (the morph target). Each match is a button that, on click,
@@ -24,7 +22,7 @@
     [:ul {:id (str "search-" sig) :class "ss-results" "data-show" (str "$" sig "_open")}
      (if (seq matches)
        (for [o matches]
-         (let [v (str (opt-value o)) l (str (opt-label o))]
+         (let [v (str (sources/option-value o)) l (str (sources/option-label o))]
            [:li [:button {:type "button"
                           "data-on:click"
                           (str "$" sig "=" (pr-str v) "; $" sig "_q=" (pr-str l)

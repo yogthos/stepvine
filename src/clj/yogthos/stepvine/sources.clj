@@ -23,8 +23,14 @@
    [java.net URI]))
 
 ;; --- option helpers -------------------------------------------------------
+;; The single source of truth for reading an option's value/label across its
+;; three shapes: a map `{:value :label}`, a `[label value]` pair, or a bare
+;; scalar (value == label). Used by the dropdown/search widgets too.
 
-(defn- option-label [o]
+(defn option-value [o]
+  (cond (map? o) (:value o) (vector? o) (second o) :else o))
+
+(defn option-label [o]
   (cond (map? o) (:label o) (vector? o) (first o) :else o))
 
 (defn- filter-options

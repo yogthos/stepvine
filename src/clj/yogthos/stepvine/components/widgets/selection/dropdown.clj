@@ -2,21 +2,10 @@
   "Select/dropdown widget with option formatting, placeholder, and filtering.
    Serves both `:dropdown` and the form-facing `:dropdown-select` alias."
   (:require
-   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.sources :as sources]
    [yogthos.stepvine.render :refer [render-widget]]))
-
-(defn- option-value [option]
-  (cond
-    (map? option)    (:value option)
-    (vector? option) (second option)
-    :else            option))
-
-(defn- option-label [option]
-  (cond
-    (map? option)    (:label option)
-    (vector? option) (first option)
-    :else            option))
 
 (defn- format-option [option fmt]
   (if (and fmt (map? option))
@@ -66,8 +55,8 @@
               read-only      (assoc :disabled true))]
            (cons [:option {:value ""} (or placeholder "— select —")]
                  (for [o opts]
-                   (let [v (option-value o)
-                         l (option-label o)
+                   (let [v (sources/option-value o)
+                         l (sources/option-label o)
                          disp (format-option l fmt)]
                      [:option
                       (cond-> {:value (str v)}
