@@ -8,6 +8,7 @@
    a newer form. Moving a document forward is the explicit, opt-in `rebase!`."
   (:require
    [yogthos.stepvine.documents :as documents]
+   [yogthos.stepvine.forms-compile :as forms-compile]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.imports :as imports]
    [yogthos.stepvine.migrations :as migrations]
@@ -65,7 +66,7 @@
    nil if there is no such document."
   [{:keys [forms documents session-manager]} doc-id]
   (when-let [doc (documents/get-document documents doc-id)]
-    (let [form-raw (forms/get-form-version forms (:form-id doc) (:form-version doc 1))]
+    (let [form-raw (forms-compile/get-form-version forms (:form-id doc) (:form-version doc 1))]
       (session/ensure-document! session-manager doc-id form-raw (:db doc))
       {:document doc :form-raw form-raw})))
 
@@ -79,7 +80,7 @@
   [{:keys [forms documents session-manager] :as resources} doc-id]
   (when-let [doc (documents/get-document documents doc-id)]
     (let [target   (forms/latest-published forms (:form-id doc))
-          form-new (forms/get-form-version forms (:form-id doc) target)]
+          form-new (forms-compile/get-form-version forms (:form-id doc) target)]
       (if (migrations/needs-migration? form-new (:form-version doc 1))
         (let [db' (migrations/migrate form-new (:form-version doc 1) (:db doc))]
           (session/ensure-document! session-manager doc-id form-new db')

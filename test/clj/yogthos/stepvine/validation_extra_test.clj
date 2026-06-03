@@ -5,6 +5,7 @@
   (:require
    [clojure.test :refer [deftest testing is]]
    [yogthos.stepvine.editor.impl :as impl]
+   [yogthos.stepvine.forms-compile :as forms-compile]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.validation :as v]))
 
@@ -15,7 +16,7 @@
       (is (= '[v checkin] (second (:fn r)))))))   ; (fn [v checkin] …)
 
 (def ^:private form
-  (forms/prepare-form {}
+  (forms-compile/prepare-form {}
    '{:id :event :version 1
      :data {:model [[:checkin  {:id :checkin  :type :string}]
                     [:checkout {:id :checkout :type :string :validation [[:after :checkin]]}]

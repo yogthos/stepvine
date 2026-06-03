@@ -9,6 +9,7 @@
    [yogthos.stepvine.access :as access]
    [yogthos.stepvine.auth :as auth]
    [yogthos.stepvine.documents :as documents]
+   [yogthos.stepvine.forms-compile :as forms-compile]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.users :as users]
    [yogthos.stepvine.web.layout :as layout]
@@ -34,7 +35,7 @@
   "Workflowed forms `user` is a team member of, with their workflow."
   [forms-store access-store user]
   (for [id (forms/list-forms forms-store)
-        :let [f (forms/get-form forms-store id)]
+        :let [f (forms-compile/get-form forms-store id)]
         :when (and (workflowed? f) (access/team-member? access-store user id))]
     {:id id :title (:title f) :workflow (:workflow f)}))
 
@@ -68,7 +69,7 @@
   (fn [req]
     (let [user    (auth/current-user users-store req)
           form-id (keyword (get-in req [:path-params :form]))
-          form    (forms/get-form forms-store form-id)]
+          form    (forms-compile/get-form forms-store form-id)]
       (if-not (and form (workflowed? form) (access/team-member? access-store user form-id))
         (resp/redirect "/queue" :see-other)
         (let [wf       (:workflow form)

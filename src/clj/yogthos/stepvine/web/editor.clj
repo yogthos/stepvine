@@ -16,6 +16,7 @@
    [yogthos.stepvine.access :as access]
    [yogthos.stepvine.auth :as auth]
    [yogthos.stepvine.editor.impl :as impl]
+   [yogthos.stepvine.forms-compile :as forms-compile]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.options :as options]
    [yogthos.stepvine.signals :as signals]
@@ -55,7 +56,7 @@
    errors render as a message (with :views nil)."
   [forms-store options-store edn-str css view-id]
   (try
-    (let [form (forms/prepare-form forms-store (edn/read-string edn-str))
+    (let [form (forms-compile/prepare-form forms-store (edn/read-string edn-str))
           vid  (resolve-preview-view form view-id)
           sess (impl/create-session form {})
           ctx  (-> (render/session->context sess vid "preview")

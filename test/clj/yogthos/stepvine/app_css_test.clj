@@ -5,6 +5,7 @@
    [clojure.test :refer [deftest testing is]]
    [clojure.string :as str]
    [integrant.core :as ig]
+   [yogthos.stepvine.forms-compile :as forms-compile]
    [yogthos.stepvine.forms :as forms]))
 
 (deftest sibling-css-loads-into-the-form
@@ -23,4 +24,4 @@
     (testing "an app with no CSS has no href"
       (is (nil? (forms/app-css-href store :bmi))))
     (testing "CSS is excluded from the versioned archive (live, not pinned)"
-      (is (nil? (:css (forms/get-form-version store :ticket 1)))))))
+      (is (nil? (:css (forms-compile/get-form-version store :ticket 1)))))))

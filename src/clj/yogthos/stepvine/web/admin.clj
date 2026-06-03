@@ -7,6 +7,7 @@
    [ring.util.response :as resp]
    [yogthos.stepvine.access :as access]
    [yogthos.stepvine.auth :as auth]
+   [yogthos.stepvine.forms-compile :as forms-compile]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.http :as http]
    [yogthos.stepvine.mailer :as mailer]
@@ -145,7 +146,7 @@
            (into [:table [:tr [:th "App"] [:th "Required roles"] [:th] [:th]]]
                  (for [id (sort-by name (forms/list-forms forms-store))]
                    [:tr
-                    [:td (or (:title (forms/get-form forms-store id)) (name id)) " "
+                    [:td (or (:title (forms-compile/get-form forms-store id)) (name id)) " "
                      [:small.muted (name id) (when (forms/css forms-store id) " · styled")]]
                     [:td
                      [:form {:method "post" :action (str "/admin/forms/" (name id) "/roles")}

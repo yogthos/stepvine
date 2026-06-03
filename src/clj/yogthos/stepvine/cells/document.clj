@@ -20,6 +20,7 @@
    [yogthos.stepvine.exports :as exports]
    [yogthos.stepvine.index :as index]
    [yogthos.stepvine.imports :as imports]
+   [yogthos.stepvine.forms-compile :as forms-compile]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.hub :as hub]
    [yogthos.stepvine.options :as options]
@@ -50,7 +51,7 @@
           user       (users/get-user users user-id)
           status     (some-> (get-in req [:query-params "status"]) keyword)
           form-ids   (access/accessible-forms access user (forms/list-forms forms))
-          form-list  (map (fn [id] (let [f (forms/get-form forms id)]
+          form-list  (map (fn [id] (let [f (forms-compile/get-form forms id)]
                                      {:id id :title (:title f) :index? (boolean (:index f))}))
                           form-ids)
           docs-by    (group-by :form-id (documents/accessible-by documents user-id))]
@@ -65,7 +66,7 @@
   (fn [{:keys [forms users]} {req :http-request}]
     (let [form-id (get-in req [:path-params :id])
           user    (users/get-user users (get-in req [:session :user-id]))]
-      {:html (landing/index-page-html user form-id (forms/get-form forms form-id) nil nil)})))
+      {:html (landing/index-page-html user form-id (forms-compile/get-form forms form-id) nil nil)})))
 
 ;; --- POST /form/:id/new (create) ------------------------------------------
 
@@ -86,7 +87,7 @@
 
 (defn- do-create
   [{:keys [documents forms users] :as resources} form-id user-id index-key]
-  (let [form     (forms/get-form forms form-id)
+  (let [form     (forms-compile/get-form forms form-id)
         idx-spec (:index form)
         user     (users/get-user users user-id)]
     (cond

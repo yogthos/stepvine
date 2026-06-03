@@ -7,6 +7,7 @@
    [clojure.string :as str]
    [ring.util.response :as resp]
    [yogthos.stepvine.documents :as documents]
+   [yogthos.stepvine.forms-compile :as forms-compile]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.users :as users]
    [yogthos.stepvine.web.layout :as layout])
@@ -20,7 +21,7 @@
   (when ms (.format date-fmt (Instant/ofEpochMilli ms))))
 
 (defn- result-item [forms d]
-  (let [f (forms/get-form forms (:form-id d))]
+  (let [f (forms-compile/get-form forms (:form-id d))]
     [:li.sv-result
      [:a {:href (str "/doc/" (:id d))}
       [:span.sv-result-title (or (:title f) (name (:form-id d)))]

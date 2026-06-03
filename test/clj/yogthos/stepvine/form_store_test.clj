@@ -6,6 +6,7 @@
    [clojure.test :refer [deftest testing is]]
    [clojure.java.io :as io]
    [integrant.core :as ig]
+   [yogthos.stepvine.forms-compile :as forms-compile]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.versions :as versions]))
 
@@ -17,12 +18,12 @@
 (defn- run-contract [store]
   (forms/save-form! store form-v1)
   (testing "working form is fetched with its CSS"
-    (is (= :widget (:id (forms/get-form store :widget))))
+    (is (= :widget (:id (forms-compile/get-form store :widget))))
     (is (= ".x{color:red}" (forms/css store :widget))))
   (testing "the version is archived without CSS (CSS is live, not pinned)"
     (is (= 1 (forms/latest-published store :widget)))
-    (is (some? (forms/get-form-version store :widget 1)))
-    (is (nil? (:css (forms/get-form-version store :widget 1))))
+    (is (some? (forms-compile/get-form-version store :widget 1)))
+    (is (nil? (:css (forms-compile/get-form-version store :widget 1))))
     (is (string? (forms/version-digest store :widget 1))))
   (testing "the live CSS href is cache-busting"
     (is (re-matches #"/app/widget/style\.css\?v=[0-9a-f]{12}" (forms/app-css-href store :widget))))
@@ -50,7 +51,7 @@
     (forms/save-form! (ig/init-key :store/forms {:backend :sql :db-file f}) form-v1)
     (testing "a fresh store on the same DB sees the persisted app + version"
       (let [s2 (ig/init-key :store/forms {:backend :sql :db-file f})]
-        (is (= :widget (:id (forms/get-form s2 :widget))))
+        (is (= :widget (:id (forms-compile/get-form s2 :widget))))
         (is (= ".x{color:red}" (forms/css s2 :widget)))
         (is (= 1 (forms/latest-published s2 :widget)))))
     (io/delete-file f true)))

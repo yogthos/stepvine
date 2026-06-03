@@ -32,6 +32,13 @@
   `clojure.string`/`web.security` requires. (Placed flat under `web/` per the
   existing convention, not a new `views/` subdir.) Verified: 217 tests +
   storyboard (landing, index lookup, admin all render).
+- ✅ Phase 2 (cont.) — form compilation extracted from `forms.clj` →
+  **`forms_compile.clj`** (`prepare-form`, private `compile-import-effects`, and
+  the prepared reads `get-form`/`get-form-version`). `forms.clj` is now a pure
+  store: it returns raw EDN and no longer requires `cascades`/`imports`/
+  `validation`/`partials` (no more upward dependency). 17 call sites repointed
+  `forms/get-form*`/`prepare-form` → `forms-compile/…` across 10 files. Verified:
+  217 tests (incl. form_store/builder/validation_extra/app_css) + clean boot.
 
 **Deferred** (documented here; not done — judged high-churn or tangled for a late
 single-session pass; safe to pick up incrementally next):

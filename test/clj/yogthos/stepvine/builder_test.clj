@@ -5,6 +5,7 @@
    [clojure.test :refer [deftest testing is]]
    [integrant.core :as ig]
    [yogthos.stepvine.builder :as builder]
+   [yogthos.stepvine.forms-compile :as forms-compile]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.session :as session]))
 
@@ -49,7 +50,7 @@
                :data {:model [[:x {:id :x :type :string}]]} :views {}}]
     (forms/save-form! store form)
     (testing "available in-memory and on disk, and reloadable"
-      (is (= :gen (:id (forms/get-form store "gen"))))
+      (is (= :gen (:id (forms-compile/get-form store "gen"))))
       (is (.exists (io/file dir "gen.edn")))
       (is (= form (forms/load-form dir "gen"))))
     (io/delete-file (io/file dir "gen.edn") true)

@@ -28,10 +28,6 @@
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
    [next.jdbc :as jdbc]
-   [yogthos.stepvine.cascades :as cascades]
-   [yogthos.stepvine.imports :as imports]
-   [yogthos.stepvine.partials :as partials]
-   [yogthos.stepvine.validation :as validation]
    [yogthos.stepvine.versions :as versions]))
 
 ;; --- Protocol -------------------------------------------------------------
@@ -49,30 +45,11 @@
   (-store-draft!    [s form] "Upsert the draft form (EDN + CSS).")
   (-discard-draft!  [s id]   "Drop the draft for id."))
 
-;; --- Authoring (pure-ish helpers) -----------------------------------------
+;; Form compilation (partials splice + validation/cascade compile + import
+;; effects) is a downstream concern — it lives in `yogthos.stepvine.forms-compile`
+;; (`prepare-form`/`get-form`/`get-form-version`). This store returns raw EDN.
 
-(defn- compile-import-effects
-  "Add a form effect per event-triggered import, so an import is fired by the
-   engine's effect signal (not the host inspecting changes)."
-  [form]
-  (let [effs (imports/->effects form)]
-    (cond-> form
-      (seq effs) (update-in [:data :effects] (fnil into []) effs))))
-
-(defn prepare-form
-  "Resolve a served form: splice partials (§15.9), compile declarative validation
-   into error + :valid? reactions (§15.8), compile cascading-dropdown dependencies
-   into Domino clearing events, and event-triggered imports into Domino effect
-   signals. Public so the live editor can preview a form exactly as it will be
-   served."
-  [store form]
-  (some->> form
-           (partials/splice (:partials store))
-           validation/compile-validations
-           cascades/compile-cascades
-           compile-import-effects))
-
-(def ^:private prepare prepare-form)
+;; --- Loading helpers (pure EDN/disk) --------------------------------------
 
 (defn- edn-file? [^java.io.File f]
   (and (.isFile f) (str/ends-with? (.getName f) ".edn")))
@@ -201,13 +178,9 @@
       {:id (:id form) :version v :digest d})))
 
 ;; --- Public API (backend-agnostic) ----------------------------------------
-
-(defn get-form
-  "The current working form by id, with partials spliced + validation compiled.
-   Used for previews/builder + new-document listing; loaded documents resolve
-   their pinned version via `get-form-version`."
-  [store id]
-  (prepare store (-form store (keyword id))))
+;; Prepared reads (partials spliced + validation compiled) — `get-form` /
+;; `get-form-version` — live in `yogthos.stepvine.forms-compile`. The store
+;; itself only exposes raw reads.
 
 (defn list-forms [store] (-form-ids store))
 
@@ -224,12 +197,6 @@
       (:version (-form store (keyword id)) 1)))
 
 (defn version-digest [store id v] (-archived-digest store (keyword id) v))
-
-(defn get-form-version
-  "The exact archived form for a pinned `[id version]` (partials spliced), falling
-   back to the working form when the archive has no such entry."
-  [store id v]
-  (prepare store (or (-archived store (keyword id) v) (-form store (keyword id)))))
 
 (defn save-form!
   "Persist the working form (EDN + CSS) and publish its version. CSS is live
