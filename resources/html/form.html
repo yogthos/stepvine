@@ -6,6 +6,8 @@
     <title>{{title}}</title>
     <!-- Datastar engine, vendored locally (see vendor-build/) — no CDN. -->
     <script type="module" src="/vendor/datastar.js"></script>
+    <!-- Table widget DnD/scroll behaviour; each table fragment calls into it. -->
+    <script src="/vendor/table.js"></script>
     <!-- Default theme. Widgets emit only HTML structure; all presentation is
          external CSS. A form view may layer its own theme on top via
          :opts {:theme "…"} (a /name, an absolute /path, or a full URL). -->

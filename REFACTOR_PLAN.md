@@ -46,17 +46,22 @@
   + `sources/option-label`); `append-meta!` (the read-conj-write-`[:meta k]`
   shape behind `append-report!`/`record-effect!` → `documents/append-meta!`).
   Verified: 217 tests each.
+- ✅ Phase 1 (cont.) — `field-bind-attrs` dedup: the focus→lock / blur→unlock /
+  disabled-while-locked attr trio (+ the edit-event POST) → **`components/bind.clj`**
+  (`lock-attrs` + `edit-bind-attrs`). 8 input widgets repointed (they differ only
+  in the edit-event key: `input__debounce.300ms`/`.200ms`/`change`);
+  `checkbox_enabled` keeps its bespoke split wiring. Added `bind_test` + a
+  `render_test` assertion on the BMI input's lock attrs — this path was previously
+  uncovered. Verified: 220 tests + full storyboard.
+- ✅ Phase 2 (cont.) — `table.clj` inline DnD/scroll JS → served
+  **`resources/public/vendor/table.js`** (`svRowDnd`/`svColumnDnd`/
+  `svHorizontalScroll`), loaded once in `form.html`. The table emits tiny inline
+  `[:script "svX()"]` bootstrap calls per fragment (Datastar re-runs them so a
+  re-rendered/replaced table re-attaches) — exact execution semantics preserved,
+  table.clj 624→465 LOC. Verified: 220 tests + full storyboard (table sort/page,
+  0 console errors).
 
-**Deferred** (documented here; not done — safe to pick up incrementally next):
-- ⏳ `field-bind-attrs` dedup — the focus→lock / blur→unlock / disabled-while-
-  locked attr trio is identical across ~9 input widgets (the edit event differs:
-  `data-on:input__debounce` vs `data-on:change`). A `components` helper taking the
-  edit-event string would collapse it. Deferred because it touches the core
-  edit/lock wire across 9 widgets and has **no unit-test coverage** (render_test
-  doesn't assert the lock/disabled attrs) — needs a green browser storyboard to
-  verify, which is environmentally flaky in this sandbox (the dev-server JVM gets
-  reaped unpredictably under the background-job harness).
-- ⏳ `table.clj` inline JS blobs → a served `/vendor` asset.
+**Deferred** (lower priority, Phase 5):
 - ⏳ store protocol parity (`users`/`access`/`audit`) + shared `store/sqlite`.
 
 ---

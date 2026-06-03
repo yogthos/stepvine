@@ -388,7 +388,9 @@
                [:stepvine.components/table
                 {:id :people :label "Team" :can-move-rows? true}]
                table-ctx))]
-    (is (str/includes? html "dragstart"))
+    ;; the DnD behaviour lives in /vendor/table.js; the table emits a bootstrap
+    ;; call that Datastar re-runs on each re-render (see svRowDnd there)
+    (is (str/includes? html "svRowDnd()"))
     (is (str/includes? html "data-table-dnd"))
     (is (str/includes? html "data-table-row-idx"))))
 
@@ -402,7 +404,8 @@
                table-ctx))]
     (is (str/includes? html "data-col-reorderable"))
     (is (str/includes? html "data-col-removable"))
-    (is (str/includes? html "table-col-drag-from"))))
+    ;; column DnD behaviour lives in /vendor/table.js (svColumnDnd)
+    (is (str/includes? html "svColumnDnd()"))))
 
 (deftest table-restore-column-button-appears-only-when-a-column-is-hidden
   (testing "no hidden columns: no restore button"
@@ -439,7 +442,8 @@
                 {:id :people :label "Team" :horizontal? true}]
                table-ctx))]
     (is (str/includes? html "data-horizontal-scroll"))
-    (is (str/includes? html "scrollLeft"))))
+    ;; wheel-to-horizontal-scroll behaviour lives in /vendor/table.js
+    (is (str/includes? html "svHorizontalScroll()"))))
 
 ;; --- re-com parity: ported components --------------------------------------
 
