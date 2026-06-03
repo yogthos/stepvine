@@ -318,6 +318,15 @@
                             (assoc-in (into [:meta] path) value)
                             (assoc-in [:meta :modified-at] (System/currentTimeMillis))))))
 
+(defn append-meta!
+  "Append `entry` to the document's `[:meta k]` vector (read-conj-write back via
+   `update-meta!`). Returns the index the entry was appended at. The shared shape
+   behind the durable `:reports` and `:effects` logs."
+  [store id k entry]
+  (let [cur (vec (get-in (get-document store id) [:meta k]))]
+    (update-meta! store id [k] (conj cur entry))
+    (count cur)))
+
 (defn delete!
   [store id]
   (-delete! store id))

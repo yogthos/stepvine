@@ -27,9 +27,7 @@
 (defn- append-report!
   "Append a report entry (snapshot or pdf) to the document, returning its index."
   [documents doc-id entry]
-  (let [cur (vec (get-in (documents/get-document documents doc-id) [:meta :reports]))]
-    (documents/update-meta! documents doc-id [:reports] (conj cur entry))
-    (count cur)))
+  (documents/append-meta! documents doc-id :reports entry))
 
 (defmulti perform!
   "Perform one effect intent. Dispatch on `:kind`. Args: the cell resources, the
@@ -107,8 +105,7 @@
 (defn record-effect!
   "Append an entry to the document's durable effect log `[:meta :effects]`."
   [documents doc-id entry]
-  (documents/update-meta! documents doc-id [:effects]
-                          (conj (effect-log documents doc-id) (assoc entry :at (System/currentTimeMillis)))))
+  (documents/append-meta! documents doc-id :effects (assoc entry :at (System/currentTimeMillis))))
 
 (defn perform-step!
   "Perform one effect step at-most-once. Skips when `key` already succeeded

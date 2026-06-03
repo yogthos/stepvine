@@ -39,14 +39,24 @@
   `validation`/`partials` (no more upward dependency). 17 call sites repointed
   `forms/get-form*`/`prepare-form` → `forms-compile/…` across 10 files. Verified:
   217 tests (incl. form_store/builder/validation_extra/app_css) + clean boot.
+- ✅ Phase 1 (cont.) — dedups: `load-edn-dir` (4 copies of `edn-file?` + the
+  dir-load loop → **`edn-dir.clj`**); `read-signals`/`read-rev` (7 inconsistent
+  `(try (json/read-value (d*/get-signals req)) …)` sites → **`web/request.clj`**);
+  option value/label readers (search + dropdown + sources → `sources/option-value`
+  + `sources/option-label`); `append-meta!` (the read-conj-write-`[:meta k]`
+  shape behind `append-report!`/`record-effect!` → `documents/append-meta!`).
+  Verified: 217 tests each.
 
-**Deferred** (documented here; not done — judged high-churn or tangled for a late
-single-session pass; safe to pick up incrementally next):
-- ⏳ `cells/document.clj` landing HTML → `web/views/landing.clj`.
-- ⏳ `forms.clj` `prepare-form` → `forms_compile.clj` (store shouldn't compile).
+**Deferred** (documented here; not done — safe to pick up incrementally next):
+- ⏳ `field-bind-attrs` dedup — the focus→lock / blur→unlock / disabled-while-
+  locked attr trio is identical across ~9 input widgets (the edit event differs:
+  `data-on:input__debounce` vs `data-on:change`). A `components` helper taking the
+  edit-event string would collapse it. Deferred because it touches the core
+  edit/lock wire across 9 widgets and has **no unit-test coverage** (render_test
+  doesn't assert the lock/disabled attrs) — needs a green browser storyboard to
+  verify, which is environmentally flaky in this sandbox (the dev-server JVM gets
+  reaped unpredictably under the background-job harness).
 - ⏳ `table.clj` inline JS blobs → a served `/vendor` asset.
-- ⏳ remaining dedups: `load-edn-dir`, `opt-value/opt-label`, `field-bind-attrs`,
-  `read-signals`, `append-meta!`.
 - ⏳ store protocol parity (`users`/`access`/`audit`) + shared `store/sqlite`.
 
 ---
