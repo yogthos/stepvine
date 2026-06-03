@@ -24,6 +24,7 @@
    [yogthos.stepvine.web.pagenav :as pagenav]
    [yogthos.stepvine.web.collection-entry :as collection-entry]
    [yogthos.stepvine.web.collection-item :as collection-item]
+   [yogthos.stepvine.web.doc-search :as doc-search]
    [yogthos.stepvine.web.queue :as queue]
    [yogthos.stepvine.web.report :as report]
    [yogthos.stepvine.web.search :as search]
@@ -87,6 +88,8 @@
      ;; landing + create (anti-forgery)
      ["/"             (af (page doc/index))]
      ["/form/:id/new" (af (merge (page doc/new-page) (post doc/create)))]
+     ;; content search across the documents the signed-in user can access (§j00)
+     ["/search"       {:get {:handler (doc-search/handler resources)}}]
      ;; work queues — a workflowed form's documents by state, for its team
      ["/queue"        (af {:get (queue/index documents forms users access)})]
      ["/queue/:form"  (af {:get (queue/for-form documents forms users access)})]

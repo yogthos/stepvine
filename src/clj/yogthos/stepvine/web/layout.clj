@@ -39,6 +39,10 @@
    [:div.sv-topbar-right
     (if user
       [:span.sv-usermenu
+       [:form.sv-search {:method "get" :action "/search" :role "search"}
+        [:input.sv-search-input {:type "search" :name "q"
+                                 :placeholder "Search documents…"
+                                 :aria-label "Search documents"}]]
        [:a.sv-navlink {:href "/queue" :title "Work queues"} "Queues"]
        (when (users/admin? user)
          (list [:a.sv-navlink {:href "/admin/forms" :title "App editor"} "Apps"]

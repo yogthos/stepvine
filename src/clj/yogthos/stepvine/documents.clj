@@ -17,6 +17,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
+   [clojure.walk :as walk]
    [duratom.core :as duratom]
    [integrant.core :as ig]
    [next.jdbc :as jdbc])
@@ -155,6 +156,38 @@
   "Documents matching `criteria` {:owner :status} via the backend's index."
   [store criteria]
   (-query store criteria))
+
+;; --- Content search (§j00) -------------------------------------------------
+;; A simple, backend-agnostic content search over the field values stored in a
+;; document's domino `:db` (plus its form id). It is ALWAYS layered on top of
+;; `accessible-by`, so a user can only ever search documents they may access —
+;; the auth scope is structural, not an afterthought. (A SQLite JSON1/FTS5 index
+;; can replace the in-Clojure scan later without changing this contract.)
+
+(defn document-text
+  "Lower-cased searchable text for a document: every string/number value in its
+   `:db` (top-level + collection + nested-collection fields) plus the form id."
+  [doc]
+  (let [vals (volatile! (transient [(name (:form-id doc))]))]
+    (walk/postwalk
+     (fn [x] (when (or (string? x) (number? x)) (vswap! vals conj! (str x))) x)
+     (:db doc))
+    (str/lower-case (str/join " " (persistent! @vals)))))
+
+(defn matches-query?
+  "True when `doc`'s searchable text contains `q` (case-insensitive). A blank
+   query matches everything."
+  [doc q]
+  (let [q (str/lower-case (str/trim (str q)))]
+    (or (str/blank? q)
+        (str/includes? (document-text doc) q))))
+
+(defn search-accessible
+  "Documents `user-id` may access whose content matches `query`, newest first.
+   Auth-scoped by construction — only `accessible-by` documents are considered."
+  [store user-id query]
+  (->> (accessible-by store user-id)
+       (filter #(matches-query? % query))))
 
 (defn share!
   "Grant `user-id` access to a document."

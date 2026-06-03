@@ -53,3 +53,29 @@
       (is (= "Observation" (:resourceType result))))
     (testing "unknown export id yields nil"
       (is (nil? (exports/render-export sess :nope))))))
+
+;; --- Content search, auth-scoped (§j00) -----------------------------------
+
+(deftest search-is-scoped-to-accessible-documents
+  (let [store (atom {})
+        a (documents/create! store :ticket {:created-by "alice"})
+        b (documents/create! store :ticket {:created-by "bob"})]
+    (documents/save-db! store (:id a) {:title "Broken printer" :detail "the laser jet is jammed"})
+    (documents/save-db! store (:id b) {:title "VPN outage" :detail "cannot connect"})
+    (testing "a user finds their own matching document"
+      (is (= [(:id a)] (map :id (documents/search-accessible store "alice" "printer")))))
+    (testing "search NEVER returns another user's document (auth scope)"
+      (is (empty? (documents/search-accessible store "alice" "vpn")))     ; bob's doc
+      (is (empty? (documents/search-accessible store "bob" "printer"))))  ; alice's doc
+    (testing "a shared document becomes searchable by the sharee"
+      (documents/share! store (:id b) "alice")
+      (is (= [(:id b)] (map :id (documents/search-accessible store "alice" "vpn")))))
+    (testing "match is case-insensitive over field values and the form id"
+      (is (seq (documents/search-accessible store "alice" "BROKEN")))
+      (is (seq (documents/search-accessible store "alice" "ticket"))))   ; matches :form-id
+    (testing "a blank query returns every accessible document (own + shared)"
+      (is (= 2 (count (documents/search-accessible store "alice" "")))))
+    (testing "nested / collection field values are searchable too"
+      (documents/save-db! store (:id a) {:title "Broken printer"
+                                         :lines {"l1" {:item "toner cartridge"}}})
+      (is (= [(:id a)] (map :id (documents/search-accessible store "alice" "toner")))))))

@@ -26,6 +26,24 @@ body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #
 .sv-crumbs a { color: #2563eb; text-decoration: none; }
 .sv-crumbs a:hover { text-decoration: underline; }
 .sv-usermenu { display: flex; align-items: center; gap: .6rem; }
+
+/* ── Document search (§j00) ───────────────────────────────────────────── */
+.sv-search { margin: 0; }
+.sv-search-input { padding: .35rem .6rem; border: 1px solid #d1d5db; border-radius: 999px;
+                   background: #fff; font-size: .85rem; width: 12rem; max-width: 40vw; }
+.sv-search-input:focus { outline: none; border-color: #93c5fd; box-shadow: 0 0 0 2px #dbeafe; }
+.sv-search-page { display: flex; gap: .5rem; margin: 1rem 0 1.5rem; }
+.sv-search-page .sv-search-input { width: 100%; max-width: 30rem; border-radius: .5rem; }
+.sv-search-go { padding: .4rem 1rem; border: 1px solid #2563eb; border-radius: .5rem;
+                background: #2563eb; color: #fff; cursor: pointer; }
+.sv-search-results { list-style: none; margin: 0; padding: 0; }
+.sv-result { border: 1px solid #e5e7eb; border-radius: .5rem; margin-bottom: .5rem; }
+.sv-result > a { display: flex; justify-content: space-between; align-items: baseline;
+                 gap: 1rem; padding: .6rem .85rem; text-decoration: none; color: #1f2937; }
+.sv-result > a:hover { background: #f9fafb; }
+.sv-result-title { font-weight: 600; }
+.sv-result-meta { color: #6b7280; font-size: .8rem; white-space: nowrap; }
+.sv-muted { color: #6b7280; }
 .sv-avatar { display: inline-flex; align-items: center; justify-content: center;
              width: 1.9rem; height: 1.9rem; border-radius: 50%; background: #2563eb;
              color: #fff; font-weight: 700; font-size: .85rem; flex: 0 0 auto; }

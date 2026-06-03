@@ -926,6 +926,33 @@ try {
   await page.waitForSelector(`#item-teams-${teamId}-members-${memId}`, { state: 'detached' });
   ok('removed the nested member (deep-path remove)');
 
+  // ---- 30. Document content search (auth-scoped) ----
+  step('30. Document content search');
+  // create a note with a distinctive body to search for
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Quick Note")'), '#body');
+  await page.fill('#body', 'xylophone calibration procedure');
+  await settleFields(page);
+  const noteUrl = page.url().replace(/\?.*$/, '');
+  ok('created a note with searchable content');
+  // search via the navbar box
+  await page.fill('.sv-topbar .sv-search-input', 'xylophone');
+  await page.press('.sv-topbar .sv-search-input', 'Enter');
+  await page.waitForSelector('.sv-search-results');
+  const hit = page.locator('.sv-search-results .sv-result a').first();
+  ((await hit.count()) > 0 && (await hit.getAttribute('href')) === noteUrl.replace(BASE, ''))
+    ? ok('the navbar search finds an accessible document by its content')
+    : bad(`search did not link to the note (${await hit.count()} results)`);
+  // the result opens the document
+  await hit.click();
+  await page.waitForSelector('#body');
+  (await page.locator('#body').inputValue()).includes('xylophone')
+    ? ok('the search result links to the matching document') : bad('result link opened the wrong doc');
+  // a non-matching query shows the empty state
+  await page.goto(BASE + '/search?q=zzznotarealtoken');
+  (await page.locator('.sv-muted').innerText()).includes('No accessible documents')
+    ? ok('a non-matching query shows the empty state') : bad('empty state missing');
+
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');
   if (pageErrors.length === 0) ok('no uncaught page or console errors');
