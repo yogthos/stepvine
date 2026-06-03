@@ -4,7 +4,9 @@
    field signal (reactive over the signal like selection-list). Groups use native
    <details>/<summary> for expand/collapse — no extra signal needed."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]
    [yogthos.stepvine.components.widgets.selection.array-signal :as arr]))
 
 (defn- leaf [ctx sig sel url read-only {:keys [label value]}]
@@ -26,10 +28,10 @@
 
 (defmethod render-widget :stepvine.components/tree-select
   [ctx _component {:keys [id label nodes read-only]} _body]
-  (let [sig     (render/item-signal-name ctx id)
+  (let [sig     (signals/item-signal-name ctx id)
         current (get-in ctx [:values id])
         sel     (set (when (sequential? current) current))
-        url     (render/field-post-url ctx id)
+        url     (endpoints/field-post-url ctx id)
         render-node* (fn render-node* [node]
                        (if (:children node)
                          (branch render-node* node)

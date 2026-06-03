@@ -6,7 +6,7 @@
   (:require
    [clojure.string :as str]
    [hiccup2.core :as h]
-   [yogthos.stepvine.render :as render]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.users :as users]
    [yogthos.stepvine.web.security :as security]))
 
@@ -136,7 +136,7 @@
           cur       (nth pages idx)
           prev      (get pages (dec idx))
           nxt       (get pages (inc idx))
-          valid-sig (when-let [v (:valid cur)] (render/$ v))]
+          valid-sig (when-let [v (:valid cur)] (signals/$ v))]
       [:div#sv-pagenav.sv-pagenav
        (if prev
          [:a.sv-pagenav-prev {:href (page-href doc-id (:view prev))

@@ -16,6 +16,7 @@
   (:require
    [clojure.string :as str]
    [hiccup2.core :as h]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.render :as render :refer [render-widget]]))
 
 ;; ═══════════════════════════════════════════════════════════════════════════
@@ -128,7 +129,7 @@
 
 (defn- editable-label
   [ctx coll-id {:keys [path label default-label]}]
-  (let [sig (render/item-signal-name ctx (keyword (str "col-label-" (name path))))]
+  (let [sig (signals/item-signal-name ctx (keyword (str "col-label-" (name path))))]
     [:input.widget-table-editable-label
      {:type        "text"
       :value       (str (or label ""))
@@ -149,7 +150,7 @@
    re-renders with the filtered view; the active value persists in view-state."
   [ctx coll-id {:keys [col label source] :or {label "Filter:"}}]
   (let [col       (keyword col)
-        sig       (render/item-signal-name ctx (keyword (str (name coll-id) "-filter")))
+        sig       (signals/item-signal-name ctx (keyword (str (name coll-id) "-filter")))
         items     (get-in ctx [:collections coll-id :items])
         explicit  (when source (get-in ctx [:options source]))
         values    (if explicit

@@ -1,12 +1,14 @@
 (ns yogthos.stepvine.components.widgets.selection.menu
   "Menu widget — button group that sets a value or triggers actions."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/menu
   [ctx _component {:keys [id label options read-only]} _body]
-  (let [sig (render/item-signal-name ctx id)
-        url (render/field-post-url ctx id)
+  (let [sig (signals/item-signal-name ctx id)
+        url (endpoints/field-post-url ctx id)
         opts (or options (get-in ctx [:options id]) [])]
     [:div.widget.menu.field
      [:label label]

@@ -12,11 +12,16 @@
 - ✅ Phase 4 — documentation: **ARCHITECTURE.md** (request flow + invariants + feature
   map), `forms/README.md`, `components/README.md` (widget catalog), inline `:meta`
   schema (`documents.clj`) + table view-state shape (`session.clj`).
+- ✅ Phase 2 (cont.) — `render.clj` signals + endpoints extraction: the Datastar
+  wire vocabulary + session→signal projection → **`signals.clj`**; the field/
+  collection URL scheme → **`endpoints.clj`**. render.clj now owns only the markup
+  walk + `render-widget` dispatch + collection-node projection (411→~250 LOC).
+  ~50 caller files repointed (`render/` → `signals/`/`endpoints/`); 7 non-widget
+  callers no longer require render at all. Verified: 217 tests + 32 storyboard
+  workflows, 0 page errors.
 
 **Deferred** (documented here; not done — judged high-churn or tangled for a late
 single-session pass; safe to pick up incrementally next):
-- ⏳ `render.clj` signals + endpoints extraction — ~50 widget/caller files use these
-  as the rendering SPI; high mechanical churn, do as a dedicated pass.
 - ⏳ `session.clj` table view-state → `view_state.clj` — shares `update-view!`/
   `item-keys` with `move-item!`/`clear-items!`; unpick those couplings first.
 - ⏳ `cells/document.clj` landing HTML → `web/views/landing.clj`.

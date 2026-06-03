@@ -3,12 +3,13 @@
    with :action it POSTs a server-side action (like :action button, but inline).
    Label is static (:label) or signal-bound (:rxn / :id)."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/hyperlink
   [ctx _component {:keys [href doc-path target label rxn id action disabled]} _body]
   (let [sig-id  (or rxn id)
-        sig     (when sig-id (if rxn (render/$ sig-id) (render/item-$ ctx sig-id)))
+        sig     (when sig-id (if rxn (signals/$ sig-id) (signals/item-$ ctx sig-id)))
         current (when sig-id
                   (if rxn (get (:rxns ctx) sig-id) (get-in ctx [:values sig-id])))
         ;; :doc-path resolves to a path under this document (e.g. "report/0")

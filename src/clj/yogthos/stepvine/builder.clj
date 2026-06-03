@@ -9,14 +9,14 @@
    engine it produces — collections, reactivity and all."
   (:require
    [clojure.string :as str]
-   [yogthos.stepvine.render :as render]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.editor.impl :as impl]))
 
 (defn- ordered-fields
   "The field-definition rows from the builder document's :fields collection, in
    order, keeping only rows with a non-blank field id."
   [session]
-  (let [{:keys [order items]} (get (render/collections-data session) :fields)]
+  (let [{:keys [order items]} (get (signals/collections-data session) :fields)]
     (->> order
          (map items)
          (filter (fn [{:keys [fid]}] (not (str/blank? fid)))))))

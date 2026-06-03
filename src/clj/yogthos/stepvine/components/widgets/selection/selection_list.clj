@@ -3,7 +3,9 @@
    each a checkbox bound to an :array field signal. Selected state is reactive
    over the signal (data-attr:checked), so it stays in sync across clients."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]
    [yogthos.stepvine.components.widgets.selection.array-signal :as arr]))
 
 (defn- option-pair [o]
@@ -11,11 +13,11 @@
 
 (defmethod render-widget :stepvine.components/selection-list
   [ctx _component {:keys [id label options read-only]} _body]
-  (let [sig     (render/item-signal-name ctx id)
+  (let [sig     (signals/item-signal-name ctx id)
         current (get-in ctx [:values id])
         sel     (set (when (sequential? current) current))
         opts    (or options (get-in ctx [:options id]) [])
-        url     (render/field-post-url ctx id)]
+        url     (endpoints/field-post-url ctx id)]
     [:div.widget.selection-list.field
      (when label [:label label])
      (into [:ul.selection-list-items {:role "listbox" "aria-multiselectable" "true"}]

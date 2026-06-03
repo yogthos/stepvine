@@ -2,6 +2,7 @@
   "Form container widget — seeds all signals and opens the SSE stream."
   (:require
    [jsonista.core :as json]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.render :as render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/form
@@ -16,13 +17,13 @@
         ;; (Datastar drops null signals, so an unseeded field would never become
         ;; a bindable/sendable signal).
         bool? (into #{} (keep (fn [[id opts]] (when (= :boolean (:type opts))
-                                                (render/signal-name id)))
+                                                (signals/signal-name id)))
                               (:field-opts ctx)))
         ;; :array fields (multi-select / selection-list / tree-select) seed as an
         ;; empty JSON array so membership tests like ($sig).includes(v) are valid
         ;; before any selection (a "" seed would be a string, not an array).
         array? (into #{} (keep (fn [[id opts]] (when (= :array (:type opts))
-                                                 (render/signal-name id)))
+                                                 (signals/signal-name id)))
                                (:field-opts ctx)))
         ;; lifecycle signals (§15.5): `locked` reflects a finalized/read-only
         ;; document (seeded from the doc status, flipped live on submit/revise);
@@ -31,7 +32,7 @@
                                                 (bool? k)  false
                                                 (array? k) []
                                                 :else      "")]))
-                   (merge (render/signal-map ctx)
+                   (merge (signals/signal-map ctx)
                           {"uid" uid "presence" 1 "locks" {}
                            ;; optimistic-concurrency revision (§oc): kept current
                            ;; over SSE, posted back by consequential actions

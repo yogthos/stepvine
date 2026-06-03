@@ -24,6 +24,7 @@
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.hub :as hub]
    [yogthos.stepvine.options :as options]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
    [yogthos.stepvine.users :as users]
@@ -263,7 +264,7 @@
                    ;; AND :writable-in field editability (§parity)
                    (assoc :workflow-state wstate)
                    ;; resolve option sources for top-level AND collection-item fields
-                   (assoc :options (options/resolve-field-options options-store (render/all-field-opts sess))))]
+                   (assoc :options (options/resolve-field-options options-store (signals/all-field-opts sess))))]
       {:vid      vid
        :html     (render/render-view ctx (render/view-markup sess vid))
        :form-raw form-raw

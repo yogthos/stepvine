@@ -5,7 +5,9 @@
    to move between columns with no element re-render (field changes broadcast
    signals only). Clicking an available item adds it; a selected item removes it."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]
    [yogthos.stepvine.components.widgets.selection.array-signal :as arr]))
 
 (defn- option-pair [o]
@@ -18,11 +20,11 @@
 
 (defmethod render-widget :stepvine.components/multi-select
   [ctx _component {:keys [id label options read-only left-title right-title]} _body]
-  (let [sig     (render/item-signal-name ctx id)
+  (let [sig     (signals/item-signal-name ctx id)
         current (get-in ctx [:values id])
         sel     (set (when (sequential? current) current))
         opts    (or options (get-in ctx [:options id]) [])
-        url     (render/field-post-url ctx id)
+        url     (endpoints/field-post-url ctx id)
         item    (fn [side l v]
                   [:button.multi-select-item
                    (cond-> {:type "button"

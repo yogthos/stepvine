@@ -9,11 +9,12 @@
    result sets the field signal `$<field>` and persists it via the normal field
    endpoint — server-authoritative throughout."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/search-select
   [ctx _component {:keys [id label source placeholder]} _body]
-  (let [sig        (render/signal-name id)
+  (let [sig        (signals/signal-name id)
         q-name     (str sig "_q")              ; query/display signal NAME (data-bind)
         open       (str "$" sig "_open")       ; results-open flag ($-ref, expressions)
         results-id (str "search-" sig)

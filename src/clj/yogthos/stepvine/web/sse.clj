@@ -15,7 +15,7 @@
    [jsonista.core :as json]
    [yogthos.stepvine.docs :as docs]
    [yogthos.stepvine.hub :as hub]
-   [yogthos.stepvine.render :as render]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.session :as session]
    [starfederation.datastar.clojure.api :as d*]
    [starfederation.datastar.clojure.adapter.ring :as ds-ring])
@@ -57,7 +57,7 @@
             ;; catches up real data without overwriting empty fields being edited.
             (when-let [s (session/current-maybe manager doc-id)]
               (let [populated (into {} (remove (comp #{""} val))
-                                    (render/session->signal-map s))]
+                                    (signals/session->signal-map s))]
                 (when (seq populated)
                   (d*/patch-signals! gen (json/write-value-as-string populated)))))
             (broadcast-presence! hub doc-id)

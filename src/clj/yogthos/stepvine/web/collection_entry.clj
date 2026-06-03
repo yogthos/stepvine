@@ -13,7 +13,7 @@
    [starfederation.datastar.clojure.adapter.ring :as ds-ring]
    [yogthos.stepvine.cells.form :as cform]
    [yogthos.stepvine.docs :as docs]
-   [yogthos.stepvine.render :as render]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.session :as session]))
 
 (defn- parse-fields
@@ -22,7 +22,7 @@
   (for [pair (str/split (or param "") #",")
         :let [[ifield tfield] (str/split pair #":")]
         :when (and (seq ifield) (seq tfield))]
-    [(keyword ifield) (keyword tfield) (render/signal-name (keyword tfield))]))
+    [(keyword ifield) (keyword tfield) (signals/signal-name (keyword tfield))]))
 
 (defn handler
   "Build the modal-entry commit handler closed over the document resources."
@@ -35,7 +35,7 @@
           signals (try (json/read-value (d*/get-signals req)) (catch Exception _ {}))]
       (when (docs/ensure! resources doc-id)
         (let [sess  (session/current session-manager doc-id)
-              fopts (get-in (render/collections-data sess) [coll :field-opts])
+              fopts (get-in (signals/collections-data sess) [coll :field-opts])
               row   (into {} (for [[ifield _tfield tsig] pairs
                                    :let [v (cform/coerce (get fopts ifield) (get signals tsig))]
                                    :when (some? v)]

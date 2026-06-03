@@ -1,11 +1,13 @@
 (ns yogthos.stepvine.components.widgets.basics.slider
   "Range slider widget with value display."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/slider
   [ctx _component {:keys [id label min max step read-only]} _body]
-  (let [sig      (render/item-signal-name ctx id)
+  (let [sig      (signals/item-signal-name ctx id)
         in-item? (boolean (:item ctx))
         current  (get-in ctx [:values id])]
     [:div.widget.slider.field
@@ -20,7 +22,7 @@
         (not in-item?) (assoc :id (name id) :name (name id))
         read-only      (assoc :disabled true)
         (not read-only)
-        (assoc "data-on:input__debounce.100ms" (str "@post('" (render/field-post-url ctx id) "')")
+        (assoc "data-on:input__debounce.100ms" (str "@post('" (endpoints/field-post-url ctx id) "')")
                "data-attr:disabled" (str "!!$locks." sig " && $locks." sig " != $uid")))]
-     [:span.slider-value {"data-text" (render/item-$ ctx id)}
+     [:span.slider-value {"data-text" (signals/item-$ ctx id)}
       (str (or current (or min 0)))]]))

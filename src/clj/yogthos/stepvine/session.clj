@@ -15,7 +15,7 @@
    [yogthos.stepvine.documents :as documents]
    [yogthos.stepvine.hub :as hub]
    [clojure.string :as str]
-   [yogthos.stepvine.render :as render]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.editor :as e]
    [yogthos.stepvine.editor.impl :as impl]
    [yogthos.stepvine.editor.locks :as locks])
@@ -166,7 +166,7 @@
 ;; them — so they live in the session map under :view-state and survive transacts
 ;; (apply only touches ::ctx). Updated directly on the session atom (no domino
 ;; transact); the route handler re-renders + broadcasts. The table widget READS
-;; this shape from the render ctx (`render/collections-data`). Shape (invariant #4):
+;; this shape from the render ctx (`signals/collections-data`). Shape (invariant #4):
 ;;
 ;;   :view-state {coll-id {:sort   {:col <kw> :dir :asc|:desc}   ; nil = unsorted
 ;;                         :filter {:col <kw> :value <str>}      ; absent = all rows
@@ -292,14 +292,14 @@
    JSON-merge-patch."
   [session]
   (let [top  (into {}
-                   (map (fn [id] [(render/signal-name id)
+                   (map (fn [id] [(signals/signal-name id)
                                   (:locked-by (locks/get-lock session id))]))
                    (keys (:field-opts session)))
         item (into {}
-                   (for [[coll-id {:keys [order field-opts]}] (render/collections-data session)
+                   (for [[coll-id {:keys [order field-opts]}] (signals/collections-data session)
                          idx order
                          fid (keys field-opts)]
-                     [(str (render/signal-name coll-id) "_" idx "_" (render/signal-name fid))
+                     [(str (signals/signal-name coll-id) "_" idx "_" (signals/signal-name fid))
                       (:locked-by (locks/get-lock session [coll-id idx fid]))]))]
     (merge top item)))
 
@@ -357,8 +357,8 @@
   "Diff old vs new session signals and push only the changed ones (plus any
    `extra` system signals, e.g. the bumped :rev) to all connections."
   [hub* id old new extra]
-  (let [old-sigs (render/session->signal-map old)
-        new-sigs (render/session->signal-map new)
+  (let [old-sigs (signals/session->signal-map old)
+        new-sigs (signals/session->signal-map new)
         delta    (merge (into {} (remove (fn [[k v]] (= v (get old-sigs k)))) new-sigs)
                         extra)]
     (when (seq delta)

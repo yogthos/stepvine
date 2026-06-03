@@ -2,18 +2,20 @@
   "Checkbox-enabled text field widget — a checkbox that toggles a paired text input.
    When unchecked, the text field is disabled and cleared."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/checkbox-enabled
   [ctx _component {:keys [id label text-label read-only]} _body]
-  (let [sig          (render/item-signal-name ctx id)
+  (let [sig          (signals/item-signal-name ctx id)
         in-item?     (boolean (:item ctx))
         current      (get-in ctx [:values id])
         enabled?     (boolean (:enabled? current))
         text-value   (:value current "")
         checkbox-sig (str sig "_enabled")
         text-sig     (str sig "_value")
-        url          (render/field-post-url ctx id)]
+        url          (endpoints/field-post-url ctx id)]
     [:div.widget.checkbox-enabled.field
      [:input
       (cond-> {:type      "checkbox"
@@ -39,5 +41,5 @@
         (assoc :disabled true)
         (and enabled? (not read-only))
         (assoc "data-on:input__debounce.300ms" (str "@post('" url "')")
-               "data-on:focus" (str "@post('" (render/field-lock-url ctx id) "')")
-               "data-on:blur"  (str "@post('" (render/field-unlock-url ctx id) "')")))]]))
+               "data-on:focus" (str "@post('" (endpoints/field-lock-url ctx id) "')")
+               "data-on:blur"  (str "@post('" (endpoints/field-unlock-url ctx id) "')")))]]))

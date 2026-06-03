@@ -2,7 +2,9 @@
   "Select/dropdown widget with option formatting, placeholder, and filtering.
    Serves both `:dropdown` and the form-facing `:dropdown-select` alias."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (defn- option-value [option]
   (cond
@@ -44,7 +46,7 @@
    parent's value, and carries a `field-<id>` wrapper id so the server can re-render
    it when the parent changes."
   [ctx {:keys [id label options placeholder fmt read-only depends-on]}]
-  (let [sig      (render/item-signal-name ctx id)
+  (let [sig      (signals/item-signal-name ctx id)
         in-item? (boolean (:item ctx))
         current  (get-in ctx [:values id])
         opts0    (or options (get-in ctx [:options id]) [])
@@ -55,9 +57,9 @@
       (or label (name id))]
      (into [:select
             (cond-> {"data-bind" sig
-                     "data-on:change" (str "@post('" (render/field-post-url ctx id) "')")
-                     "data-on:focus"  (str "@post('" (render/field-lock-url ctx id) "')")
-                     "data-on:blur"   (str "@post('" (render/field-unlock-url ctx id) "')")
+                     "data-on:change" (str "@post('" (endpoints/field-post-url ctx id) "')")
+                     "data-on:focus"  (str "@post('" (endpoints/field-lock-url ctx id) "')")
+                     "data-on:blur"   (str "@post('" (endpoints/field-unlock-url ctx id) "')")
                      "data-attr:disabled" (str "!!$locks." sig " && $locks." sig " != $uid")}
               ;; only top-level fields get a stable id/name (item ids would collide)
               (not in-item?) (assoc :id (name id) :name (name id))

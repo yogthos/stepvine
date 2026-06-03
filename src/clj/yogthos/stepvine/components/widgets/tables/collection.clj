@@ -6,6 +6,8 @@
    to the full path (§jj9)."
   (:require
    [clojure.string :as str]
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
    [yogthos.stepvine.render :as render :refer [render-widget]]))
 
 (defn- collection-data
@@ -16,16 +18,16 @@
   (if (seq parent-path)
     (let [items (get (:values ctx) coll-id)]
       {:order      (vec (keys items))
-       :field-opts (render/nested-collection-field-opts (get-in ctx [:field-opts coll-id]))
+       :field-opts (signals/nested-collection-field-opts (get-in ctx [:field-opts coll-id]))
        :items      items})
     (get-in ctx [:collections coll-id])))
 
 (defmethod render-widget :stepvine.components/collection
   [ctx _component {:keys [id]} body]
   (let [coll-id     id
-        parent-path (vec (render/item-path ctx))
+        parent-path (vec (signals/item-path ctx))
         {:keys [order field-opts items]} (collection-data ctx coll-id parent-path)
-        container   (str "coll-" (str/join "-" (map render/signal-name (conj parent-path coll-id))))]
+        container   (str "coll-" (str/join "-" (map signals/signal-name (conj parent-path coll-id))))]
     (into [:div.collection {:id container}]
           (concat
            (for [idx order]
@@ -34,11 +36,11 @@
                                     :item   {:path item-path :coll coll-id :idx idx}
                                     :values (get items idx)
                                     :field-opts field-opts)]
-               [:div.coll-item {:id (str "item-" (str/join "-" (map render/signal-name item-path)))}
+               [:div.coll-item {:id (str "item-" (str/join "-" (map signals/signal-name item-path)))}
                 (render/render-children item-ctx body)
                 [:button.remove
-                 {"data-on:click" (str "@post('" (render/coll-item-url ctx item-path "remove") "')")}
+                 {"data-on:click" (str "@post('" (endpoints/coll-item-url ctx item-path "remove") "')")}
                  "Remove"]]))
            [[:button.add
-             {"data-on:click" (str "@post('" (render/coll-item-url ctx (conj parent-path coll-id) "add") "')")}
+             {"data-on:click" (str "@post('" (endpoints/coll-item-url ctx (conj parent-path coll-id) "add") "')")}
              "+ Add"]]))))

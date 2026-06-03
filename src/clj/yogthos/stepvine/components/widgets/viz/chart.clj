@@ -9,7 +9,8 @@
    Title, axes and legend are static config baked in at render time."
   (:require
    [hiccup2.core :as h]
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (def ^:private chart-js-template
   "%1$s = chart-id, %2$s = chart type, %3$s = title, %4$s = xAxis snippet,
@@ -37,7 +38,7 @@
 
 (defmethod render-widget :stepvine.components/chart
   [ctx _component {:keys [id label chart-type x-axis-title y-axis-title legend]} _body]
-  (let [sig      (render/item-signal-name ctx id)
+  (let [sig      (signals/item-signal-name ctx id)
         chart-id (str "chart-" (name id))
         data-key (keyword (str (name id) "-data"))
         ;; SSR seed of the series (reaction or field named <id>-data), then a

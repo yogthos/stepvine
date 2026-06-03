@@ -10,7 +10,7 @@
    [starfederation.datastar.clojure.api :as d*]
    [starfederation.datastar.clojure.adapter.ring :as ds-ring]
    [yogthos.stepvine.docs :as docs]
-   [yogthos.stepvine.render :as render]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.sources :as sources]))
 
 (defn- opt-value [o] (cond (map? o) (:value o) (vector? o) (second o) :else o))
@@ -39,7 +39,7 @@
   (fn [req]
     (let [doc-id  (get-in req [:path-params :id])
           fid     (keyword (get-in req [:path-params :fid]))
-          sig     (render/signal-name fid)
+          sig     (signals/signal-name fid)
           src-id  (some-> (get-in req [:query-params "source"]) not-empty keyword)
           signals (try (json/read-value (d*/get-signals req)) (catch Exception _ {}))
           query   (get signals (str sig "_q"))

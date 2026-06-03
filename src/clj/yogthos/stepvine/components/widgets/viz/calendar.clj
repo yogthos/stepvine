@@ -13,7 +13,9 @@
    No global Datastar handle is used (Datastar v1 exposes none to scripts)."
   (:require
    [hiccup2.core :as h]
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (def ^:private calendarjs-js-template
   "%1$s = cal-id, %2$s = field POST url, %3$s = events signal name."
@@ -46,7 +48,7 @@
 
 (defmethod render-widget :stepvine.components/calendar
   [ctx _component {:keys [id label]} _body]
-  (let [sig        (render/item-signal-name ctx id)
+  (let [sig        (signals/item-signal-name ctx id)
         cal-id     (str "caljs-" (name id))
         events-id  (keyword (str (name id) "-events"))
         ;; SSR seed: the stored JSON string for <id>-events (field or reaction)
@@ -65,5 +67,5 @@
         "data-attr:data-events" (str "$" sig "_events || '[]'")}]]
      [:script (h/raw (format calendarjs-js-template
                              cal-id
-                             (render/field-post-url ctx events-id)
-                             (render/signal-name events-id)))])))
+                             (endpoints/field-post-url ctx events-id)
+                             (signals/signal-name events-id)))])))

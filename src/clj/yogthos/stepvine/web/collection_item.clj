@@ -18,7 +18,7 @@
    [starfederation.datastar.clojure.api :as d*]
    [yogthos.stepvine.cells.form :as cform]
    [yogthos.stepvine.docs :as docs]
-   [yogthos.stepvine.render :as render]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.session :as session]))
 
 (defn- parse-path
@@ -51,7 +51,7 @@
         (case op
           :field  (let [fid     (get-in req [:path-params :fid])
                         signals (try (json/read-value (d*/get-signals req)) (catch Exception _ {}))
-                        sig     (render/item-signal-name {:item {:path path}} (keyword fid))
+                        sig     (signals/item-signal-name {:item {:path path}} (keyword fid))
                         form    (:form (session/current session-manager doc-id))
                         fopts   (leaf-field-opts form (vec (take-nth 2 path)) fid)]
                     (session/set-deep-item-field! session-manager doc-id path fid

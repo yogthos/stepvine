@@ -8,6 +8,7 @@
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.hub :as hub]
    [yogthos.stepvine.options :as options]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
    [starfederation.datastar.clojure.adapter.test :as ds-test]
@@ -26,7 +27,7 @@
     (let [i1 (session/add-item! mgr "roster" :members)
           i2 (session/add-item! mgr "roster" :members)]
       (testing "two items were created"
-        (is (= 2 (count (get-in (render/collections-data (session/current mgr "roster"))
+        (is (= 2 (count (get-in (signals/collections-data (session/current mgr "roster"))
                                 [:members :order])))))
       (testing "a per-item edit recomputes that item's derived field"
         (session/set-item-field! mgr "roster" :members i1 :first "Ada")
@@ -36,12 +37,12 @@
       (testing "items are independent (i2 untouched — its event hasn't fired)"
         (is (nil? (impl/value (session/current mgr "roster") [:members i2 :full]))))
       (testing "item signals are namespaced <coll>_<idx>_<field>"
-        (let [sm (render/session->signal-map (session/current mgr "roster"))]
+        (let [sm (signals/session->signal-map (session/current mgr "roster"))]
           (is (= "Ada"          (get sm (str "members_" i1 "_first"))))
           (is (= "Ada Lovelace" (get sm (str "members_" i1 "_full"))))))
       (testing "removing an item drops it"
         (session/remove-item! mgr "roster" :members i2)
-        (is (= [i1] (get-in (render/collections-data (session/current mgr "roster"))
+        (is (= [i1] (get-in (signals/collections-data (session/current mgr "roster"))
                             [:members :order])))))))
 
 (deftest add-item-with-populates-a-row-in-one-transact
@@ -58,7 +59,7 @@
       (testing "a per-item derived field computes from the populated values"
         (is (= "Ada Lovelace" (impl/value sess [:members idx :full]))))
       (testing "it is a single ordered item in the collection"
-        (is (= [idx] (get-in (render/collections-data sess) [:members :order])))))))
+        (is (= [idx] (get-in (signals/collections-data sess) [:members :order])))))))
 
 (deftest collection-change-broadcasts-to-peers
   (let [[_ h mgr] (mgr+)
@@ -83,7 +84,7 @@
       (testing "the per-item reaction recomputes (read via vector id)"
         (is (= "gh" (impl/value (session/current mgr "roster") [:members idx :initials]))))
       (testing "and is carried in the item-scoped signal map"
-        (let [sm (render/session->signal-map (session/current mgr "roster"))]
+        (let [sm (signals/session->signal-map (session/current mgr "roster"))]
           (is (= "gh" (get sm (str "members_" idx "_initials")))))))))
 
 (deftest per-item-locking-is-independent-and-enforced
@@ -124,7 +125,7 @@
           sess (session/current mgr "builder")
           ctx  (-> (render/session->context sess :default "builder")
                    (assoc :options (options/resolve-field-options
-                                    store (render/all-field-opts sess))))
+                                    store (signals/all-field-opts sess))))
           html (render/render-collection ctx sess :default :fields)]
       (testing "binds the item-scoped signal, not the bare field signal"
         (is (str/includes? html (str "data-bind=\"fields_" idx "_ftype\"")))
@@ -152,7 +153,7 @@
 ;; --- Table view-state (sort / page / row order) ---------------------------
 
 (defn- order-of [mgr]
-  (get-in (render/collections-data (session/current mgr "roster")) [:members :order]))
+  (get-in (signals/collections-data (session/current mgr "roster")) [:members :order]))
 
 (deftest move-item-reorders-by-view-state
   (let [[_ _ mgr] (mgr+)

@@ -2,7 +2,8 @@
   "Inline signal-bound text — renders a field or reaction value as a <span>."
   (:require
    [yogthos.stepvine.format :as fmt]
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/value
   [ctx _component {:keys [rxn id default fmt]} _body]
@@ -12,7 +13,7 @@
   ;; `:fmt` (printf-style, e.g. "$%.2f") formats the value server-side AND live.
   (let [sig-id   (or rxn id)
         in-item? (boolean (:item ctx))
-        sig      (if in-item? (render/item-$ ctx sig-id) (if rxn (render/$ rxn) (render/$ id)))
+        sig      (if in-item? (signals/item-$ ctx sig-id) (if rxn (signals/$ rxn) (signals/$ id)))
         current  (if in-item?
                    (get (:values ctx) sig-id)
                    (get (if rxn (:rxns ctx) (:values ctx)) sig-id))]

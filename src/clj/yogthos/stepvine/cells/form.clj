@@ -18,6 +18,7 @@
    [yogthos.stepvine.users :as users]
    [yogthos.stepvine.hub :as hub]
    [yogthos.stepvine.options :as options]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.session :as session]
    yogthos.stepvine.components   ; register all widget render methods
@@ -49,7 +50,7 @@
        :uid       (get-in req [:session :user-id])   ; authenticated user
        ;; the signal name is sanitized (e.g. :form-id -> "form_id"), so read the
        ;; posted value by the sanitized name, not the raw path-param field id
-       :raw-value (get signals (render/signal-name (keyword field-id)))})))
+       :raw-value (get signals (signals/signal-name (keyword field-id)))})))
 
 (defn- rerender-dependents!
   "Cascading dropdowns: re-render the dropdowns whose parent value moved in this
@@ -67,7 +68,7 @@
     (when (seq deps)
       (let [ctx (-> (render/session->context sess :default doc-id)
                     (assoc :options (options/resolve-field-options
-                                     options-store (render/all-field-opts sess))))]
+                                     options-store (signals/all-field-opts sess))))]
         (doseq [{:keys [node]} deps]
           (hub/broadcast-elements! hub doc-id (render/render-view ctx node)))))))
 
@@ -150,7 +151,7 @@
   (let [sess (session/current session-manager doc-id)
         ctx  (-> (render/session->context sess :default doc-id)
                  (assoc :options (options/resolve-field-options
-                                  options-store (render/all-field-opts sess))))]
+                                  options-store (signals/all-field-opts sess))))]
     (when-let [html (render/render-collection ctx sess :default coll-id)]
       (hub/broadcast-elements! hub doc-id html))))
 
@@ -170,8 +171,8 @@
        :field-id fid
        :uid      (get-in req [:session :user-id])   ; authenticated user
        :value    (when fid
-                   (get signals (str (render/signal-name coll) "_" idx "_"
-                                     (render/signal-name fid))))})))
+                   (get signals (str (signals/signal-name coll) "_" idx "_"
+                                     (signals/signal-name fid))))})))
 
 (myc/defcell :form/coll-add
   {:requires [:forms :documents :session-manager :hub :options-store]
@@ -205,7 +206,7 @@
       (let [sess  (session/current session-manager doc-id)
             coll  (keyword coll-id)
             fid   (keyword field-id)
-            fopts (get-in (render/collections-data sess) [coll :field-opts fid])]
+            fopts (get-in (signals/collections-data sess) [coll :field-opts fid])]
         (session/apply-item-field-as! session-manager doc-id uid coll idx fid (coerce fopts value))))
     {:status 204 :body ""}))
 

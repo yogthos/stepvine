@@ -4,13 +4,15 @@
    tab's id and POSTs. Render the per-tab content separately with :show keyed on
    the same signal — matching re-com, where the tab strip is just the selector."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/tabs
   [ctx _component {:keys [id label tabs variant read-only]} _body]
-  (let [sig     (render/item-signal-name ctx id)
+  (let [sig     (signals/item-signal-name ctx id)
         current (get-in ctx [:values id])
-        url     (render/field-post-url ctx id)
+        url     (endpoints/field-post-url ctx id)
         variant (name (or variant :horizontal))]
     [:div.widget.tabs.field
      (when label [:label label])

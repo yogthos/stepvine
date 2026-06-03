@@ -1,14 +1,16 @@
 (ns yogthos.stepvine.components.widgets.selection.selections
   "Button-based selection widget (single or multi)."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/selections
   [ctx _component {:keys [id label options multi? read-only]} _body]
-  (let [sig     (render/item-signal-name ctx id)
+  (let [sig     (signals/item-signal-name ctx id)
         current (get-in ctx [:values id])
         opts    (or options (get-in ctx [:options id]) [])
-        url     (render/field-post-url ctx id)]
+        url     (endpoints/field-post-url ctx id)]
     [:div.widget.selections.field
      [:label label]
      (into [:div.selections-group]

@@ -1,11 +1,13 @@
 (ns yogthos.stepvine.components.widgets.basics.input-time
   "Time input widget using HTML5 type=\"time\"."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]]))
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]]))
 
 (defmethod render-widget :stepvine.components/input-time
   [ctx _component {:keys [id label placeholder read-only]} _body]
-  (let [sig      (render/item-signal-name ctx id)
+  (let [sig      (signals/item-signal-name ctx id)
         in-item? (boolean (:item ctx))]
     [:div.widget.input-time.field
      [:label {:for (when-not in-item? (name id))}
@@ -17,7 +19,7 @@
         (not in-item?) (assoc :id (name id) :name (name id))
         read-only      (assoc :readonly true)
         (not read-only)
-        (assoc "data-on:input__debounce.300ms" (str "@post('" (render/field-post-url ctx id) "')")
-               "data-on:focus" (str "@post('" (render/field-lock-url ctx id) "')")
-               "data-on:blur"  (str "@post('" (render/field-unlock-url ctx id) "')")
+        (assoc "data-on:input__debounce.300ms" (str "@post('" (endpoints/field-post-url ctx id) "')")
+               "data-on:focus" (str "@post('" (endpoints/field-lock-url ctx id) "')")
+               "data-on:blur"  (str "@post('" (endpoints/field-unlock-url ctx id) "')")
                "data-attr:disabled" (str "!!$locks." sig " && $locks." sig " != $uid")))]]))

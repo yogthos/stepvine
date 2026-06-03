@@ -12,7 +12,9 @@
      :caption     true to show a friendly reformatted echo of the picked date
                   (the native input always stores/edits ISO yyyy-mm-dd)."
   (:require
-   [yogthos.stepvine.render :as render :refer [render-widget]])
+   [yogthos.stepvine.signals :as signals]
+   [yogthos.stepvine.endpoints :as endpoints]
+   [yogthos.stepvine.render :refer [render-widget]])
   (:import
    (java.time LocalDate)))
 
@@ -38,9 +40,9 @@
 
 (defmethod render-widget :stepvine.components/date-picker
   [ctx _component {:keys [id label min max step placeholder helpers caption read-only]} _body]
-  (let [sig      (render/item-signal-name ctx id)
+  (let [sig      (signals/item-signal-name ctx id)
         in-item? (boolean (:item ctx))
-        post-url (render/field-post-url ctx id)]
+        post-url (endpoints/field-post-url ctx id)]
     [:div.widget.date-picker.field
      [:label {:for (when-not in-item? (name id))}
       (or label (name id))]
@@ -55,8 +57,8 @@
         read-only                  (assoc :readonly true)
         (not read-only)
         (assoc "data-on:change" (str "@post('" post-url "')")
-               "data-on:focus"  (str "@post('" (render/field-lock-url ctx id) "')")
-               "data-on:blur"   (str "@post('" (render/field-unlock-url ctx id) "')")
+               "data-on:focus"  (str "@post('" (endpoints/field-lock-url ctx id) "')")
+               "data-on:blur"   (str "@post('" (endpoints/field-unlock-url ctx id) "')")
                "data-attr:disabled" (str "!!$locks." sig " && $locks." sig " != $uid")))]
      ;; quick-set helpers: set the signal to a resolved literal date, then post
      (when (and (seq helpers) (not read-only))

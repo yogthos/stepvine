@@ -4,14 +4,15 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest testing is]]
    [yogthos.stepvine.forms :as forms]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.render :as render]
    yogthos.stepvine.components   ; register widget render methods
    [yogthos.stepvine.editor.impl :as impl]))
 
 (deftest signal-name-sanitizes-ids
-  (is (= "kg"           (render/signal-name :kg)))
-  (is (= "overweight"   (render/signal-name :overweight?)))
-  (is (= "bmi_category" (render/signal-name :bmi-category))))
+  (is (= "kg"           (signals/signal-name :kg)))
+  (is (= "overweight"   (signals/signal-name :overweight?)))
+  (is (= "bmi_category" (signals/signal-name :bmi-category))))
 
 (deftest theme-href-resolves-view-opts
   (let [sess (fn [theme]

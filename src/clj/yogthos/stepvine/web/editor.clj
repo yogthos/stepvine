@@ -18,6 +18,7 @@
    [yogthos.stepvine.editor.impl :as impl]
    [yogthos.stepvine.forms :as forms]
    [yogthos.stepvine.options :as options]
+   [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.render :as render]
    [yogthos.stepvine.web.layout :as layout]
    [yogthos.stepvine.web.security :as security]))
@@ -59,7 +60,7 @@
           sess (impl/create-session form {})
           ctx  (-> (render/session->context sess vid "preview")
                    (assoc :options (options/resolve-field-options
-                                    options-store (render/all-field-opts sess))))
+                                    options-store (signals/all-field-opts sess))))
           view (render/render-view ctx (render/view-markup sess vid))]
       {:views (preview-views form)
        :view  vid
