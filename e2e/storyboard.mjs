@@ -250,7 +250,9 @@ try {
   btnBg === 'rgb(13, 148, 136)'
     ? ok('app CSS applied (re-skinned the action button)') : bad(`app CSS not applied: ${btnBg}`);
   (await stateText()) === 'open' ? ok('initial state :open') : bad(`state not open: ${await stateText()}`);
-  await page.fill('#title', 'Printer down'); await page.waitForTimeout(450);
+  // edit a field, then let the change (and the bumped $rev) round-trip over SSE
+  // before the workflow action — a stale rev would (correctly) reject the action
+  await page.fill('#title', 'Printer down'); await settleFields(page);
   (await page.locator('.wf-btn:has-text("Submit for review")').isVisible())
     ? ok('submit action shown in :open') : bad('submit action not shown in :open');
   await page.click('.wf-btn:has-text("Submit for review")'); await page.waitForTimeout(600);
@@ -700,7 +702,7 @@ try {
   await openDoc(page, () => page.click('button:has-text("New Support Ticket")'), '#title');
   await page.fill('#title', 'Server down');
   await page.selectOption('#priority', 'high');           // -> high-priority? reaction true
-  await page.waitForTimeout(500);
+  await settleFields(page);                               // let the edits + $rev sync over SSE
   await page.click('.wf-btn:has-text("Submit for review")');
   await page.waitForTimeout(700);
   // the :when-gated escalation step ran (only on high priority)
@@ -725,7 +727,7 @@ try {
     ? ok('the Review view is not shown in :open') : bad('review view leaked in :open');
   // submit -> state :review
   await page.fill('#summary', 'Lost shipment');
-  await page.waitForTimeout(450);
+  await settleFields(page);                               // let the edit + $rev sync over SSE
   await page.click('.wf-btn:has-text("Submit for review")');
   await page.waitForTimeout(700);
   // reload (no ?view) -> the Review view is auto-selected by the new state
@@ -951,6 +953,44 @@ try {
   await page.goto(BASE + '/search?q=zzznotarealtoken');
   (await page.locator('.sv-muted').innerText()).includes('No accessible documents')
     ? ok('a non-matching query shows the empty state') : bad('empty state missing');
+
+  // ---- 31. Optimistic concurrency — stale-write rejection (:rev) ----
+  step('31. Optimistic concurrency (:rev)');
+  const errMark31 = pageErrors.length;   // this scenario deliberately triggers a 409
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Support Ticket")'), '#title');
+  const ocUrl = page.url().replace(/\?.*$/, '');
+  await page.fill('#title', 'Disk full');   // a data edit bumps the rev 0 -> 1
+  await settleFields(page);
+  const post = (rev) => page.evaluate(async ([u, r]) => {
+    const res = await fetch(u, { method: 'POST',
+      headers: { 'datastar-request': 'true', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rev: r, title: 'Disk full' }) });
+    return { status: res.status, body: await res.text() };
+  }, [`${ocUrl}/wf/submit`, rev]);
+  // a workflow action carrying a STALE rev (0, before the title edit) is rejected
+  const stale = await post(0);
+  (stale.status === 409 && /stale/.test(stale.body))
+    ? ok('a workflow action with a stale :rev is rejected (409 "stale")')
+    : bad(`stale action not rejected: ${JSON.stringify(stale)}`);
+  // the document did NOT transition (still open / not read-only)
+  await openDoc(page, () => page.reload(), '#title');
+  (await page.locator('.sv-status').isVisible().catch(() => false))
+    ? bad('document was finalized by a stale action') : ok('the rejected action left the document unchanged');
+  // the SAME action with the CURRENT rev is accepted (read the live rev the page
+  // was rendered with — it tracks data edits)
+  const curRev = await page.evaluate(() => {
+    const el = document.querySelector('[data-signals]');
+    return el ? JSON.parse(el.getAttribute('data-signals')).rev : null;
+  });
+  const fresh = await post(curRev);
+  fresh.status === 204
+    ? ok(`the same action with the current :rev (${curRev}) is accepted (204)`)
+    : bad(`current-rev action not accepted: ${JSON.stringify(fresh)} (rev=${curRev})`);
+  // the deliberate stale POST is logged by the browser as a failed resource load
+  // (HTTP 409) — drop those expected entries so the error watch stays meaningful
+  pageErrors.splice(errMark31, pageErrors.length - errMark31,
+    ...pageErrors.slice(errMark31).filter((e) => !/Failed to load resource.*409/.test(e)));
 
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');

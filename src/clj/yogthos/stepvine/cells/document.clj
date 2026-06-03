@@ -11,6 +11,7 @@
    [jsonista.core :as json]
    [mycelium.core :as myc]
    [selmer.parser :as selmer]
+   [starfederation.datastar.clojure.api :as d*]
    [yogthos.stepvine.access :as access]
    [yogthos.stepvine.audit :as audit]
    [yogthos.stepvine.builder :as builder]
@@ -255,6 +256,9 @@
                    (assoc :perm-roles (users/roles user) :perm-admin? (users/admin? user))
                    ;; finalized documents render read-only (§15.5)
                    (assoc :locked? (documents/locked? doc))
+                   ;; optimistic-concurrency token seeded into $rev (kept current
+                   ;; over SSE); consequential actions post it back to detect staleness
+                   (assoc :rev (:rev doc))
                    ;; current workflow state — drives $state action buttons (§15.10)
                    ;; AND :writable-in field editability (§parity)
                    (assoc :workflow-state wstate)
@@ -318,12 +322,14 @@
 
 (myc/defcell :doc/parse-view-op
   {:input  {:http-request :map}
-   :output {:doc-id :any :view-id :any :uid :any}
-   :doc    "Document id (path), target view (query, default :default), acting user."}
+   :output {:doc-id :any :view-id :any :uid :any :rev :any}
+   :doc    "Document id (path), target view (query, default :default), acting user, rev."}
   (fn [_ {req :http-request}]
     {:doc-id  (get-in req [:path-params :id])
      :view-id (keyword (or (get-in req [:query-params "view"]) "default"))
-     :uid     (get-in req [:session :user-id])}))
+     :uid     (get-in req [:session :user-id])
+     :rev     (try (some-> (json/read-value (d*/get-signals req)) (get "rev") long)
+                   (catch Exception _ nil))}))
 
 (defn- broadcast-lock! [hub doc-id locked?]
   (hub/broadcast-signals! hub doc-id {"locked" locked?}))
@@ -334,10 +340,11 @@
 
 (myc/defcell :doc/submit
   {:requires [:forms :documents :session-manager :hub :audit]
-   :input    {:doc-id :any :view-id :any :uid :any}
+   :input    {:doc-id :any :view-id :any :uid :any :rev :any}
    :output   {:status :int :body :string}
-   :doc      "Finalize a view: guard sole-editor + validity, snapshot, approve, lock."}
-  (fn [{:keys [session-manager hub documents audit] :as resources} {:keys [doc-id view-id uid]}]
+   :doc      "Finalize a view: guard rev (optimistic concurrency) + sole-editor +
+              validity, snapshot, approve, lock."}
+  (fn [{:keys [session-manager hub documents audit] :as resources} {:keys [doc-id view-id uid rev]}]
     (if-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
       (let [doc         (documents/get-document documents doc-id)
             others      (disj (hub/users hub doc-id) uid)
@@ -345,6 +352,11 @@
             valid?      (or (nil? submit-when)
                             (boolean (session/value session-manager doc-id submit-when)))]
         (cond
+          ;; optimistic concurrency: the user submitted from a stale view (§j00/oc)
+          (not (documents/rev-current? documents doc-id rev))
+          (do (notice! hub doc-id "This document changed elsewhere — refresh and try again.")
+              {:status 409 :body "Stale document revision."})
+
           (documents/submitted-for? doc view-id)
           {:status 409 :body "Already submitted."}
 
@@ -367,17 +379,25 @@
 
 (myc/defcell :doc/revise
   {:requires [:forms :documents :session-manager :hub :audit]
-   :input    {:doc-id :any :view-id :any :uid :any}
+   :input    {:doc-id :any :view-id :any :uid :any :rev :any}
    :output   {:status :int :body :string}
-   :doc      "Re-open a submitted view; broadcast the unlocked state."}
-  (fn [{:keys [hub documents audit] :as resources} {:keys [doc-id view-id uid]}]
-    (when (docs/ensure! resources doc-id)
-      (documents/revise! documents doc-id view-id)
-      (audit/record! audit {:doc-id doc-id :by uid :action :doc/revise
-                            :detail {:view view-id}})
-      (broadcast-lock! hub doc-id
-                       (documents/locked? (documents/get-document documents doc-id))))
-    {:status 204 :body ""}))
+   :doc      "Re-open a submitted view (rev-guarded); broadcast the unlocked state."}
+  (fn [{:keys [hub documents audit] :as resources} {:keys [doc-id view-id uid rev]}]
+    (cond
+      (not (docs/ensure! resources doc-id))
+      {:status 404 :body "No such document."}
+
+      (not (documents/rev-current? documents doc-id rev))
+      (do (notice! hub doc-id "This document changed elsewhere — refresh and try again.")
+          {:status 409 :body "Stale document revision."})
+
+      :else
+      (do (documents/revise! documents doc-id view-id)
+          (audit/record! audit {:doc-id doc-id :by uid :action :doc/revise
+                                :detail {:view view-id}})
+          (broadcast-lock! hub doc-id
+                           (documents/locked? (documents/get-document documents doc-id)))
+          {:status 204 :body ""}))))
 
 ;; --- POST /doc/:id/share | /delete (owner-only) ---------------------------
 

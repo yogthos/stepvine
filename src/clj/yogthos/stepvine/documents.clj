@@ -2,7 +2,7 @@
   "Document-instance store (`:store/documents`).
 
    A *document* is a saved instance of a form template, carrying its pinned form
-   version, lifecycle `:status`, a `:rev` concurrency token, the persisted domino
+   version, lifecycle `:status`, a `:rev` data-revision token (optimistic concurrency, §oc), the persisted domino
    `:db`, and a system `:meta` map.
 
    The store is **pluggable behind a `DocStore` protocol** (§15.13): an
@@ -194,6 +194,19 @@
   [store id user-id]
   (-transact! store id (fn [doc] (update doc :shared (fnil conj #{}) user-id))))
 
+(defn current-rev
+  "The document's current optimistic-concurrency revision (0 if absent)."
+  [store id]
+  (or (:rev (get-document store id)) 0))
+
+(defn rev-current?
+  "True when `rev` (a client's last-seen revision, possibly nil) is up to date with
+   the document's current `:rev`. A nil rev — a request that carried no token, e.g.
+   a legacy client — is treated as current so the guard never blocks those. Used to
+   reject stale decision-committing actions (submit / revise / workflow)."
+  [store id rev]
+  (or (nil? rev) (= (long rev) (current-rev store id))))
+
 (defn save-db!
   "Persist the latest domino db for a document and bump its optimistic-concurrency
    `:rev` + `:meta :modified-at` (no-op if it doesn't exist)."
@@ -214,7 +227,7 @@
 
 (defn submit!
   "Finalize a view: record an append-only approval + an immutable snapshot, add
-   the view to `:submitted-views`, set `:status :submitted`, bump `:rev`."
+   the view to `:submitted-views`, set `:status :submitted` (a meta change — does not bump the data `:rev`)."
   [store id view-id uid snapshot]
   (-transact! store id
               (fn [doc]
@@ -226,7 +239,7 @@
                                  {:view view-id :by uid :at now
                                   :form-version (:form-version doc) :snapshot snapshot})
                       (assoc :status :submitted)
-                      (update :rev (fnil inc 0)))))))
+                      (assoc-in [:meta :modified-at] now))))))
 
 (defn revise!
   "Re-open a submitted view (keeps the approval log — append-only). Returns the
@@ -238,7 +251,7 @@
                   (-> doc
                       (assoc-in [:meta :submitted-views] views)
                       (assoc :status (if (seq views) :submitted :in-progress))
-                      (update :rev (fnil inc 0)))))))
+                      (assoc-in [:meta :modified-at] (System/currentTimeMillis)))))))
 
 ;; --- Workflow state machine (§15.10) --------------------------------------
 
@@ -250,7 +263,7 @@
 
 (defn set-workflow-state!
   "Move the document into workflow state `state`, appending to its transition
-   history and bumping :rev. `locked?` marks the state read-only (mirrored into
+   history. `locked?` marks the state read-only (mirrored into
    `:status` so the existing edit guard applies)."
   [store id state locked? by]
   (-transact! store id
@@ -260,7 +273,7 @@
                     (update-in [:meta :workflow :history] (fnil conj [])
                                {:state state :by by :at (System/currentTimeMillis)})
                     (assoc :status (if locked? :submitted :in-progress))
-                    (update :rev (fnil inc 0))))))
+                    (assoc-in [:meta :modified-at] (System/currentTimeMillis))))))
 
 (defn assignee
   "The user-id this document is currently assigned to, or nil."
@@ -268,7 +281,7 @@
 
 (defn assign!
   "Route the document to user `user-id` (nil clears the assignment), recording it
-   in `[:meta :assignee]` + the assignment history, bumping :rev."
+   in `[:meta :assignee]` + the assignment history."
   [store id user-id by]
   (-transact! store id
               (fn [doc]
@@ -276,15 +289,15 @@
                     (assoc-in [:meta :assignee] user-id)
                     (update-in [:meta :assignments] (fnil conj [])
                                {:to user-id :by by :at (System/currentTimeMillis)})
-                    (update :rev (fnil inc 0))))))
+                    (assoc-in [:meta :modified-at] (System/currentTimeMillis))))))
 
 (defn update-meta!
-  "Persist a value at `[:meta & path]` (workflow step directive), bumping :rev."
+  "Persist a value at `[:meta & path]` (workflow step directive)."
   [store id path value]
   (-transact! store id
               (fn [doc] (-> doc
                             (assoc-in (into [:meta] path) value)
-                            (update :rev (fnil inc 0))))))
+                            (assoc-in [:meta :modified-at] (System/currentTimeMillis))))))
 
 (defn delete!
   [store id]

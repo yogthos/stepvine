@@ -33,6 +33,9 @@
                                                 :else      "")]))
                    (merge (render/signal-map ctx)
                           {"uid" uid "presence" 1 "locks" {}
+                           ;; optimistic-concurrency revision (§oc): kept current
+                           ;; over SSE, posted back by consequential actions
+                           "rev" (or (:rev ctx) 0)
                            "locked" (boolean (:locked? ctx)) "notice" ""
                            ;; current workflow state name, for $state-driven
                            ;; action-button visibility (§15.10)

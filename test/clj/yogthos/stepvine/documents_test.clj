@@ -79,3 +79,22 @@
       (documents/save-db! store (:id a) {:title "Broken printer"
                                          :lines {"l1" {:item "toner cartridge"}}})
       (is (= [(:id a)] (map :id (documents/search-accessible store "alice" "toner")))))))
+
+;; --- Optimistic concurrency (:rev) -----------------------------------------
+
+(deftest rev-current-detects-stale-revisions
+  (let [store (atom {})
+        d (documents/create! store :ticket {:created-by "u1"})
+        id (:id d)]
+    (testing "a fresh document is at rev 0"
+      (is (= 0 (documents/current-rev store id))))
+    (testing "rev 0 is current; an out-of-date rev is not"
+      (is (documents/rev-current? store id 0))
+      (is (not (documents/rev-current? store id -1))))
+    (testing "a write bumps the rev, so the old rev goes stale"
+      (documents/save-db! store id {:title "x"})
+      (is (= 1 (documents/current-rev store id)))
+      (is (not (documents/rev-current? store id 0)))   ; client that saw rev 0 is now stale
+      (is (documents/rev-current? store id 1)))
+    (testing "a nil rev (no token) is always treated as current"
+      (is (documents/rev-current? store id nil)))))

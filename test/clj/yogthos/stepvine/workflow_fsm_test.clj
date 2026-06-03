@@ -38,10 +38,14 @@
                  :users (atom {"u1" {:id "u1" :roles #{:reviewer}}})}]
     {:res res :id (:id doc) :mgr mgr :docs docs :audit aud}))
 
-(defn- run [res id action uid]
-  (myc/run-compiled wf-fsm/run-action res
-                    {:http-request {:path-params {:id id :action (name action)}
-                                    :session {:user-id uid}}}))
+(defn- run
+  ([res id action uid] (run res id action uid nil))
+  ([res id action uid rev]
+   (myc/run-compiled wf-fsm/run-action res
+                     {:http-request (cond-> {:path-params {:id id :action (name action)}
+                                             :session {:user-id uid}}
+                                      rev (assoc :request-method :post
+                                                 :body (jsonista.core/write-value-as-string {:rev rev})))})))
 
 (deftest legal-transition-runs-and-persists
   (let [{:keys [res id mgr docs audit]} (setup)]
@@ -69,6 +73,22 @@
       (let [out (run res id :approve "u1")]                      ; :approve not legal from :open
         (is (= 409 (:status out)))
         (is (= "illegal-transition" (:body out)))))))
+
+(deftest stale-revision-is-rejected
+  (let [{:keys [res id mgr docs]} (setup)]
+    (docs/ensure! res id)
+    (session/apply-change! mgr id [[:title "Printer is down"]])   ; valid + bumps :rev
+    (let [cur (documents/current-rev docs id)]
+      (testing "an action carrying the current rev proceeds"
+        (is (= 204 (:status (run res id :submit "u1" cur))))
+        (is (= :review (documents/workflow-state (documents/get-document docs id) :open))))
+      (testing "an action carrying a stale (older) rev is rejected 409, no transition"
+        (let [out (run res id :approve "u1" (dec cur))]           ; pretend client is behind
+          (is (= 409 (:status out)))
+          (is (= "stale" (:body out)))
+          (is (= :review (documents/workflow-state (documents/get-document docs id) :open))))))
+    (testing "an action with no rev token still works (legacy / untracked client)"
+      (is (= 204 (:status (run res id :approve "u1")))))))
 
 (deftest terminal-transition-locks-and-snapshots
   (let [{:keys [res id mgr docs]} (setup)]

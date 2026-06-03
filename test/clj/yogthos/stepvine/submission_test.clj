@@ -22,8 +22,10 @@
                (map #(select-keys % [:view :by]) (get-in d [:meta :approvals])))))
       (testing "an immutable snapshot is stored"
         (is (= {:weight 72} (-> d (get-in [:meta :reports]) first :snapshot))))
-      (testing "rev was bumped"
-        (is (= 1 (:rev d)))))))
+      (testing "submit is a meta change — it does NOT bump the data :rev (§oc:
+                rev tracks data, so a client's own lifecycle action never self-stales)"
+        (is (= 0 (:rev d)))
+        (is (some? (get-in d [:meta :modified-at])))))))
 
 (deftest revise-reopens-but-keeps-the-approval
   (let [doc   (documents/create! (atom {}) :intake {:created-by "u1"})

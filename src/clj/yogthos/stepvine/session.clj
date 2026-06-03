@@ -349,12 +349,13 @@
 ;; --- Component ------------------------------------------------------------
 
 (defn- broadcast-changes!
-  "Diff old vs new session signals and push only the changed ones to all
-   connections on the document."
-  [hub* id old new]
+  "Diff old vs new session signals and push only the changed ones (plus any
+   `extra` system signals, e.g. the bumped :rev) to all connections."
+  [hub* id old new extra]
   (let [old-sigs (render/session->signal-map old)
         new-sigs (render/session->signal-map new)
-        delta    (into {} (remove (fn [[k v]] (= v (get old-sigs k)))) new-sigs)]
+        delta    (merge (into {} (remove (fn [[k v]] (= v (get old-sigs k)))) new-sigs)
+                        extra)]
     (when (seq delta)
       (hub/broadcast-signals! hub* id delta))))
 
@@ -363,8 +364,9 @@
   (e/session-manager
    {:on-update
     (fn [id old new]
-      ;; persist the latest db back into the document record (if one exists)
-      (when documents
-        (documents/save-db! documents id (impl/db new)))
-      (when hub
-        (broadcast-changes! hub id old new)))}))
+      ;; persist the latest db back into the document record (if one exists); the
+      ;; save bumps :rev, which we broadcast so every client's $rev stays current
+      (let [saved (when documents
+                    (documents/save-db! documents id (impl/db new)))]
+        (when hub
+          (broadcast-changes! hub id old new (when saved {"rev" (:rev saved)})))))}))
