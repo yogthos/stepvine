@@ -10,6 +10,7 @@
    [yogthos.stepvine.options :as options]
    [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.render :as render]
+   [yogthos.stepvine.view-state :as view-state]
    [yogthos.stepvine.session :as session]
    [starfederation.datastar.clojure.adapter.test :as ds-test]
    yogthos.stepvine.components   ; register widget render methods
@@ -165,7 +166,7 @@
       (testing "initial order is insertion order"
         (is (= [i1 i2 i3] (order-of mgr))))
       (testing "moving i3 before i1 reorders the collection"
-        (session/move-item! mgr "roster" :members i3 i1)
+        (view-state/move-item! mgr "roster" :members i3 i1)
         (is (= [i3 i1 i2] (order-of mgr))))
       (testing "a newly added item appears after the stored order"
         (let [i4 (session/add-item! mgr "roster" :members)]
@@ -288,16 +289,16 @@
           (is (= 3 (row-count html)))
           (is (str/includes? html "Page 1 of 1"))))
       (testing "sort by title ascending orders the rows alphabetically"
-        (session/set-table-sort! mgr "tasks" :tasks "title")
+        (view-state/set-table-sort! mgr "tasks" :tasks "title")
         (let [[alice bob charlie] (positions (render-tasks mgr) "Alice" "Bob" "Charlie")]
           (is (< alice bob charlie))))
       (testing "clicking the same column again toggles to descending"
-        (session/set-table-sort! mgr "tasks" :tasks "title")
+        (view-state/set-table-sort! mgr "tasks" :tasks "title")
         (let [[charlie bob alice] (positions (render-tasks mgr) "Charlie" "Bob" "Alice")]
           (is (< charlie bob alice))))
       (testing "sort by priority is numeric (1,2,3 -> Alice,Bob,Charlie)"
-        (session/set-table-sort! mgr "tasks" :tasks "title")      ; third cycle clears
-        (session/set-table-sort! mgr "tasks" :tasks "priority")
+        (view-state/set-table-sort! mgr "tasks" :tasks "title")      ; third cycle clears
+        (view-state/set-table-sort! mgr "tasks" :tasks "priority")
         (let [[alice bob charlie] (positions (render-tasks mgr) "Alice" "Bob" "Charlie")]
           (is (< alice bob charlie))))
       (testing "paging splits a 4th row onto page 2"
@@ -305,7 +306,7 @@
           (session/set-item-field! mgr "tasks" :tasks d :title "Dave")
           (is (str/includes? (render-tasks mgr) "Page 1 of 2"))
           (is (= 3 (row-count (render-tasks mgr))))
-          (session/set-table-page! mgr "tasks" :tasks "next")
+          (view-state/set-table-page! mgr "tasks" :tasks "next")
           (is (str/includes? (render-tasks mgr) "Page 2 of 2"))
           (is (= 1 (row-count (render-tasks mgr)))))))))
 
@@ -328,7 +329,7 @@
       (testing "no filter: all rows shown"
         (is (= 3 (row-count (render-tasks mgr)))))
       (testing "filtering by priority=1 keeps only matching rows"
-        (session/set-table-filter! mgr "tasks" :tasks :priority "1")
+        (view-state/set-table-filter! mgr "tasks" :tasks :priority "1")
         (let [html (render-tasks mgr)]
           (is (= 2 (row-count html)))      ; Alpha + Charlie
           ;; the non-matching row (Bravo) is not rendered (its value still appears
@@ -339,7 +340,7 @@
       (testing "the active filter value is marked selected (survives re-render)"
         (is (str/includes? (render-tasks mgr) "selected")))
       (testing "a blank value clears the filter"
-        (session/set-table-filter! mgr "tasks" :tasks :priority "")
+        (view-state/set-table-filter! mgr "tasks" :tasks :priority "")
         (is (= 3 (row-count (render-tasks mgr))))))))
 
 ;; --- Column customization (overlay: reorder / hide / restore / relabel) ----
@@ -378,17 +379,17 @@
           (is (str/includes? h (bind :memo)))
           (is (str/includes? h (bind :amount)))))
       (testing "hiding a column removes its cells"
-        (session/hide-table-column! mgr "ledger" :rows :memo)
+        (view-state/hide-table-column! mgr "ledger" :rows :memo)
         (let [h (render-ledger mgr)]
           (is (not (str/includes? h (bind :memo))))
           (is (str/includes? h (bind :date)))))
       (testing "reordering puts amount before date"
-        (session/set-table-column-order! mgr "ledger" :rows ["amount" "date" "memo"])
+        (view-state/set-table-column-order! mgr "ledger" :rows ["amount" "date" "memo"])
         (let [h (render-ledger mgr)]
           (is (< (str/index-of h (bind :amount)) (str/index-of h (bind :date))))))
       (testing "restore brings back the most-recently-hidden column"
-        (session/restore-table-column! mgr "ledger" :rows)
+        (view-state/restore-table-column! mgr "ledger" :rows)
         (is (str/includes? (render-ledger mgr) (bind :memo))))
       (testing "a label override shows as the header input value"
-        (session/set-table-column-label! mgr "ledger" :rows :date "When")
+        (view-state/set-table-column-label! mgr "ledger" :rows :date "When")
         (is (str/includes? (render-ledger mgr) "value=\"When\""))))))

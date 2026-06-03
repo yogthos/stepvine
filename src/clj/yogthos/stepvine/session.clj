@@ -150,8 +150,9 @@
   [manager doc-id item-path field-id value]
   (apply-change! manager doc-id [[(conj (vec item-path) (keyword field-id)) value]]))
 
-(defn- item-keys
-  "Current item index keys of a collection, in db order."
+(defn item-keys
+  "Current item index keys of a collection, in db order. A session primitive used
+   both here (clear-items!) and by the view-state layer (move-item!)."
   [manager doc-id coll-id]
   (vec (filter string? (keys (get (impl/db (current manager doc-id)) coll-id)))))
 
@@ -161,105 +162,9 @@
   (doseq [k (item-keys manager doc-id coll-id)]
     (apply-change! manager doc-id [[[coll-id k] nil]])))
 
-;; --- Table view-state (presentation only; per document, shared by viewers) ---
-;; Sort/page/row-order/filter are not document data — domino has no concept of
-;; them — so they live in the session map under :view-state and survive transacts
-;; (apply only touches ::ctx). Updated directly on the session atom (no domino
-;; transact); the route handler re-renders + broadcasts. The table widget READS
-;; this shape from the render ctx (`signals/collections-data`). Shape (invariant #4):
-;;
-;;   :view-state {coll-id {:sort   {:col <kw> :dir :asc|:desc}   ; nil = unsorted
-;;                         :filter {:col <kw> :value <str>}      ; absent = all rows
-;;                         :page   <int>                         ; 0-based
-;;                         :order  [idx …]                       ; row drag order
-;;                         :cols   {:order  [path …]             ; column reorder
-;;                                  :hidden #{path …}            ; removed columns
-;;                                  :labels {path <str>}}}}      ; relabeled headers
-
-(defn- update-view!
-  [manager doc-id coll-id f]
-  (swap! (e/get-session-atom! manager doc-id)
-         update-in [:view-state coll-id] (fnil f {})))
-
-(defn move-item!
-  "Reorder a collection by moving item key `from-key` to before `to-key`. Stores
-   the resulting order in view-state; collections-data renders by it."
-  [manager doc-id coll-id from-key to-key]
-  (when (and from-key to-key (not= from-key to-key))
-    (let [base (set (item-keys manager doc-id coll-id))]
-      (when (and (base from-key) (base to-key))
-        (update-view! manager doc-id coll-id
-                      (fn [{:keys [order] :as vs}]
-                        (let [cur (vec (filter base (or (not-empty order) (item-keys manager doc-id coll-id))))
-                              cur (vec (remove #{from-key} cur))
-                              ti  (.indexOf cur to-key)
-                              ti  (if (neg? ti) (count cur) ti)]
-                          (assoc vs :order (vec (concat (subvec cur 0 ti) [from-key] (subvec cur ti)))))))))))
-
-(defn set-table-sort!
-  "Cycle the sort for a column: unsorted → asc → desc → unsorted."
-  [manager doc-id coll-id col]
-  (let [col (keyword col)]
-    (update-view! manager doc-id coll-id
-                  (fn [{:keys [sort] :as vs}]
-                    (assoc vs :sort
-                           (cond
-                             (not= (:col sort) col) {:col col :dir :asc}
-                             (= (:dir sort) :asc)   {:col col :dir :desc}
-                             :else                  nil))))))
-
-(defn set-table-filter!
-  "Set the table's row filter (view-state) to `{:col <col> :value <v>}`. A blank
-   value clears the filter (all rows shown). View-only — no document change."
-  [manager doc-id coll-id col value]
-  (update-view! manager doc-id coll-id
-                (fn [vs]
-                  (if (str/blank? (str value))
-                    (dissoc vs :filter)
-                    (assoc vs :filter {:col (keyword col) :value (str value)})))))
-
-;; --- Table column customization (view-state overlay: order/hidden/labels) ---
-
-(defn set-table-column-order!
-  "Persist a column display order (a vector of column path keywords)."
-  [manager doc-id coll-id paths]
-  (let [order (mapv keyword paths)]
-    (update-view! manager doc-id coll-id #(assoc-in % [:cols :order] order))))
-
-(defn hide-table-column!
-  "Hide a column from the table display (view-only; the field/data is untouched)."
-  [manager doc-id coll-id path]
-  (update-view! manager doc-id coll-id
-                #(update-in % [:cols :hidden] (fnil conj #{}) (keyword path))))
-
-(defn restore-table-column!
-  "Un-hide the most-recently-hidden column (the inverse of hide); no-op if none."
-  [manager doc-id coll-id]
-  (update-view! manager doc-id coll-id
-                (fn [vs]
-                  (let [hidden (get-in vs [:cols :hidden])]
-                    (if (seq hidden)
-                      (assoc-in vs [:cols :hidden] (disj hidden (last (vec hidden))))
-                      vs)))))
-
-(defn set-table-column-label!
-  "Override (or clear, on blank) a column's display label."
-  [manager doc-id coll-id path label]
-  (update-view! manager doc-id coll-id
-                (fn [vs]
-                  (if (str/blank? (str label))
-                    (update-in vs [:cols :labels] dissoc (keyword path))
-                    (assoc-in vs [:cols :labels (keyword path)] (str label))))))
-
-(defn set-table-page!
-  "Move the table page: dir is \"next\"/\"prev\" or an absolute integer string."
-  [manager doc-id coll-id dir]
-  (update-view! manager doc-id coll-id
-                (fn [{:keys [page] :or {page 0} :as vs}]
-                  (assoc vs :page (max 0 (case dir
-                                           "next" (inc page)
-                                           "prev" (dec page)
-                                           (or (parse-long (str dir)) page)))))))
+;; Table view-state (sort/filter/page/row-order/column-overlay) is presentation,
+;; not document data — it lives in `yogthos.stepvine.view-state`, built on the
+;; `item-keys` primitive above and the session atom.
 
 (defn set-item-field!
   "Set a single field of a collection item (vector id [coll idx field])."

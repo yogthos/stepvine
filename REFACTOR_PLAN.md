@@ -19,11 +19,15 @@
   ~50 caller files repointed (`render/` → `signals/`/`endpoints/`); 7 non-widget
   callers no longer require render at all. Verified: 217 tests + 32 storyboard
   workflows, 0 page errors.
+- ✅ Phase 2 (cont.) — table view-state extracted from `session.clj` →
+  **`view_state.clj`** (`set-table-sort!`/`-filter!`/`-page!`/column overlay +
+  `move-item!`). The shared `item-keys` helper stays in `session.clj` as a public
+  primitive (`clear-items!` still uses it); `view-state` depends on `session`
+  one-way. Callers (`cells/form.clj`, `collections_test`) repointed `session/` →
+  `view-state/`. Verified: 217 tests + clean-data storyboard (steps 1–30).
 
 **Deferred** (documented here; not done — judged high-churn or tangled for a late
 single-session pass; safe to pick up incrementally next):
-- ⏳ `session.clj` table view-state → `view_state.clj` — shares `update-view!`/
-  `item-keys` with `move-item!`/`clear-items!`; unpick those couplings first.
 - ⏳ `cells/document.clj` landing HTML → `web/views/landing.clj`.
 - ⏳ `forms.clj` `prepare-form` → `forms_compile.clj` (store shouldn't compile).
 - ⏳ `table.clj` inline JS blobs → a served `/vendor` asset.

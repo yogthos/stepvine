@@ -20,6 +20,7 @@
    [yogthos.stepvine.options :as options]
    [yogthos.stepvine.signals :as signals]
    [yogthos.stepvine.render :as render]
+   [yogthos.stepvine.view-state :as view-state]
    [yogthos.stepvine.session :as session]
    yogthos.stepvine.components   ; register all widget render methods
    [starfederation.datastar.clojure.api :as d*]))
@@ -251,7 +252,7 @@
     (when (docs/ensure! resources doc-id)
       (let [coll (keyword coll-id)]
         (when-let [col (get query-params "col")]
-          (session/set-table-sort! session-manager doc-id coll col))
+          (view-state/set-table-sort! session-manager doc-id coll col))
         (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
@@ -263,7 +264,7 @@
   (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id query-params]}]
     (when (docs/ensure! resources doc-id)
       (let [coll (keyword coll-id)]
-        (session/set-table-page! session-manager doc-id coll (get query-params "dir"))
+        (view-state/set-table-page! session-manager doc-id coll (get query-params "dir"))
         (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
@@ -275,7 +276,7 @@
   (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id query-params]}]
     (when (docs/ensure! resources doc-id)
       (let [coll (keyword coll-id)]
-        (session/set-table-filter! session-manager doc-id coll
+        (view-state/set-table-filter! session-manager doc-id coll
                                    (get query-params "col") (get query-params "value"))
         (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
@@ -291,7 +292,7 @@
             from (get query-params "from")
             to   (get query-params "to")]
         (when (and from to)
-          (session/move-item! session-manager doc-id coll from to))
+          (view-state/move-item! session-manager doc-id coll from to))
         (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
@@ -315,7 +316,7 @@
   (fn [{:keys [session-manager] :as resources} {:keys [doc-id coll-id]}]
     (when (docs/ensure! resources doc-id)
       (let [coll (keyword coll-id)]
-        (session/restore-table-column! session-manager doc-id coll)
+        (view-state/restore-table-column! session-manager doc-id coll)
         (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
@@ -329,7 +330,7 @@
       (let [coll  (keyword coll-id)
             order (some-> (get query-params "order") not-empty (str/split #","))]
         (when (seq order)
-          (session/set-table-column-order! session-manager doc-id coll order))
+          (view-state/set-table-column-order! session-manager doc-id coll order))
         (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
@@ -342,7 +343,7 @@
     (when (docs/ensure! resources doc-id)
       (let [coll (keyword coll-id)]
         (when-let [path (get query-params "path")]
-          (session/hide-table-column! session-manager doc-id coll path))
+          (view-state/hide-table-column! session-manager doc-id coll path))
         (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
 
@@ -355,6 +356,6 @@
     (when (docs/ensure! resources doc-id)
       (let [coll (keyword coll-id)]
         (when-let [col (get query-params "col")]
-          (session/set-table-column-label! session-manager doc-id coll col (get query-params "label")))
+          (view-state/set-table-column-label! session-manager doc-id coll col (get query-params "label")))
         (rerender-collection! resources doc-id coll)))
     {:status 204 :body ""}))
