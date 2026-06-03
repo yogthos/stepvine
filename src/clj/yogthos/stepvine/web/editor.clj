@@ -94,18 +94,42 @@
 
 ;; --- save -----------------------------------------------------------------
 
-(defn save [forms-store]
+(defn- json-ok  [m] {:status 200 :headers {"Content-Type" "application/json"} :body (json/write-value-as-string (assoc m :ok true))})
+(defn- json-err [e] {:status 400 :headers {"Content-Type" "application/json"}
+                     :body (json/write-value-as-string {:ok false :error (str (or (.getMessage e) e))})})
+
+(defn save
+  "Save the editor content as the form's DRAFT (no publish). New documents keep
+   using the last published version until the draft is published (§lqj)."
+  [forms-store]
   (fn [req]
     (let [{:keys [edn css]} (json/read-value (:body req) json-mapper)]
       (try
         (let [form (cond-> (edn/read-string edn)
-                     (seq css) (assoc :css css)
+                     (seq css)   (assoc :css css)
                      (empty? css) (dissoc :css))]
-          (forms/save-form! forms-store form)
-          {:status 200 :headers {"Content-Type" "application/json"} :body "{\"ok\":true}"})
-        (catch Throwable e
-          {:status 400 :headers {"Content-Type" "application/json"}
-           :body (json/write-value-as-string {:ok false :error (str (or (.getMessage e) e))})})))))
+          (forms/save-draft! forms-store form)
+          (json-ok {:draft true}))
+        (catch Throwable e (json-err e))))))
+
+(defn publish
+  "Promote the pending draft to the working form + a new published version, so new
+   documents pick it up. Surfaces the sealing guard (bump :version) as an error."
+  [forms-store]
+  (fn [req]
+    (let [id (get-in req [:path-params :id])]
+      (try
+        (if-let [r (forms/publish-draft! forms-store id)]
+          (json-ok {:version (:version r)})
+          (json-err (ex-info "No draft to publish." {})))
+        (catch Throwable e (json-err e))))))
+
+(defn discard
+  "Drop the pending draft; the published working form is unaffected."
+  [forms-store]
+  (fn [req]
+    (forms/discard-draft! forms-store (get-in req [:path-params :id]))
+    (json-ok {:discarded true})))
 
 ;; --- create ---------------------------------------------------------------
 
@@ -179,13 +203,29 @@
   });
   const psel = document.getElementById('preview-view');
   if (psel) psel.onchange = () => { previewView = psel.value; preview(); };
+  const msg = (t, good) => { const m = document.getElementById('savemsg');
+    m.textContent = t; m.style.color = good ? '#16a34a' : '#b91c1c'; setTimeout(()=>m.textContent='', 4000); };
+  const setDraft = (on) => { document.getElementById('discard').hidden = !on;
+    document.getElementById('draftstate').textContent = on ? '● unpublished draft' : ''; };
+  const url = (op) => location.pathname.replace('/edit','/'+op);
   document.getElementById('save').onclick = async () => {
-    const r = await fetch(location.pathname.replace('/edit','/save'),{method:'POST',
+    const r = await fetch(url('save'),{method:'POST',
       headers:{'Content-Type':'application/json','datastar-request':'true'},
       body:JSON.stringify({edn,css})});
-    const m = document.getElementById('savemsg'); const ok = r.ok;
-    m.textContent = ok ? 'Saved ✓' : ('Error: ' + ((await r.json()).error||'')); m.style.color = ok?'#16a34a':'#b91c1c';
-    setTimeout(()=>m.textContent='', 4000);
+    if (r.ok) { setDraft(true); msg('Draft saved ✓', true); } else msg('Error: ' + ((await r.json()).error||''), false);
+  };
+  document.getElementById('publish').onclick = async () => {
+    // persist current edits as the draft first, then publish it
+    await fetch(url('save'),{method:'POST',headers:{'Content-Type':'application/json','datastar-request':'true'},body:JSON.stringify({edn,css})});
+    const r = await fetch(url('publish'),{method:'POST',headers:{'datastar-request':'true'}});
+    const j = await r.json();
+    if (r.ok) { setDraft(false); msg('Published v' + j.version + ' ✓', true); }
+    else msg('Publish failed: ' + (j.error||''), false);
+  };
+  document.getElementById('discard').onclick = async () => {
+    if (!confirm('Discard this draft and revert to the published version?')) return;
+    await fetch(url('discard'),{method:'POST',headers:{'datastar-request':'true'}});
+    location.reload();   // re-open the published working form
   };
   preview();
 })();")
@@ -196,6 +236,8 @@
        ".ed-toolbar form{display:inline} .ed-toolbar input{padding:.25rem .4rem;border:1px solid #d1d5db;border-radius:.375rem}"
        ".ed-toolbar button{padding:.3rem .8rem;border:1px solid #d1d5db;border-radius:.375rem;background:#fff;cursor:pointer}"
        "#save{background:#2563eb;color:#fff;border-color:#2563eb} .muted{color:#6b7280}"
+       "#publish{background:#16a34a;color:#fff;border-color:#16a34a}"
+       "#discard{color:#b91c1c} #draftstate{color:#b45309;font-weight:600}"
        ".ed-split{display:flex;height:calc(100vh - 160px);min-height:24rem}"
        ".ed-left{flex:1;display:flex;flex-direction:column;border-right:1px solid #e5e7eb;min-width:0}"
        ".ed-tabs{display:flex;border-bottom:1px solid #e5e7eb}"
@@ -212,7 +254,9 @@
 (defn edit-page [forms-store access-store users-store]
   (fn [req]
     (let [id    (get-in req [:path-params :id])
-          form  (forms/raw-form forms-store (keyword id))
+          ;; open the pending draft if one exists, else the published working form
+          form  (forms/for-editing forms-store id)
+          drafting? (forms/has-draft? forms-store id)
           edn   (with-out-str (pprint/pprint (dissoc form :css)))
           css   (or (:css form) "")]
       (-> (resp/response
@@ -223,7 +267,10 @@
                       {:label "Forms" :href "/admin/forms"} {:label id}]
              :head   [:style editor-styles]}
             [:div.ed-toolbar
-             [:button#save "Save"]
+             [:button#save "Save draft"]
+             [:button#publish "Publish"]
+             [:button#discard {:hidden (not drafting?)} "Discard draft"]
+             [:span#draftstate.muted (when drafting? "● unpublished draft")]
              [:span#savemsg.muted]
              [:span.muted "·"]
              [:form {:method "post" :action (str "/admin/forms/" id "/roles")}

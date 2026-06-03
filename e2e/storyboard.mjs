@@ -368,11 +368,11 @@ try {
   (await page.frameLocator('#preview').locator('.sv-status').isVisible().catch(() => false))
     ? bad('preview shows the read-only banner on a fresh form')
     : ok('preview is clean (no spurious read-only banner)');
-  // save persists the app to the DB
+  // Save stores the edits as a draft (drafts authoring flow, §lqj)
   await page.click('#save');
   await page.waitForTimeout(800);
-  (await page.locator('#savemsg').innerText()).includes('Saved')
-    ? ok('saved the app live') : bad(`save failed: ${await page.locator('#savemsg').innerText()}`);
+  (await page.locator('#savemsg').innerText()).includes('Draft saved')
+    ? ok('Save stored the edits as a draft') : bad(`save failed: ${await page.locator('#savemsg').innerText()}`);
   // the new app is now available
   await page.goto(BASE + '/');
   (await page.locator('h2:has-text("Demo App")').count()) > 0
@@ -991,6 +991,53 @@ try {
   // (HTTP 409) — drop those expected entries so the error watch stays meaningful
   pageErrors.splice(errMark31, pageErrors.length - errMark31,
     ...pageErrors.slice(errMark31).filter((e) => !/Failed to load resource.*409/.test(e)));
+
+  // ---- 32. Drafts authoring flow ----
+  step('32. Drafts authoring flow');
+  await page.goto(BASE + '/admin/forms');
+  await page.fill('input[name=id]', 'draftdemo');
+  await page.fill('input[name=title]', 'Draft Demo');
+  await Promise.all([page.waitForURL(/\/admin\/forms\/draftdemo\/edit/),
+                     page.click('button:has-text("Create & edit")')]);
+  await page.waitForSelector('.cm-editor', { timeout: 20000 });
+  ok('created an app and opened the editor');
+  // a freshly published app has no pending draft
+  ((await page.locator('#draftstate').innerText()).trim() === '' && await page.locator('#discard').isHidden())
+    ? ok('a freshly published app shows no pending draft') : bad('unexpected draft state on a fresh app');
+  // the Save button stores a DRAFT — the indicator + Discard appear
+  await page.click('#save');
+  await page.waitForFunction(() => /unpublished draft/.test(document.querySelector('#draftstate').textContent), null, { timeout: 4000 })
+    .then(() => ok('Save stores a draft (the "unpublished draft" indicator appears)'))
+    .catch(() => bad('no draft indicator after Save'));
+  (await page.locator('#discard').isVisible()) ? ok('the Discard button appears once a draft exists') : bad('discard not shown with a draft');
+  // Discard drops the draft
+  page.once('dialog', (d) => d.accept());
+  await page.click('#discard');
+  await page.waitForLoadState('networkidle');
+  (await page.locator('#draftstate').innerText()).trim() === ''
+    ? ok('Discard drops the draft (indicator cleared, reverted to published)') : bad('draft not discarded');
+
+  // the core invariant: a pending draft does NOT affect live documents until published
+  const v2 = JSON.stringify({ css: '', edn:
+    '{:id :draftdemo :title "Draft Demo" :version 2 ' +
+    ':data {:model [[:marker {:id :marker :type :string}]]} ' +
+    ':views {:default {:opts {:widget-namespaces {"c" "stepvine.components"}} ' +
+    ':markup [:c/form {} [:h1 "DRAFT V2 MARKER"] [:c/input-field {:id :marker :label "Marker"}]]}}}' });
+  await page.evaluate(async ([u, body]) => {
+    await fetch(u, { method: 'POST', headers: { 'datastar-request': 'true', 'Content-Type': 'application/json' }, body });
+  }, ['/admin/forms/draftdemo/save', v2]);
+  // a NEW document still uses the published v1 (scaffold) — not the draft
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Draft Demo")'), '#sv-doc-body');
+  (await page.locator('body').innerText()).includes('DRAFT V2 MARKER')
+    ? bad('a new document used the unpublished draft') : ok('a pending draft does NOT reach new documents (still on the published version)');
+  // publish the draft -> promotes to a new version
+  await page.evaluate(async (u) => { await fetch(u, { method: 'POST', headers: { 'datastar-request': 'true' } }); }, '/admin/forms/draftdemo/publish');
+  // now a NEW document uses the promoted v2
+  await page.goto(BASE + '/');
+  await openDoc(page, () => page.click('button:has-text("New Draft Demo")'), '#sv-doc-body');
+  (await page.locator('body').innerText()).includes('DRAFT V2 MARKER')
+    ? ok('after Publish, new documents use the promoted version') : bad('publish did not promote the draft to new documents');
 
   // ---- console / page errors -------------------------------------------
   step('Console / page errors');

@@ -109,6 +109,8 @@
       ["/forms/:id/roles"    (af {:post (admin/set-form-roles access)})]
       ["/forms/:id/edit"     (af {:get  (editor/edit-page forms access users)})]
       ["/forms/:id/save"     (ds {:post (editor/save forms)})]
+      ["/forms/:id/publish"  (ds {:post (editor/publish forms)})]   ; promote draft -> version
+      ["/forms/:id/discard"  (ds {:post (editor/discard forms)})]   ; drop the draft
       ["/outbox"             (af {:get  (admin/outbox-page mailer http-client users)})]]
      ;; document routes — access-controlled
      ["/doc/:id" {:middleware [doc-access]}

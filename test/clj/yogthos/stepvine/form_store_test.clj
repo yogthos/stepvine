@@ -54,3 +54,48 @@
         (is (= ".x{color:red}" (forms/css s2 :widget)))
         (is (= 1 (forms/latest-published s2 :widget)))))
     (io/delete-file f true)))
+
+;; --- Drafts authoring flow (stepvine-lqj) ----------------------------------
+
+(def draft-base '{:id :gizmo :version 1 :data {:model [[:a {:id :a :type :string}]]}})
+(def draft-v2   '{:id :gizmo :version 2 :css ".g{color:green}"
+                  :data {:model [[:a {:id :a :type :string}] [:b {:id :b :type :string}]]}})
+
+(defn- run-draft-contract [store]
+  (forms/save-form! store draft-base)                 ; publish v1 (the live form)
+  (testing "no draft initially — the editor falls back to the working form"
+    (is (not (forms/has-draft? store :gizmo)))
+    (is (nil? (forms/draft store :gizmo)))
+    (is (= draft-base (forms/for-editing store :gizmo))))
+  (testing "save-draft! stores WIP — it does NOT publish or change the working form"
+    (forms/save-draft! store draft-v2)
+    (is (forms/has-draft? store :gizmo))
+    (is (= 2 (:version (forms/draft store :gizmo))))
+    (is (= ".g{color:green}" (:css (forms/draft store :gizmo))))
+    (is (= 1 (forms/latest-published store :gizmo)))         ; NOT published
+    (is (= 1 (:version (forms/raw-form store :gizmo))))      ; working form unchanged
+    (is (nil? (forms/version-digest store :gizmo 2))))       ; v2 not archived
+  (testing "the editor loads the draft when one exists"
+    (is (= 2 (:version (forms/for-editing store :gizmo)))))
+  (testing "publish-draft! promotes the draft -> working form + new version, clears the draft"
+    (is (= 2 (:version (forms/publish-draft! store :gizmo))))
+    (is (not (forms/has-draft? store :gizmo)))
+    (is (= 2 (forms/latest-published store :gizmo)))
+    (is (= 2 (:version (forms/raw-form store :gizmo))))      ; working form is now v2
+    (is (some? (forms/version-digest store :gizmo 2))))
+  (testing "discard-draft! drops a draft, leaving the working form untouched"
+    (forms/save-draft! store (assoc draft-v2 :version 3))
+    (is (forms/has-draft? store :gizmo))
+    (forms/discard-draft! store :gizmo)
+    (is (not (forms/has-draft? store :gizmo)))
+    (is (= 2 (:version (forms/raw-form store :gizmo))))      ; still v2
+    (is (= 2 (forms/latest-published store :gizmo)))))
+
+(deftest map-backend-draft-contract
+  (run-draft-contract (forms/atom-store {:dir nil :forms {} :versions (versions/archive)})))
+
+(deftest sql-backend-draft-contract
+  (let [f "data/test-draft-store.db"]
+    (io/delete-file f true)
+    (run-draft-contract (ig/init-key :store/forms {:backend :sql :db-file f}))
+    (io/delete-file f true)))

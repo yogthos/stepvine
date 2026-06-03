@@ -43,7 +43,11 @@
   (-archived        [s id v] "The archived form for [id v] (no CSS), or nil.")
   (-latest-published [s id]  "Highest published (non-draft) version number, or nil.")
   (-archived-digest [s id v] "Content digest of [id v], or nil.")
-  (-publish!        [s form] "Archive form at its :version (sealing-checked). Returns {:id :version :digest}."))
+  (-publish!        [s form] "Archive form at its :version (sealing-checked). Returns {:id :version :digest}.")
+  ;; --- Draft authoring slot (§lqj): WIP edits, separate from working/published
+  (-draft           [s id]   "The draft form (EDN + :css) for id, or nil.")
+  (-store-draft!    [s form] "Upsert the draft form (EDN + CSS).")
+  (-discard-draft!  [s id]   "Drop the draft for id."))
 
 ;; --- Authoring (pure-ish helpers) -----------------------------------------
 
@@ -98,10 +102,13 @@
 
 ;; --- map/disk backend -----------------------------------------------------
 
-(defrecord MapFormStore [dir forms versions partials]
+(defrecord MapFormStore [dir forms versions partials drafts]
   FormStore
   (-form [_ id] (get @forms (keyword id)))
   (-form-ids [_] (keys @forms))
+  (-draft [_ id] (get @drafts (keyword id)))
+  (-store-draft! [_ form] (swap! drafts assoc (keyword (:id form)) form) (:id form))
+  (-discard-draft! [_ id] (swap! drafts dissoc (keyword id)) nil)
   (-store-form! [_ form]
     (let [id (:id form)]
       (when dir
@@ -118,11 +125,12 @@
 (defn atom-store
   "An in-memory/disk form store (the default backend). `forms` may be a map or an
    atom; `versions` an archive atom (or nil); `partials` a partials map (or nil)."
-  [{:keys [dir forms versions partials]}]
+  [{:keys [dir forms versions partials drafts]}]
   (->MapFormStore dir
                   (if (instance? clojure.lang.IAtom forms) forms (atom (or forms {})))
                   versions
-                  partials))
+                  partials
+                  (if (instance? clojure.lang.IAtom drafts) drafts (atom (or drafts {})))))
 
 ;; --- SQLite backend -------------------------------------------------------
 
@@ -133,7 +141,10 @@
       (form_id text not null, version integer not null, digest text not null,
        draft integer not null default 0, edn text not null, published_at integer,
        primary key (form_id, version))"
-   "create index if not exists idx_form_versions_form on form_versions(form_id)"])
+   "create index if not exists idx_form_versions_form on form_versions(form_id)"
+   ;; the single WIP draft per form (§lqj) — separate from the published working form
+   "create table if not exists form_drafts
+      (form_id text primary key, edn text not null, css text, updated_at integer)"])
 
 (defrecord SqlFormStore [ds partials]
   FormStore
@@ -143,6 +154,19 @@
         (:forms/css row) (assoc :css (:forms/css row)))))
   (-form-ids [_]
     (mapv (comp keyword :forms/id) (jdbc/execute! ds ["select id from forms"])))
+  (-draft [_ id]
+    (when-let [row (jdbc/execute-one! ds ["select edn, css from form_drafts where form_id=?" (name id)])]
+      (cond-> (edn/read-string (:form_drafts/edn row))
+        (:form_drafts/css row) (assoc :css (:form_drafts/css row)))))
+  (-store-draft! [_ form]
+    (jdbc/execute! ds ["insert into form_drafts(form_id,edn,css,updated_at) values(?,?,?,?)
+                        on conflict(form_id) do update set edn=excluded.edn, css=excluded.css,
+                        updated_at=excluded.updated_at"
+                       (name (:id form)) (pr-str (dissoc form :css)) (:css form)
+                       (System/currentTimeMillis)])
+    (:id form))
+  (-discard-draft! [_ id]
+    (jdbc/execute! ds ["delete from form_drafts where form_id=?" (name id)]) nil)
   (-store-form! [_ form]
     (jdbc/execute! ds ["insert into forms(id,edn,css,updated_at) values(?,?,?,?)
                         on conflict(id) do update set edn=excluded.edn, css=excluded.css,
@@ -215,6 +239,49 @@
   (-publish! store form)
   (:id form))
 
+;; --- Drafts authoring flow (§lqj) -----------------------------------------
+;; A form has at most one WIP *draft*, edited in the live editor and kept apart
+;; from the published working form. Authors iterate on the draft (no new version,
+;; new documents keep using the last published form) and Publish when ready.
+
+(defn draft
+  "The raw draft form (EDN + :css) for id, or nil when none is pending."
+  [store id]
+  (-draft store (keyword id)))
+
+(defn has-draft? [store id] (boolean (-draft store (keyword id))))
+
+(defn for-editing
+  "The form the editor should open: the pending draft if one exists, else the
+   published working form."
+  [store id]
+  (or (-draft store (keyword id)) (-form store (keyword id))))
+
+(defn save-draft!
+  "Save WIP edits as the form's draft — no publish, the working form and the
+   version new documents pin to are untouched."
+  [store form]
+  (-store-draft! store form)
+  (:id form))
+
+(defn discard-draft!
+  "Drop a pending draft; the published working form is unaffected."
+  [store id]
+  (-discard-draft! store (keyword id))
+  (keyword id))
+
+(defn publish-draft!
+  "Promote the pending draft to the working form AND publish its version, then
+   clear the draft. Returns `{:id :version :digest}`, or nil if there is no draft.
+   Throws (sealing guard) if the draft's `:version` collides with a sealed one —
+   the author must bump `:version` to publish a change."
+  [store id]
+  (when-let [form (-draft store (keyword id))]
+    (-store-form! store form)
+    (let [pub (-publish! store form)]
+      (-discard-draft! store (keyword id))
+      (or pub {:id (keyword id) :version (:version form 1)}))))
+
 ;; --- App CSS (app-owned styling, served live) -----------------------------
 
 (defn css
@@ -252,7 +319,7 @@
            (log/info "apps backed by SQLite at" (or db-file "data/apps.db"))
            store)
     (let [store (->MapFormStore dir (atom (load-dir dir))
-                                (versions/init-archive versions-file) partials)]
+                                (versions/init-archive versions-file) partials (atom {}))]
       (doseq [form (vals @(:forms store))] (-publish! store form))
       (log/info "loaded forms from" dir ":" (vec (-form-ids store)))
       store)))
