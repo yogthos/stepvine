@@ -22,9 +22,7 @@
    The cross-field validators reference another field `f` (a bare id, or
    `{:path-key f}`); that field's value is threaded in as an extra reaction arg.
    The generated reaction `:fn`s are quoted forms using only clojure.core, so they
-   evaluate under the same sci sandbox as authored fns — never `clojure.core/eval`."
-  (:require
-   [clojure.string :as str]))
+   evaluate under the same sci sandbox as authored fns — never `clojure.core/eval`.")
 
 (defn- ref-field
   "The field id a cross-field validator references: a bare keyword, or

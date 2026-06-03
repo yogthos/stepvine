@@ -108,11 +108,6 @@
   [{:keys [related-fn parents-fn]} id]
   (loop [locks #{}
          related #{id}]
-    ;; (println "GET DERIVED LOCK IDS")
-    ;; (println "RELATED")
-    ;; (println related)
-    ;; (println "LOCKS")
-    ;; (println locks)
     (if (empty? (difference related locks))
       locks
       (recur (union related locks)

@@ -1,9 +1,7 @@
 (ns yogthos.stepvine.editor.impl
   (:require [sci.core :as sci]
-            [yogthos.stepvine.editor.locks   :as locks]
-            [yogthos.stepvine.editor.data    :as data]
-            [yogthos.stepvine.editor.actions :as actions]
-            [clojure.pprint]))
+            [yogthos.stepvine.editor.locks :as locks]
+            [yogthos.stepvine.editor.data  :as data]))
 
 (defn eval-form [form-raw]
   (sci/eval-string (pr-str form-raw)
@@ -33,12 +31,8 @@
      :parents-fn (data/get-parents-fn ctx)
      :field-opts-fn (data/get-field-opts-fn ctx) ;; TODO: deprecate in favour of field-opts
      :field-opts (data/get-field-opts-map ctx)
-     :connections     #{}
-     ::actions/pending {}
-     ;; NOTE: We are directly pulling the action map from the parsed form.
-     ;;       write a helper if more sophisticated parsing/interpreting is required.
-     ::actions/rules   (:actions form)
-     ::locks/locks     {}}))
+     :connections  #{}
+     ::locks/locks {}}))
 
 
 (defn value [session id]
@@ -61,13 +55,3 @@
 
 (defn apply-changes [session changes]
   (data/transact-ctx session changes))
-
-(defn apply-changes! [session changes]
-  (let [result (data/transact-ctx session changes)
-        {:keys [status] :as report} (data/get-tx-report (::data/ctx result))]
-    (if (= status :complete)
-      result
-      (throw (ex-info "Error transacting changes!"
-                      {:error-id ::transaction-error
-                       :changes changes
-                       :report report})))))

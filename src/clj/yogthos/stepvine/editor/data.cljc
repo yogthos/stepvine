@@ -316,9 +316,6 @@
 (defn get-field-opts-map [ctx]
   (field-opts* ctx))
 
-(defn get-fields [session]
-  (keys (field-opts* (::ctx session))))
-
 ;; ---- collection render data --------------------------------------------------
 
 (defn collections-data

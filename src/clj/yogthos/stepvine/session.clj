@@ -71,10 +71,6 @@
   [manager id]
   (impl/emitted-effects (current manager id)))
 
-(defn snapshot-of
-  [manager id]
-  (snapshot (current manager id)))
-
 ;; --- Applying changes -----------------------------------------------------
 
 (defn apply-change!
