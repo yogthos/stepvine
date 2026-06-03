@@ -82,6 +82,25 @@
           where   (if (seq clauses) (str " where " (str/join " and " clauses)) "")]
       (mapv row->doc (jdbc/execute! ds (into [(str "select doc from documents" where)] args))))))
 
+;; --- Document shape: the `:meta` schema (ARCHITECTURE.md invariant #2) ------
+;; A document is {:id :form-id :form-version :form-digest :owner :shared :status
+;;                :db <domino db> :rev <int> :created-at :meta {…}}.
+;; `:rev` is the optimistic-concurrency token — TOP-LEVEL, not in :meta — bumped by
+;; `save-db!` on every DATA save (invariant #3). `:meta` collects system fields a
+;; client can never write directly; there is NO validation (`update-meta!` trusts
+;; its caller), so this is the authoritative key list — writer → reader:
+;;
+;;   :created-at/:created-by/:modified-at/:modified-by  create! / lifecycle  → audit, UI
+;;   :submitted-views #{view}     submit!/revise!         → submitted-for?, the submit guard
+;;   :approvals [{:view :by :at}] submit!                 → approval log view
+;;   :reports   [{:snapshot|:pdf}]effects/append-report!  → the /report routes
+;;   :effects   [{:key :status}]  effects/record-effect!  → saga idempotency (logged-ok?)
+;;   :workflow  {:state :history} set-workflow-state!     → workflow-state, $state, view gating
+;;   :assignee/:assignments       assign!                 → work queues
+;;   :pre-rebase {:version :db}   save-migration!         → audited form-version rebase
+;;   :deleted?                    (reserved)              → soft-delete
+;;   <any path>                   directives :set-meta    → a workflow step (unconstrained)
+
 ;; --- Public API (backend-agnostic) ----------------------------------------
 
 (defn get-document [store id] (-fetch store id))

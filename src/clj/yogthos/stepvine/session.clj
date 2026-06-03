@@ -163,9 +163,18 @@
 
 ;; --- Table view-state (presentation only; per document, shared by viewers) ---
 ;; Sort/page/row-order/filter are not document data — domino has no concept of
-;; them — so they live in the session map under :view-state {coll-id {...}} and
-;; survive transacts (apply only touches ::ctx). Updated directly on the session
-;; atom (no domino transact); the route handler re-renders + broadcasts.
+;; them — so they live in the session map under :view-state and survive transacts
+;; (apply only touches ::ctx). Updated directly on the session atom (no domino
+;; transact); the route handler re-renders + broadcasts. The table widget READS
+;; this shape from the render ctx (`render/collections-data`). Shape (invariant #4):
+;;
+;;   :view-state {coll-id {:sort   {:col <kw> :dir :asc|:desc}   ; nil = unsorted
+;;                         :filter {:col <kw> :value <str>}      ; absent = all rows
+;;                         :page   <int>                         ; 0-based
+;;                         :order  [idx …]                       ; row drag order
+;;                         :cols   {:order  [path …]             ; column reorder
+;;                                  :hidden #{path …}            ; removed columns
+;;                                  :labels {path <str>}}}}      ; relabeled headers
 
 (defn- update-view!
   [manager doc-id coll-id f]
