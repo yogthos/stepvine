@@ -25,6 +25,13 @@
   primitive (`clear-items!` still uses it); `view-state` depends on `session`
   one-way. Callers (`cells/form.clj`, `collections_test`) repointed `session/` →
   `view-state/`. Verified: 217 tests + clean-data storyboard (steps 1–30).
+- ✅ Phase 2 (cont.) — landing + index-lookup hiccup views extracted from
+  `cells/document.clj` → **`web/landing.clj`** (`landing-html`/`index-page-html`
+  + private `create-control`/`doc-row`/`landing-styles`). The cell is now
+  parse→orchestrate→view, matching `cells/form.clj`; it dropped its
+  `clojure.string`/`web.security` requires. (Placed flat under `web/` per the
+  existing convention, not a new `views/` subdir.) Verified: 217 tests +
+  storyboard (landing, index lookup, admin all render).
 
 **Deferred** (documented here; not done — judged high-churn or tangled for a late
 single-session pass; safe to pick up incrementally next):
