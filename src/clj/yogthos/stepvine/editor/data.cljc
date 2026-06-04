@@ -364,13 +364,26 @@
 
 (defn get-related-fn
   "Returns `(fn [id] -> #{related-ids})`: the id plus everything up- and
-   downstream of it in the events graph (the set that must be co-locked)."
+   downstream of it in the events graph (the set that must be co-locked, so a
+   second user can't race the inputs/outputs of a shared computation — e.g.
+   editing `:kg` co-locks `:m` and the `:bmi` they both feed).
+
+   The events graph is keyed by model *paths* (`[:patient :weight]`), not field
+   ids, so an id is mapped to its path before the walk and the reachable paths are
+   mapped back to lock ids: a top-level field to its keyword id, a collection-item
+   field path (`[coll idx field]`) to the path itself (which IS its lock id, so
+   the cascade stays scoped to one item)."
   [ctx]
-  (let [graph (::d/graph ctx)]
+  (let [graph (::d/graph ctx)
+        {:keys [path->id id->opts]} (model-of ctx)
+        coll-segs (into #{} (keep (fn [[id opts]] (when (:collection? opts) id)) id->opts))
+        ->lock-id (fn [p] (if (and (vector? p) (coll-segs (first p))) p (or (path->id p) p)))]
     (fn [id]
-      (union #{id}
-             (graph-reachable graph id :input)
-             (graph-reachable graph id :output)))))
+      (let [path (id->path ctx id)]
+        (into #{id}
+              (map ->lock-id)
+              (union (graph-reachable graph path :input)
+                     (graph-reachable graph path :output)))))))
 
 (defn get-parents-fn
   "Returns `(fn [id] -> #{ancestor-ids})` — the lock-parents of an id.
