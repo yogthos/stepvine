@@ -174,11 +174,17 @@
 ;; ==============================================================================
 
 (defn apply-lock!
-  "Attempts to lock a id as user (user). Throws an error if there is a conflict."
+  "Attempts to lock a id as user (user). Throws an error if there is a conflict.
+
+   Owner-aware: a lock already held by `user` is not a conflict — re-locking a
+   field you hold, or one that was co-locked into your related set, is allowed (so
+   re-focusing a related field before blur releases it doesn't spuriously fail).
+   Only a lock held by a *different* user conflicts."
   [user {:keys [related-fn parents-fn] :as session} id]
   (let [ids-to-lock (get-derived-lock-ids session id)]
     (if-some [[failed-id conflicting-lock]
-              (some (fn [p] (when-some [conflict (first (conflicting-locks session p))]
+              (some (fn [p] (when-some [conflict (first (remove (partial owns-lock? user)
+                                                                (conflicting-locks session p)))]
                               [p conflict]))
                     ids-to-lock)]
       (throw (ex-info (str "Cannot lock " id " due to conflicting lock for related id: " failed-id)

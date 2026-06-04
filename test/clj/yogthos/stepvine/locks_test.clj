@@ -84,3 +84,24 @@
       (testing "a different item is unaffected"
         (is (= :ok (session/apply-item-field-as! mgr "roster" "userB" :members "a2" :first "Augusta")))
         (is (= "Augusta" (session/value mgr "roster" [:members "a2" :first])))))))
+
+(deftest re-locking-your-own-field-is-not-a-conflict
+  ;; A field the user already holds — directly, or because it was co-locked into
+  ;; their related set — must be re-lockable by that same user (focus may re-fire
+  ;; before blur releases, e.g. tabbing between two related fields). Only a *different*
+  ;; user's lock is a conflict.
+  (let [form (forms/load-form "bmi")
+        h    (atom {})
+        mgr  (ig/init-key :session/manager {:documents (atom {}) :hub h})]
+    (session/ensure-document! mgr "bmi" form {})
+    (is (= :ok (session/lock-field! mgr h "bmi" "userA" :kg))) ; co-locks :kg :m :bmi
+    (testing "re-locking the same field is allowed"
+      (is (= :ok (session/lock-field! mgr h "bmi" "userA" :kg))))
+    (testing "locking a field already co-locked into your own set is allowed"
+      (is (= :ok (session/lock-field! mgr h "bmi" "userA" :m)))
+      (is (= :ok (session/lock-field! mgr h "bmi" "userA" :bmi))))
+    (testing "a different user is still blocked by the held lock"
+      (is (= :conflict (session/lock-field! mgr h "bmi" "userB" :m))))
+    (testing "the original holder can still save after the re-locks"
+      (is (= :ok (session/apply-field-as! mgr "bmi" "userA" :kg 80)))
+      (is (= 80 (session/value mgr "bmi" :kg))))))
