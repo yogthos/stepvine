@@ -1,0 +1,158 @@
+;; Project status report — a richer end-to-end document type used by the
+;; document-flow storyboard. It exercises the full lifecycle a real form needs:
+;;
+;;   • a decent spread of input widgets (text, dropdown, date, radio, slider,
+;;     textarea, checkbox, number inputs);
+;;   • a cascading derived field (:total = sum of the four quarterly budgets);
+;;   • an editable MILESTONES table (collection) in the edit view;
+;;   • a read-only PREVIEW view with a budget CHART;
+;;   • a printable summary :report (the "generate PDF" affordance — print to PDF);
+;;   • submit / revise (finalize → read-only → reopen).
+;;
+;; No :roles — any authenticated user may create one.
+{:id      :project-report
+ :title   "Project Report"
+ :version 1
+
+ :data
+ {:model
+  [[:project    {:id :project    :type :string}]
+   [:lead       {:id :lead       :type :string}]
+   [:department {:id :department :type :string}]
+   [:start-date {:id :start-date :type :string}]
+   [:status     {:id :status     :type :string}]
+   [:priority   {:id :priority   :type :number}]
+   [:summary    {:id :summary    :type :string}]
+   [:on-track   {:id :on-track   :type :boolean}]
+   ;; quarterly budget ($k) — the chart and :total derive from these four
+   [:q1    {:id :q1    :type :number}]
+   [:q2    {:id :q2    :type :number}]
+   [:q3    {:id :q3    :type :number}]
+   [:q4    {:id :q4    :type :number}]
+   [:total {:id :total :type :number}]
+   ;; editable milestones, rendered as a table in the edit view
+   [:tasks
+    {:id :tasks :collection? true :index-id :tid
+     :schema {:model [[:tid    {:id :tid}]
+                      [:name   {:id :name   :type :string}]
+                      [:owner  {:id :owner  :type :string}]
+                      [:effort {:id :effort :type :number}]]}}]]
+
+  :events
+  [{:id      :calc-total
+    :inputs  [:q1 :q2 :q3 :q4]
+    :outputs [:total]
+    :handler (fn [{{:keys [q1 q2 q3 q4]} :inputs}]
+               {:total (+ (or q1 0) (or q2 0) (or q3 0) (or q4 0))})}]
+
+  :reactions
+  ;; chart_data: the four quarterly figures as a JSON array — the :chart widget
+  ;; (id :chart) reads the `:chart-data` reaction as its <id>-data series and
+  ;; redraws live as the inputs change.
+  [{:id :chart-data :args [:q1 :q2 :q3 :q4]
+    :fn (fn [a b c d] (str "[" (or a 0) "," (or b 0) "," (or c 0) "," (or d 0) "]"))}
+   {:id :status-label :args [:status]
+    :fn (fn [s] (case s "planning" "Planning" "active" "Active"
+                        "blocked" "Blocked" "complete" "Complete" "—"))}
+   {:id :department-label :args [:department]
+    :fn (fn [d] (case d "engineering" "Engineering" "design" "Design"
+                        "marketing" "Marketing" "operations" "Operations" "—"))}]}
+
+ ;; Printable summary — an in-browser report (value substitution + markdown) with
+ ;; a Print button (print to PDF). Linked from the preview view.
+ :reports
+ {:summary
+  {:title "Project Report"
+   :body  [:div
+           [:h1 [:val :project]]
+           [:p [:strong "Lead: "] [:val :lead]
+            " · " [:strong "Department: "] [:val :department-label]
+            " · " [:strong "Status: "] [:val :status-label]
+            " · " [:strong "Priority: "] [:val :priority]]
+           [:markdown "### Executive summary"]
+           [:p [:val :summary]]
+           [:h3 "Quarterly budget ($k)"]
+           [:table
+            [:tr [:th "Q1"] [:th "Q2"] [:th "Q3"] [:th "Q4"] [:th "Total"]]
+            [:tr [:td [:val :q1]] [:td [:val :q2]] [:td [:val :q3]] [:td [:val :q4]]
+             [:td [:strong [:val :total]]]]]]}}
+
+ :views
+ {;; ---- edit view -------------------------------------------------------
+  :default
+  {:title "Project Report"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Project Report"]
+    [:p.sv-desc "Fill in the project details and milestones, preview the chart, then submit. "
+     "Everything is saved on the server as you type."]
+
+    [:c/input-field {:id :project :label "Project name"}]
+    [:c/input-field {:id :lead :label "Project lead"}]
+    [:c/dropdown {:id :department :label "Department"
+                  :options [["Engineering" "engineering"] ["Design" "design"]
+                            ["Marketing" "marketing"] ["Operations" "operations"]]}]
+    [:c/date-picker {:id :start-date :label "Start date"}]
+    [:c/radio {:id :status :label "Status" :stacked true
+               :options [["Planning" "planning"] ["Active" "active"]
+                         ["Blocked" "blocked"] ["Complete" "complete"]]}]
+    [:c/slider {:id :priority :label "Priority (1–5)" :min 1 :max 5 :step 1}]
+    [:c/textarea {:id :summary :label "Executive summary" :rows 3 :placeholder "Brief status…"}]
+    [:c/checkbox {:id :on-track :label "On track?"}]
+
+    [:c/line {:orientation :horizontal}]
+    [:h2 "Quarterly budget ($k)"]
+    [:c/h-box {:gap :sm}
+     [:c/input-field {:id :q1 :label "Q1"}]
+     [:c/input-field {:id :q2 :label "Q2"}]
+     [:c/input-field {:id :q3 :label "Q3"}]
+     [:c/input-field {:id :q4 :label "Q4"}]]
+    [:c/labeled-value {:id :total :label "Total budget ($k)" :default "0"}]
+
+    [:c/line {:orientation :horizontal}]
+    [:h2 "Milestones"]
+    [:c/table {:id :tasks
+               :columns [{:path :name :label "Milestone" :sortable? true
+                          :widget :stepvine.components/input-field}
+                         {:path :owner :label "Owner"
+                          :widget :stepvine.components/input-field}
+                         {:path :effort :label "Effort" :sortable? true
+                          :widget :stepvine.components/input-field}]
+               :can-add-rows? true :can-delete-rows? true :can-move-rows? true
+               :striped? true}]
+
+    [:c/line {:orientation :horizontal}]
+    [:c/h-box {:gap :sm :align :center}
+     [:c/submit {:view :default :label "Submit report"}]
+     [:c/revise {:view :default :label "Reopen for editing"}]
+     [:c/hyperlink {:href "?view=preview" :label "Preview & report →"}]]
+    [:p.presence "Editors online: " [:span {:data-text "$presence"}]]]}
+
+  ;; ---- preview view (read-only summary + chart) ------------------------
+  :preview
+  {:title "Project Report — Preview"
+   :opts  {:widget-namespaces {"c" "stepvine.components"}}
+   :markup
+   [:c/form {}
+    [:h1 "Project Report — Preview"]
+    [:p [:c/hyperlink {:href "?view=default" :label "← Back to edit"}]]
+
+    [:dl.sv-summary
+     [:dt "Project"]            [:dd [:c/value {:id :project}]]
+     [:dt "Lead"]               [:dd [:c/value {:id :lead}]]
+     [:dt "Department"]         [:dd [:c/value {:rxn :department-label}]]
+     [:dt "Status"]             [:dd [:c/value {:rxn :status-label}]]
+     [:dt "Priority"]           [:dd [:c/value {:id :priority}]]
+     [:dt "Total budget ($k)"]  [:dd [:c/value {:id :total}]]]
+
+    [:h2 "Quarterly budget"]
+    [:c/chart {:id :chart :chart-type :column
+               :x-axis-title "Quarter" :y-axis-title "Budget ($k)"}]
+
+    [:p [:c/hyperlink {:doc-path "reports/summary" :label "Generate PDF report →"
+                       :target "_blank"}]]
+
+    [:c/h-box {:gap :sm :align :center}
+     [:c/submit {:view :default :label "Submit report"}]
+     [:c/revise {:view :default :label "Reopen for editing"}]]]}}}

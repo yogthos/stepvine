@@ -68,6 +68,10 @@
        :html
        (str "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
             "<link rel=\"stylesheet\" href=\"/css/stepvine.css\">"
+            ;; widget client behaviour the rendered markup may call into (the table
+            ;; widget emits `svRowDnd()` etc.). Datastar-independent, so it's safe
+            ;; in the static preview and avoids an undefined-fn console error.
+            "<script src=\"/vendor/table.js\"></script>"
             ;; the preview is static HTML with no datastar running, so elements
             ;; datastar would hide until a signal goes truthy (the transient notice
             ;; bar, the submitted/read-only banner) would otherwise show. Hide that
