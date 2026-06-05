@@ -94,11 +94,25 @@ body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #
 
 /* ── Fields ───────────────────────────────────────────────────────────── */
 .field { display: flex; align-items: center; gap: .75rem; margin: .5rem 0; }
-.field label { flex: 0 0 8rem; text-align: right; color: #374151; }
+/* the field's OWN label is the 8rem left column — scope to a DIRECT child so it
+   never matches labels nested inside a widget (radio options, checkbox rows),
+   which would otherwise be stretched to an 8rem flex-basis. */
+.field > label { flex: 0 0 8rem; text-align: right; color: #374151; }
 .field input { flex: 1; padding: .35rem .5rem; border: 1px solid #d1d5db; border-radius: .375rem; }
 .field input[readonly] { background: #f3f4f6; color: #6b7280; }
 .field select { flex: 1; padding: .35rem .5rem; border: 1px solid #d1d5db; border-radius: .375rem; background: #fff; }
 .field textarea { flex: 1; padding: .35rem .5rem; border: 1px solid #d1d5db; border-radius: .375rem; min-height: 5rem; resize: vertical; }
+/* multi-option / multi-line widgets: top-align the label with the first row
+   instead of vertically centering it against a tall control group. */
+.widget.radio.field, .widget.selection-list.field, .widget.multi-select.field,
+.widget.tree-select.field, .widget.checkbox-group.field { align-items: flex-start; }
+.widget.radio.field > label, .widget.selection-list.field > label,
+.widget.multi-select.field > label, .widget.tree-select.field > label { padding-top: .3rem; }
+/* a checkbox is a left-aligned toggle: the box sits beside its label, not pushed
+   into the 8rem right-aligned label column meant for "label | input" rows. */
+.widget.checkbox.field { justify-content: flex-start; gap: .5rem; }
+.widget.checkbox.field input[type="checkbox"] { flex: 0 0 auto; width: auto; }
+.widget.checkbox.field > label { flex: 0 0 auto; text-align: left; color: inherit; }
 
 /* ── Date picker quick-set helpers + caption (parity §a3t) ────────────── */
 .date-picker { flex-wrap: wrap; }
@@ -220,7 +234,9 @@ body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #
 .hyperlink.disabled { color: #9ca3af; cursor: not-allowed; pointer-events: none; }
 
 /* ── Layout boxes (h-box / v-box) ─────────────────────────────────────── */
-.h-box { display: flex; flex-direction: row; }
+/* a row of widgets wraps rather than overflowing the page when it can't fit */
+.h-box { display: flex; flex-direction: row; flex-wrap: wrap; }
+.h-box > * { min-width: 0; }
 .v-box { display: flex; flex-direction: column; }
 .gap-sm { gap: .5rem; } .gap-md { gap: 1rem; } .gap-lg { gap: 1.5rem; }
 .align-start { align-items: flex-start; } .align-center { align-items: center; }

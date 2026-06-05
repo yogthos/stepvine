@@ -23,7 +23,17 @@
       (is (= "@post('/doc/d1/field/kg/unlock')" (get a "data-on:blur")))
       (is (= "!!$locks.kg && $locks.kg != $uid" (get a "data-attr:disabled"))))
     (testing "plus the edit POST under the given event key"
-      (is (= "@post('/doc/d1/field/kg')" (get a "data-on:input__debounce.300ms"))))))
+      (is (= "@post('/doc/d1/field/kg')" (get a "data-on:input__debounce.300ms"))))
+    (testing "a debounced text input ALSO flushes on change (blur) so navigating
+              away before the debounce fires doesn't drop the value"
+      (is (= "@post('/doc/d1/field/kg')" (get a "data-on:change"))))))
+
+(deftest non-input-edit-event-has-no-extra-change-flush
+  ;; widgets whose edit event is already :change (dropdown/checkbox) don't get a
+  ;; duplicate change handler.
+  (let [a (bind/edit-bind-attrs ctx :pick "pick" "data-on:change")]
+    (is (= "@post('/doc/d1/field/pick')" (get a "data-on:change")))
+    (is (= #{"data-on:focus" "data-on:blur" "data-attr:disabled" "data-on:change"} (set (keys a))))))
 
 (deftest edit-event-key-is-configurable
   (is (contains? (bind/edit-bind-attrs ctx :pick "pick" "data-on:change")

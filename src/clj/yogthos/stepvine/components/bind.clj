@@ -9,6 +9,7 @@
    their edit event (`data-on:input__debounce.300ms`, `data-on:change`, …) and
    sometimes supply a custom edit handler (then they use `lock-attrs` directly)."
   (:require
+   [clojure.string :as str]
    [yogthos.stepvine.endpoints :as endpoints]))
 
 (defn lock-attrs
@@ -23,7 +24,13 @@
 (defn edit-bind-attrs
   "`lock-attrs` plus the edit POST on `edit-event` — the common case where a field
    change simply posts its new value. `edit-event` is the Datastar event-attr key,
-   e.g. \"data-on:input__debounce.300ms\" or \"data-on:change\"."
+   e.g. \"data-on:input__debounce.300ms\" or \"data-on:change\".
+
+   A debounced text input *also* posts on `change` (which fires when focus leaves
+   after an edit), so moving focus or navigating away before the debounce window
+   elapses still flushes the value — otherwise the last edit is silently dropped."
   [ctx id sig edit-event]
-  (assoc (lock-attrs ctx id sig)
-         edit-event (str "@post('" (endpoints/field-post-url ctx id) "')")))
+  (let [post (str "@post('" (endpoints/field-post-url ctx id) "')")]
+    (cond-> (assoc (lock-attrs ctx id sig) edit-event post)
+      (str/starts-with? (str edit-event) "data-on:input")
+      (assoc "data-on:change" post))))

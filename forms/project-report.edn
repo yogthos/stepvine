@@ -103,11 +103,10 @@
 
     [:c/line {:orientation :horizontal}]
     [:h2 "Quarterly budget ($k)"]
-    [:c/h-box {:gap :sm}
-     [:c/input-field {:id :q1 :label "Q1"}]
-     [:c/input-field {:id :q2 :label "Q2"}]
-     [:c/input-field {:id :q3 :label "Q3"}]
-     [:c/input-field {:id :q4 :label "Q4"}]]
+    [:c/input-field {:id :q1 :label "Q1"}]
+    [:c/input-field {:id :q2 :label "Q2"}]
+    [:c/input-field {:id :q3 :label "Q3"}]
+    [:c/input-field {:id :q4 :label "Q4"}]
     [:c/labeled-value {:id :total :label "Total budget ($k)" :default "0"}]
 
     [:c/line {:orientation :horizontal}]
