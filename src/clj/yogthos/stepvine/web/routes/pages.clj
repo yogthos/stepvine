@@ -167,6 +167,7 @@
 (defmethod ig/init-key :reitit.routes/pages
   [_ opts]
   (fn []
-    ;; page-routes itself splits public (login/register/oauth) from a protected
-    ;; group whose wrap-auth requires a valid session.
-    (page-routes opts)))
+    ;; a single route node (empty path, no group-level middleware): page-routes
+    ;; splits public (login/register/oauth) from a protected sub-group whose
+    ;; wrap-auth requires a valid session.
+    ["" {} (page-routes opts)]))
