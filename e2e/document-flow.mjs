@@ -182,7 +182,14 @@ try {
   watch(report, 'report');
   await report.goto(BASE + reportHref);
   (await report.locator('h1:has-text("Apollo Migration")').count()) > 0 ? ok('report renders the project title') : bad('report missing project title');
+  // the report must carry the data filled in the form, not just the title
+  const rtext = await report.locator('body').innerText();
+  rtext.includes('Ada Lovelace') ? ok('report shows the lead (Ada Lovelace)') : bad('report missing the lead value');
+  rtext.includes('Engineering') ? ok('report shows the department label (Engineering)') : bad('report missing the department');
+  rtext.includes('Active') ? ok('report shows the status label (Active)') : bad('report missing the status');
   (await report.locator('table:has-text("Total")').count()) > 0 ? ok('report includes the quarterly budget table') : bad('report budget table missing');
+  (await report.locator('td:has-text("10")').count()) > 0 && (await report.locator('td:has-text("100")').count()) > 0
+    ? ok('report budget table shows the quarterly figures + total (10…100)') : bad('report budget table is empty (no figures)');
   (await report.locator('.sv-report-print, button:has-text("Print")').count()) > 0 ? ok('report offers a Print (→ PDF) button') : bad('no Print button on report');
   const pdf = await report.pdf();   // headless print-to-PDF — the actual artifact
   (pdf.subarray(0, 4).toString('latin1') === '%PDF' && pdf.length > 1000)
