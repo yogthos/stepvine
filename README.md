@@ -69,16 +69,28 @@ Or build a container image (multi-stage build, JDK 17):
 docker build -t stepvine . && docker run -p 3000:3000 stepvine
 ```
 
-### End-to-end storyboard
+### End-to-end storyboards
 
-A headless-browser walkthrough of every major feature (auth, live computation,
-collections, the editor, multi-page navigation, …):
+Headless-browser walkthroughs of the major features:
+
+- `storyboard.mjs` — every feature (auth, live computation, collections, the
+  editor, multi-page navigation, workflows, …)
+- `document-flow.mjs` — the full document lifecycle on a richer form (create →
+  edit → preview chart → generate PDF → submit → list → revise → resubmit)
+- `access.mjs` — the admin per-role view-access picker and its enforcement
 
 ```bash
-cd e2e && npm install && npx playwright install chromium
-# with a dev server running on :3000, from the repo root:
-node e2e/storyboard.mjs
+cd e2e && npm install && npx playwright install chromium   # one-time
+
+make e2e          # boots a fresh dev server, runs all storyboards, restores data/
+                  #   (bb e2e  |  bash e2e/run.sh)
+make e2e ARGS="document-flow access"   # a subset (bb e2e document-flow access)
 ```
+
+`make e2e` is self-contained — it starts `clj -M:dev` on a freshly-seeded store
+(so the demo forms reseed from `forms/`), runs the storyboards against it, then
+tears the server down and restores your pre-run `data/` (even on failure). To run
+a single storyboard by hand instead, start a dev server and `node e2e/storyboard.mjs`.
 
 ## Configuration
 

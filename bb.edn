@@ -17,6 +17,9 @@
          test      {:doc  "runs tests"
                     :task (clojure {:dir "."} "-M:test")}
 
+         e2e       {:doc  "runs the browser storyboards (boots a fresh dev server, restores data/ after). Pass names for a subset, e.g. `bb e2e document-flow access`."
+                    :task (apply shell "bash" "e2e/run.sh" *command-line-args*)}
+
          uberjar   {:doc  "builds the uberjar"
                     :task (clojure {:dir "."} "-T:build all")}
 
