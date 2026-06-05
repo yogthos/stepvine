@@ -49,3 +49,30 @@
     (access/set-form-roles! store :ticket [:nurse :reviewer])
     (testing "the union of assigned roles + :admin, for the admin UI's role picker"
       (is (= #{:admin :clerk :nurse :reviewer} (access/known-roles store))))))
+
+(deftest per-role-view-access
+  (let [store (access/store)]
+    (access/set-form-access! store :report {:reviewer #{:default :preview}
+                                            :approver #{:preview}})
+    (testing "form-level access still derives from the role keys"
+      (is (= #{:reviewer :approver} (access/form-roles store :report)))
+      (is (access/can-access? store {:roles #{:reviewer}} :report))
+      (is (not (access/can-access? store {:roles #{:other}} :report))))
+    (testing "a role sees only the views mapped to it"
+      (is (access/view-permitted? store {:roles #{:reviewer}} :report :default))
+      (is (access/view-permitted? store {:roles #{:reviewer}} :report :preview))
+      (is (not (access/view-permitted? store {:roles #{:approver}} :report :default)))
+      (is (access/view-permitted? store {:roles #{:approver}} :report :preview)))
+    (testing "admin sees every view; an unmapped user sees none"
+      (is (access/view-permitted? store admin :report :default))
+      (is (not (access/view-permitted? store nobody :report :preview))))
+    (testing "a role with NO views listed (#{}) sees all views (form-level grant)"
+      (access/set-form-access! store :report {:lead #{}})
+      (is (access/view-permitted? store {:roles #{:lead}} :report :default))
+      (is (access/view-permitted? store {:roles #{:lead}} :report :preview)))
+    (testing "an open form (no access map) permits every view"
+      (is (access/view-permitted? store nobody :open-form :anything)))
+    (testing "legacy set-form-roles! grants a role all views"
+      (access/set-form-roles! store :legacy [:clerk])
+      (is (access/view-permitted? store clerk :legacy :default))
+      (is (access/view-permitted? store clerk :legacy :preview)))))

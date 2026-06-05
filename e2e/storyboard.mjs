@@ -310,13 +310,13 @@ try {
 
   // ---- 13. Admin UI — role-based form access ---------------------------
   step('13. Admin UI — role-based form access');
-  // admin restricts the ticket form to the :reviewer role
+  // admin restricts the ticket form to the :reviewer role (per-role view picker)
   await page.goto(BASE + '/admin/forms');
   ok('admin can open the admin UI');
-  const fRow = page.locator('tr', { hasText: 'Support Ticket' });
-  await fRow.locator('input[name=roles]').fill('reviewer');
-  await fRow.locator('button:has-text("Save")').click();
-  await page.waitForTimeout(400);
+  const fSec = page.locator('section.app-access', { hasText: 'Support Ticket' });
+  await fSec.locator('input[name=new-role]').fill('reviewer');
+  await Promise.all([page.waitForNavigation(), fSec.locator('button:has-text("Save access")').click()]);
+  await page.waitForTimeout(200);
   // a fresh non-admin user registers (no roles)
   const rctx = await browser.newContext();
   const rpage = await rctx.newPage();
@@ -521,9 +521,10 @@ try {
     ? ok('the navbar exposes a Queues link') : bad('no Queues link in the navbar');
   // restricting a workflowed form to a role turns it into a team form with a queue
   await page.goto(BASE + '/admin/forms');
-  await page.locator('tr:has-text("Support Ticket") input[name=roles]').fill('support');
-  await page.locator('tr:has-text("Support Ticket") button:has-text("Save")').click();
-  await page.waitForTimeout(300);
+  const tSec = page.locator('section.app-access', { hasText: 'Support Ticket' });
+  await tSec.locator('input[name=new-role]').fill('support');
+  await Promise.all([page.waitForNavigation(), tSec.locator('button:has-text("Save access")').click()]);
+  await page.waitForTimeout(200);
   // the queue index lists the workflowed form
   await page.goto(BASE + '/queue');
   (await page.locator('a:has-text("Support Ticket")').count()) > 0

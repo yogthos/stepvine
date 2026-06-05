@@ -106,7 +106,7 @@
       ["/forms"              (af {:get  (admin/forms-page forms access users)})]
       ["/forms/new"          (af {:post (editor/create-form forms)})]
       ["/forms/preview"      (ds {:post (editor/preview-handler forms options-store)})]
-      ["/forms/:id/roles"    (af {:post (admin/set-form-roles access)})]
+      ["/forms/:id/roles"    (af {:post (admin/set-form-access access)})]
       ["/forms/:id/edit"     (af {:get  (editor/edit-page forms access users)})]
       ["/forms/:id/save"     (ds {:post (editor/save forms)})]
       ["/forms/:id/publish"  (ds {:post (editor/publish forms)})]   ; promote draft -> version

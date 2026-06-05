@@ -146,15 +146,21 @@
    first page of a multi-page form (or :default). Returns
    `{:vid :html :form-raw :pages :doc}` or nil when the document doesn't exist.
    Shared by the full-page render and the in-place page switch."
-  [{:keys [session-manager options-store documents users] :as resources} doc-id view-id user-id]
+  [{:keys [session-manager options-store documents users access] :as resources} doc-id view-id user-id]
   (when-let [{:keys [form-raw]} (docs/ensure! resources doc-id)]
     (let [sess     (session/current session-manager doc-id)
           user     (users/get-user users user-id)
           views    (get-in sess [:form :views])
           doc      (documents/get-document documents doc-id)
+          form-id  (:form-id doc)
           wstate   (when-let [wf (:workflow form-raw)] (documents/workflow-state doc (:initial wf)))
-          ;; per-view gate (§parity): a view's :roles restrict who may see it
-          view-ok? (fn [v] (access/role-permitted? user (get-in views [(keyword v) :roles])))
+          ;; per-view gate: when the admin has set a per-role view map for this form
+          ;; (access store), it is the source of truth for which views a user may
+          ;; see; otherwise fall back to the view's declared :roles in the EDN.
+          view-ok? (fn [v]
+                     (if (seq (access/form-access access form-id))
+                       (access/view-permitted? access user form-id v)
+                       (access/role-permitted? user (get-in views [(keyword v) :roles]))))
           ;; only the pages this user may access appear in the nav
           pages    (filterv #(view-ok? (:view %)) (:pages form-raw))
           vid  (let [v (keyword view-id)
@@ -193,7 +199,7 @@
        :theme    (render/theme-href sess vid)})))
 
 (myc/defcell :doc/render
-  {:requires [:forms :documents :session-manager :options-store :users]
+  {:requires [:forms :documents :session-manager :options-store :users :access]
    :input    {:doc-id :any :view-id :any :user-id :any}
    :output   {:html :string}
    :doc      "Ensure the document's session and render the requested view, inside

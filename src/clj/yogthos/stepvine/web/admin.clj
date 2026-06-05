@@ -19,7 +19,11 @@
   (str "table{border-collapse:collapse;width:100%} td,th{border:1px solid #e5e7eb;padding:.4rem .5rem;text-align:left}"
        ".subnav a{margin-right:.8rem} .sv-content input{padding:.25rem .4rem;border:1px solid #d1d5db;border-radius:.375rem}"
        ".sv-content button{padding:.25rem .6rem;border:1px solid #d1d5db;border-radius:.375rem;background:#fff;cursor:pointer}"
-       ".muted{color:#6b7280} code{background:#f3f4f6;padding:0 .25rem;border-radius:.25rem} form{display:inline}"))
+       ".muted{color:#6b7280} code{background:#f3f4f6;padding:0 .25rem;border-radius:.25rem} form{display:inline}"
+       ".app-access{margin:1.25rem 0;padding-top:.5rem;border-top:1px solid #eef0f3}"
+       ".app-access h2{margin:.25rem 0;font-size:1.05rem} .app-edit{font-weight:400;font-size:.85rem;margin-left:.4rem}"
+       ".access-grid{width:auto;margin:.5rem 0} .access-grid th{font-weight:600}"
+       ".access-grid td.tick{text-align:center} .access-grid input[type=checkbox]{cursor:pointer}"))
 
 (defn- page [user title body]
   (-> (resp/response
@@ -137,36 +141,68 @@
 
 ;; --- Forms -> roles -------------------------------------------------------
 
+(defn- form-view-ids
+  "The view ids of a form (the keys of its :views), for the access picker."
+  [forms-store id]
+  (vec (keys (:views (forms-compile/get-form forms-store id)))))
+
+(defn- access-grid
+  "The role × view access picker for one form: a checkbox to grant each role and,
+   per role, a checkbox per view it may see. Roles offered = those already in use
+   anywhere (minus the implicit :admin) ∪ those already on this form."
+  [forms-store access-store id]
+  (let [view-ids (form-view-ids forms-store id)
+        current  (access/form-access access-store id)          ; {role #{views}}
+        roles    (sort (distinct (concat (map name (disj (access/known-roles access-store) :admin))
+                                         (map name (keys current)))))]
+    [:form {:method "post" :action (str "/admin/forms/" (name id) "/roles")}
+     (security/csrf-field)
+     (into [:table.access-grid
+            (into [:tr [:th "Role"]] (for [v view-ids] [:th (name v)]))]
+           (for [r roles]
+             (let [rk (keyword r), vs (get current rk)]
+               (into [:tr [:td [:label [:input {:type "checkbox" :name "role" :value r
+                                                :checked (boolean (contains? current rk))}]
+                                " " r]]]
+                     (for [v view-ids]
+                       [:td.tick [:input {:type "checkbox" :name (str "v_" r) :value (name v)
+                                          :checked (boolean (and vs (contains? vs v)))}]])))))
+     [:p.muted "Tick a role to grant access; tick the views it may see (none = all views). "
+      "Admins always see everything; a form with no roles is open to all signed-in users."]
+     [:p [:input {:name "new-role" :placeholder "add a new role" :size 16}]
+      " " [:button "Save access"]]]))
+
 (defn forms-page [forms-store access-store users-store]
   (fn [req]
     (page (auth/current-user users-store req) "Forms"
-          [:div
-           [:p.muted "Edit an app's EDN + CSS live, or restrict it to roles "
-            "(space-separated; empty = open to all signed-in users)."]
-           (into [:table [:tr [:th "App"] [:th "Required roles"] [:th] [:th]]]
+          (into [:div
+                 [:p.muted "Grant roles access to each app and scope which views each role can see."]]
+                (concat
                  (for [id (sort-by name (forms/list-forms forms-store))]
-                   [:tr
-                    [:td (or (:title (forms-compile/get-form forms-store id)) (name id)) " "
-                     [:small.muted (name id) (when (forms/css forms-store id) " · styled")]]
-                    [:td
-                     [:form {:method "post" :action (str "/admin/forms/" (name id) "/roles")}
-                      (security/csrf-field)
-                      [:input {:name "roles" :value (roles-str (access/form-roles access-store id)) :size 18}]
-                      " " [:button "Save"]]]
-                    [:td.muted (when (empty? (access/form-roles access-store id)) "open")]
-                    [:td [:a {:href (str "/admin/forms/" (name id) "/edit")} "Edit"]]]))
-           [:h2 "New app"]
-           [:form {:method "post" :action "/admin/forms/new"}
-            (security/csrf-field)
-            [:input {:name "id" :placeholder "app-id (keyword)" :required true}] " "
-            [:input {:name "title" :placeholder "title"}] " "
-            [:button "Create & edit"]]])))
+                   [:section.app-access
+                    [:h2 (or (:title (forms-compile/get-form forms-store id)) (name id))
+                     " " [:small.muted (name id) (when (forms/css forms-store id) " · styled")]
+                     " " [:a.app-edit {:href (str "/admin/forms/" (name id) "/edit")} "Edit EDN/CSS"]
+                     (when (empty? (access/form-access access-store id)) [:small.muted " · open to all"])]
+                    (access-grid forms-store access-store id)])
+                 [[:h2 "New app"]
+                  [:form {:method "post" :action "/admin/forms/new"}
+                   (security/csrf-field)
+                   [:input {:name "id" :placeholder "app-id (keyword)" :required true}] " "
+                   [:input {:name "title" :placeholder "title"}] " "
+                   [:button "Create & edit"]]])))))
 
-(defn set-form-roles [access-store]
+(defn set-form-access [access-store]
   (fn [req]
-    (access/set-form-roles! access-store (get-in req [:path-params :id])
-                            (parse-roles (get-in req [:params :roles])))
-    (resp/redirect "/admin/forms" :see-other)))
+    (let [params   (:params req)
+          ->vec    (fn [x] (cond (nil? x) [] (sequential? x) x :else [x]))
+          roles    (->vec (:role params))
+          new-role (some-> (:new-role params) str/trim not-empty)
+          all      (distinct (cond-> (vec roles) new-role (conj new-role)))
+          views-of (fn [r] (->vec (get params (keyword (str "v_" r)))))
+          amap     (into {} (map (fn [r] [(keyword r) (set (map keyword (views-of r)))])) all)]
+      (access/set-form-access! access-store (get-in req [:path-params :id]) amap)
+      (resp/redirect "/admin/forms" :see-other))))
 
 ;; --- Middleware -----------------------------------------------------------
 
