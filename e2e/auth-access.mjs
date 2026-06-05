@@ -40,7 +40,7 @@ try {
     ? ok('the login form is shown') : bad('no login form on the gate');
   (await anon.locator('button:has-text("New ")').count()) === 0 && (await anon.locator('.doc').count()) === 0
     ? ok('no form-create buttons or documents leak to the anonymous visitor') : bad('forms/documents visible while logged out');
-  for (const path of ['/admin/forms', '/search', '/queue']) {
+  for (const path of ['/admin/forms', '/search', '/queue', '/doc/00000000-0000-0000-0000-000000000000']) {
     await anon.goto(BASE + path);
     anon.url().includes('/login') ? ok(`protected ${path} redirects to /login`) : bad(`${path} not gated: ${anon.url()}`);
   }
@@ -81,6 +81,32 @@ try {
     ? ok(`each radio option is a normal row height (${Math.round(box.height)}px, not ~128px)`)
     : bad(`radio option is absurdly tall: ${box && Math.round(box.height)}px`);
   await uCtx.close();
+
+  step('4. A stale session (the user was deleted) is treated as logged out');
+  // ghost registers and creates a document, then is deleted by an admin. Holding
+  // a session cookie with a now-orphaned :user-id must NOT grant access — the
+  // exact bypass that let a "signed-out" visitor see a document + form list.
+  const ghostCtx = await browser.newContext();
+  const ghost = await ghostCtx.newPage(); watch(ghost, 'ghost');
+  await ensureUser(ghost, 'ghost', 'Ghost User', 'pw');
+  const sse2 = ghost.waitForRequest(r => /\/sse/.test(r.url()), { timeout: 8000 });
+  await ghost.click('button:has-text("New Project Report")'); await ghost.waitForSelector('input[data-bind="project"]'); await sse2;
+  const ghostDoc = ghost.url();
+  ghostDoc.includes('/doc/') ? ok('ghost created a document while logged in') : bad('ghost could not create a doc');
+
+  const adm = await (await browser.newContext()).newPage(); watch(adm, 'admin3');
+  await signIn(adm, 'admin', 'admin');
+  await adm.goto(BASE + '/admin/users');
+  await Promise.all([adm.waitForNavigation(),
+                     adm.locator('tr', { hasText: 'ghost' }).locator('button:has-text("Delete")').click()]);
+  (await adm.locator('tr', { hasText: 'ghost' }).count()) === 0 ? ok('admin deleted the ghost user') : bad('ghost not deleted');
+
+  // ghost's session cookie is now orphaned — every protected route must bounce to /login
+  await ghost.goto(BASE + '/');
+  ghost.url().includes('/login') ? ok('the deleted user\'s session no longer shows the form list (→ /login)') : bad(`stale session still saw the landing: ${ghost.url()}`);
+  await ghost.goto(ghostDoc);
+  ghost.url().includes('/login') ? ok('the deleted user can no longer open their old document (→ /login)') : bad(`stale session still opened the document: ${ghost.url()}`);
+  await ghostCtx.close();
 
   step('Console / page errors');
   pageErrors.length === 0 ? ok('no uncaught page or console errors') : (bad(`${pageErrors.length} error(s):`), pageErrors.forEach(e => console.log('     ' + e)));

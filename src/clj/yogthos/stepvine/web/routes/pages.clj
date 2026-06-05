@@ -85,6 +85,10 @@
      ["/oauth/:provider"          {:get {:handler (oauth/start (:providers oauth))}}]
      ["/oauth/:provider/callback" {:get {:handler (oauth/callback (:providers oauth) users
                                                                   {:exchange-fn (:exchange-fn oauth)})}}]
+     ;; ── protected group: every route below requires a valid session ──────
+     ;; wrap-auth (on the group) resolves the session user — a missing/stale one
+     ;; is bounced to /login; the /doc subtree adds per-document access on top.
+     ["" {:middleware [(partial auth/wrap-auth users)]}
      ;; landing + create (anti-forgery)
      ["/"             (af (page doc/index))]
      ["/form/:id/new" (af (merge (page doc/new-page) (post doc/create)))]
@@ -156,12 +160,13 @@
       ["/coll/:coll/columns-remove"  (ds (post form/coll-columns-remove))]
       ["/coll/:coll/columns-label"   (ds (post form/coll-columns-label))]
       ["/action/:aid"        (ds (post doc/run-export))]
-      ["/build"              (ds (post doc/build))]]]))
+      ["/build"              (ds (post doc/build))]]]]))
 
 (derive :reitit.routes/pages :reitit/routes)
 
 (defmethod ig/init-key :reitit.routes/pages
   [_ opts]
   (fn []
-    ;; wrap-auth gates every page route; it lets /login and /register through
-    ["" {:middleware [auth/wrap-auth]} (page-routes opts)]))
+    ;; page-routes itself splits public (login/register/oauth) from a protected
+    ;; group whose wrap-auth requires a valid session.
+    (page-routes opts)))

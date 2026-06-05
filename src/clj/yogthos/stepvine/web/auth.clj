@@ -107,14 +107,27 @@
 
 (def ^:private public-paths #{"/login" "/register"})
 
+(defn- public?
+  "Pre-login routes that bypass the gate: the auth pages, the OAuth flow, and the
+   /api subtree (its own concern)."
+  [req]
+  (let [uri (or (:uri req) "")]
+    (or (contains? public-paths uri)
+        (str/starts-with? uri "/api")
+        (str/starts-with? uri "/oauth"))))
+
 (defn wrap-auth
-  "Redirect unauthenticated requests for protected pages to /login. Public:
-   /login, /register, and the /api subtree (its own concern)."
-  [handler]
+  "Gate every non-public route behind a *valid* session: the request must resolve
+   to a user that still exists in the store. A session carrying a `:user-id` that
+   no longer matches a user (the user was deleted, or the store was reset) is NOT
+   treated as authenticated — merely holding an id is not enough; the stale
+   session is cleared and the visitor is sent to /login. The resolved user is
+   threaded onto the request as `:identity` for downstream handlers."
+  [users-store handler]
   (fn [req]
-    (if (or (contains? public-paths (:uri req))
-            (str/starts-with? (or (:uri req) "") "/api")
-            (str/starts-with? (or (:uri req) "") "/oauth")   ; OAuth flow is pre-login
-            (auth/authenticated? req))
+    (if (public? req)
       (handler req)
-      (resp/redirect "/login" :see-other))))
+      (if-let [user (auth/current-user users-store req)]
+        (handler (assoc req :identity user))
+        (-> (resp/redirect "/login" :see-other)
+            (assoc :session nil))))))            ; drop the stale/invalid session
