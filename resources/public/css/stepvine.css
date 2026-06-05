@@ -190,6 +190,21 @@ body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #
 .table-page-btn { padding: .25rem .5rem; border: 1px solid #d1d5db; border-radius: .375rem; background: #fff; cursor: pointer; }
 .table-page-btn:hover { background: #f3f4f6; }
 
+/* Keep a vertical table's columns inside the container: fixed layout divides the
+   width across columns (the row-controls column stays narrow) instead of letting
+   wide cells grow the table past the page. A safety net of horizontal scroll
+   handles the genuinely-too-many-columns case rather than overflowing the body. */
+.widget-table { max-width: 100%; overflow-x: auto; }
+.widget-table-vertical .table { table-layout: fixed; }
+.widget-table-vertical .table th, .widget-table-vertical .table td { vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+.widget-table-row-controls { width: 3.25rem; white-space: nowrap; }
+/* a table cell hosts a field widget — drop the form-row chrome (the 8rem
+   right-aligned label + flex row), since the column header already names the
+   field, and let the control fill the cell. */
+.widget-table td .field, .widget-table td .widget { display: block; margin: 0; gap: 0; }
+.widget-table td .field > label { display: none; }
+.widget-table td .field input, .widget-table td .field select, .widget-table td .field textarea { width: 100%; box-sizing: border-box; }
+
 /* ── Checkbox-enabled ─────────────────────────────────────────────────── */
 .checkbox-enabled input[type="text"] { margin-left: .5rem; }
 
