@@ -7,6 +7,19 @@
     </linearGradient>
   </defs>
 
+  <!-- Colors adapt to the viewer's theme: GitHub renders this as an <img>, but
+       browsers still apply prefers-color-scheme inside the SVG. -->
+  <style>
+    .vine { stroke: #1B4332; }
+    .step { fill: #212529; }
+    .vinew { fill: #2D6A4F; }
+    @media (prefers-color-scheme: dark) {
+      .vine { stroke: #74C69D; }
+      .step { fill: #F1F8F5; }
+      .vinew { fill: #74C69D; }
+    }
+  </style>
+
   <g transform="translate(20, 25)">
     <!-- Form field steps -->
     <rect x="0" y="50" width="44" height="22" rx="6" fill="#F1F8F5" stroke="#D5E8DD" stroke-width="1.5"/>
@@ -14,7 +27,7 @@
     <rect x="44" y="0" width="44" height="22" rx="6" fill="#D5E8DD" stroke="#A8D1BC" stroke-width="1.5"/>
 
     <!-- Continuous ivy vine -->
-    <path d="M -5 70 Q 10 70 20 55 T 44 32 T 66 11 T 88 -5" fill="none" stroke="#1B4332" stroke-width="4.5" stroke-linecap="round"/>
+    <path class="vine" d="M -5 70 Q 10 70 20 55 T 44 32 T 66 11 T 88 -5" fill="none" stroke-width="4.5" stroke-linecap="round"/>
 
     <!-- Positioned leaves -->
     <use href="#ivyLeaf" transform="translate(32, 44) rotate(-45) scale(0.7)" fill="url(#leafGrad)"/>
@@ -24,6 +37,6 @@
 
   <!-- Wordmark -->
   <text x="140" y="78" font-size="56" font-weight="800" letter-spacing="-2">
-    <tspan fill="#212529">step</tspan><tspan fill="#2D6A4F">vine</tspan>
+    <tspan class="step">step</tspan><tspan class="vinew">vine</tspan>
   </text>
 </svg>
