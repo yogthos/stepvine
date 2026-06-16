@@ -1,5 +1,9 @@
 # Stepvine
 
+<p align="center">
+  <img src="stepvine_logo.svg" alt="Stepvine logo" width="420" height="120">
+</p>
+
 **Stepvine is a server-authoritative reactive form & app builder.** Forms are
 described as data (EDN), their logic runs entirely on the server, and the browser
 is a *dumb terminal*: inputs two-way–bind to server-owned signals over

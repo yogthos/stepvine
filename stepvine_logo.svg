@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" width="420" height="120">
+  <defs>
+    <path id="ivyLeaf" d="M 0 10 C -12 10 -16 -2 0 -18 C 16 -2 12 10 0 10 Z" />
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#74C69D"/>
+      <stop offset="100%" stop-color="#2D6A4F"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(20, 25)">
+    <!-- Form field steps -->
+    <rect x="0" y="50" width="44" height="22" rx="6" fill="#F1F8F5" stroke="#D5E8DD" stroke-width="1.5"/>
+    <rect x="22" y="25" width="44" height="22" rx="6" fill="#E3F0E9" stroke="#C2DFD0" stroke-width="1.5"/>
+    <rect x="44" y="0" width="44" height="22" rx="6" fill="#D5E8DD" stroke="#A8D1BC" stroke-width="1.5"/>
+
+    <!-- Continuous ivy vine -->
+    <path d="M -5 70 Q 10 70 20 55 T 44 32 T 66 11 T 88 -5" fill="none" stroke="#1B4332" stroke-width="4.5" stroke-linecap="round"/>
+
+    <!-- Positioned leaves -->
+    <use href="#ivyLeaf" transform="translate(32, 44) rotate(-45) scale(0.7)" fill="url(#leafGrad)"/>
+    <use href="#ivyLeaf" transform="translate(56, 21) rotate(135) scale(0.75)" fill="url(#leafGrad)"/>
+    <use href="#ivyLeaf" transform="translate(86, -3) rotate(45) scale(0.95)" fill="url(#leafGrad)"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="140" y="78" font-size="56" font-weight="800" letter-spacing="-2">
+    <tspan fill="#212529">step</tspan><tspan fill="#2D6A4F">vine</tspan>
+  </text>
+</svg>
