@@ -83,12 +83,12 @@ Headless-browser walkthroughs of the major features:
   edit → preview chart → generate PDF → submit → list → revise → resubmit)
 - `access.mjs` — the admin per-role view-access picker and its enforcement
 
-```bash
-cd e2e && npm install && npx playwright install chromium   # one-time
-
-make e2e          # boots a fresh dev server, runs all storyboards, restores data/
-                  #   (bb e2e  |  bash e2e/run.sh)
-make e2e ARGS="document-flow access"   # a subset (bb e2e document-flow access)
+```bashc
+d e2e && npm install && npx playwright install chromium # one-time
+cd ..                                                   # return to root
+make e2e                                                # boots a fresh dev server, runs all storyboards, restores data/
+                                                        # (bb e2e  |  bash e2e/run.sh)
+make e2e ARGS="document-flow access"                    # a subset (bb e2e document-flow access)
 ```
 
 `make e2e` is self-contained — it starts `clj -M:dev` on a freshly-seeded store
